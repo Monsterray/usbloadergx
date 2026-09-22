@@ -9,9 +9,9 @@ usbloader_gx/
 /source/version.h
 /usbloader_gx.zip
 
-# Agent-facing orientation notes, not project source. The procedure they point
-# at is tracked in .claude/skills/, which is portable; this file is not.
+# AI agent files: workstation-local, never part of the project.
 AGENTS.md
+.claude/
 
 # Local MCP server registration: holds a workstation-specific absolute path to
 # the codebase-memory binary, so it would not work anywhere else.

@@ -707,7 +707,7 @@ class GuiText: public GuiElement
 		int currentSize;
 		int linestodraw;
 		wchar_t passChar;
-		bool widescreen;
+		bool widescreen = false;
 };
 
 //!Display, manage, and manipulate tooltips in the GUI.

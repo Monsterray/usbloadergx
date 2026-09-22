@@ -183,7 +183,7 @@ void StartUpProcess::SetTextf(const char *format, ...)
 	if ((vasprintf(&tmp, format, va) >= 0) && tmp)
 	{
 		TextFade(-40);
-		gprintf(tmp);
+		gprintf("%s", tmp);
 		messageTxt->SetText(tmp);
 		TextFade(40);
 	}
@@ -248,23 +248,27 @@ bool StartUpProcess::USBSpinUp()
 int StartUpProcess::Run(int argc, char *argv[])
 {
 	bool isBadBoot = false;
+	//! Not every loader passes an argument, so there may be no path at all
+	static char noPath[] = "";
+	char *bootPath = (argc > 0 && argv && argv[0]) ? argv[0] : noPath;
+
 	// A normal launch should always have the first arg be the path
-	char *ptr = strrchr(argv[0], '/');
-	if (ptr && (argv[0][2] == ':' || argv[0][3] == ':'))
+	char *ptr = strrchr(bootPath, '/');
+	if (ptr && (bootPath[2] == ':' || bootPath[3] == ':'))
 	{
 		*ptr = 0;
 		// HBC doesn't specify the USB port
-		if (strncmp(argv[0], "usb", 3) == 0)
+		if (strncmp(bootPath, "usb", 3) == 0)
 		{
 			snprintf(Settings.BootDevice, sizeof(Settings.BootDevice), "usb1:");
-			snprintf(Settings.ConfigPath, sizeof(Settings.ConfigPath), "usb1:%s/", argv[0] + 4);
+			snprintf(Settings.ConfigPath, sizeof(Settings.ConfigPath), "usb1:%s/", bootPath + 4);
 		}
-		else if (strncmp(argv[0], "sd", 2) == 0)
-			snprintf(Settings.ConfigPath, sizeof(Settings.ConfigPath), "%s/", argv[0]);
+		else if (strncmp(bootPath, "sd", 2) == 0)
+			snprintf(Settings.ConfigPath, sizeof(Settings.ConfigPath), "%s/", bootPath);
 		gprintf("Loader path: %s\n", Settings.ConfigPath);
 	}
 	// Priiloader breaks updates and passes outdated meta.xml info
-	else if (strncmp(argv[0], "/title/00000001/", 16) == 0)
+	else if (strncmp(bootPath, "/title/00000001/", 16) == 0)
 		isBadBoot = true;
 
 	int quickGameBoot = ParseArguments(argc, argv);

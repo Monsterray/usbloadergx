@@ -235,6 +235,25 @@ s32 IosLoader::ReloadIosKeepingRights(s32 ios)
 	return IOS_ReloadIOS(ios);
 }
 
+//! The furthest byte any of the matches below reads, counted from i.
+#define MIOS_MATCH_LEN 52
+
+/*
+ * Copy a string out of the .app into a buffer that is terminated. The source is
+ * a file, so it carries no terminator of its own.
+ */
+static char *CopyReleaseDate(char *dst, size_t size, const u8 *src)
+{
+	size_t i = 0;
+	while(i + 1 < size && src[i] != 0)
+	{
+		dst[i] = (char) src[i];
+		++i;
+	}
+	dst[i] = 0;
+	return dst;
+}
+
 /*
  * Check if MIOS is DIOS MIOS, DIOS MIOS Lite or official MIOS.
  */
@@ -250,14 +269,17 @@ u8 IosLoader::GetMIOSInfo()
 
 	u8 *appfile = NULL;
 	u32 filesize = 0;
+	char releaseDate[24];
 
 	// "title/00000001/00000101/content/0000000b.app" contains DM/DML version and built date, but is not always accurate.
 	// so we are looking inside 0000000c.app to find the correct version.
 	NandTitle::LoadFileFromNand("/title/00000001/00000101/content/0000000c.app", &appfile, &filesize);
 
-	if(appfile)
+	//! Every read below the match goes up to 52 bytes past i, and filesize-4
+	//! wraps for a file shorter than four bytes.
+	if(appfile && filesize > MIOS_MATCH_LEN)
 	{
-		for(u32 i = 0; i < filesize-4; ++i)
+		for(u32 i = 0; i + MIOS_MATCH_LEN <= filesize; ++i)
 		{
 			if((*(u32*)(appfile+i)) == 'DIOS' && (*(u32*)(appfile+i+5)) == 'MIOS')
 			{
@@ -265,20 +287,21 @@ u8 IosLoader::GetMIOSInfo()
 				{
 					currentMIOS = DIOS_MIOS_LITE;
 					gprintf("DIOS MIOS Lite ");
-					currentDMLVersion = GetDMLVersion((char*)(appfile+i+31));
+					currentDMLVersion = GetDMLVersion(CopyReleaseDate(releaseDate, sizeof(releaseDate), appfile+i+31));
 				}
 				else
 				{
 					currentMIOS = DIOS_MIOS;
 					gprintf("DIOS MIOS ");
-					currentDMLVersion = GetDMLVersion((char*)(appfile+i+27));
+					currentDMLVersion = GetDMLVersion(CopyReleaseDate(releaseDate, sizeof(releaseDate), appfile+i+27));
 				}
 				break;
 			}
 			else if((*(u32*)(appfile+i)) == 'Quad' && (*(u32*)(appfile+i+4)) == 'Forc')
 			{
 				currentMIOS = QUADFORCE;
-				char* QF_version = (char*)(appfile+i+10);
+				char QF_version[8];
+				CopyReleaseDate(QF_version, sizeof(QF_version), appfile+i+10);
 				gprintf("QuadForce v%.1f \n", atof(QF_version));
 				if(atof(QF_version) >= 4.0)			currentDMLVersion = DML_VERSION_QUAD_4_0;
 				else if(atof(QF_version) == 3.0)	currentDMLVersion = DML_VERSION_QUAD_3_0;
@@ -614,6 +637,12 @@ iosinfo_t *IosLoader::GetIOSInfo(s32 ios)
 		return NULL;
 	}
 
+	if (TMD_Length <= 0x1E7)
+	{
+		free(TMD);
+		return NULL;
+	}
+
 	snprintf(filepath, sizeof(filepath), "/title/00000001/%08x/content/%08x.app", (u8)ios, *(u8 *)((u32)TMD+0x1E7));
 	free(TMD);
 
@@ -622,7 +651,8 @@ iosinfo_t *IosLoader::GetIOSInfo(s32 ios)
 
 	NandTitle::LoadFileFromNand(filepath, (u8**)&buffer, &filesize);
 
-	if (!buffer || filesize == 0)
+	//! IsD2XBase() reads info->name and info->baseios out of this
+	if (!buffer || filesize < sizeof(iosinfo_t))
 	{
 		if (buffer)
 			free(buffer);

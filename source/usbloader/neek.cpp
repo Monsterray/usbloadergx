@@ -88,7 +88,7 @@ bool neekLoadKernel (const char* nandpath)
 	//((ioshdr*)kernel)->argument = 0x42; // set argument size
 	DCFlushRange(kernel, fsize);
 	
-	gprintf("Loaded to 0x%08x, size: %d\n", kernel, fsize);
+	gprintf("Loaded to 0x%08x, size: %ld\n", (u32) kernel, fsize);
 	gprintf("NEEK: offset memory address: %08x\n", (u32)kernel - 0x80000000);	// offset
 	
 	fclose(f);

@@ -11,7 +11,7 @@ extern "C"
 
 #ifndef NO_DEBUG
 	//use this just like printf();
-	void gprintf(const char *str, ...);
+	void gprintf(const char *str, ...) __attribute__((format(printf, 1, 2)));
 	bool InitGecko();
 	void hexdump(void *d, int len);
 	void USBGeckoOutput();

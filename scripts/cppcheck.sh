@@ -6,6 +6,12 @@
 #   scripts/cppcheck.sh unused     # whole-program unusedFunction pass (single-threaded, slower)
 #
 # Third-party code (source/xml, source/libs, source/utils/minizip, source/mload/modules) is skipped.
+# Some checks are suppressed because they describe the style this codebase and libogc are
+# written in rather than a defect, and cppcheck 2.19 onwards reports them in the hundreds:
+# dangerousTypeCast (every old-style C cast), uninitMemberVarNoCtor (plain structs with no
+# constructor), noCopyConstructor / noOperatorEq / duplInheritedMember, and the two
+# performance notes about prefix operators and initialiser lists. uninitMemberVar, which
+# reports real classes, stays on. Hits inside the toolchain headers are dropped as well.
 # LIBOGC_INC must point at a libogc include directory so ATTRIBUTE_ALIGN and friends parse;
 # without it cppcheck silently drops functions from files it could not parse and the
 # unused-function list is wrong. Default: C:/devkitPro/libogc/include on Windows.
@@ -18,7 +24,12 @@ if ! command -v "$CPPCHECK" >/dev/null 2>&1; then
 fi
 LIBOGC_INC="${LIBOGC_INC:-/c/devkitPro/libogc/include}"
 
-COMMON=(-q --suppress=missingInclude --suppress=missingIncludeSystem
+SUPPRESS=(--suppress=dangerousTypeCast --suppress=uninitMemberVarNoCtor
+	--suppress=noCopyConstructor --suppress=noOperatorEq --suppress=duplInheritedMember
+	--suppress=postfixOperator --suppress=useInitializationList
+	"--suppress=*:$LIBOGC_INC/*" "--suppress=*:$ROOT/portlibs/include/*")
+
+COMMON=(-q --suppress=missingInclude --suppress=missingIncludeSystem "${SUPPRESS[@]}"
 	--template='{file}:{line}:{severity}:{id}:{message}'
 	-DGEKKO -DHW_RVL -I "$ROOT/source" -I "$ROOT/portlibs/include" -I "$LIBOGC_INC"
 	-i "$ROOT/source/xml" -i "$ROOT/source/libs" -i "$ROOT/source/utils/minizip" -i "$ROOT/source/mload/modules")

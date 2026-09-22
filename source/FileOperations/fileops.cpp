@@ -62,7 +62,7 @@ extern "C" bool CheckFile(const char * filepath)
 	char dirnoslash[strlen(filepath)+2];
 	snprintf(dirnoslash, sizeof(dirnoslash), "%s", filepath);
 
-	while(dirnoslash[strlen(dirnoslash)-1] == '/')
+	while(strlen(dirnoslash) > 0 && dirnoslash[strlen(dirnoslash)-1] == '/')
 		dirnoslash[strlen(dirnoslash)-1] = '\0';
 
 	char * notRoot = strrchr(dirnoslash, '/');
@@ -196,7 +196,7 @@ extern "C" bool CreateSubfolder(const char * fullpath)
 	strcpy(dirnoslash, fullpath);
 
 	int pos = strlen(dirnoslash)-1;
-	while(dirnoslash[pos] == '/')
+	while(pos >= 0 && dirnoslash[pos] == '/')
 	{
 		dirnoslash[pos] = '\0';
 		pos--;

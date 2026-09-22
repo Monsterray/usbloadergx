@@ -37,12 +37,12 @@ BASE_LDFLAGS='-ggdb $(MACHDEP) -Wl,-Map,$(notdir $@).map,--section-start,.init=0
 case "$MODE" in
 	warnings)
 		CF="$BASE_CFLAGS -Wformat=2 -Wno-format-nonliteral -Wnull-dereference -Wduplicated-cond -Wlogical-op -Wshadow=local -Wcast-align -Wimplicit-fallthrough=3"
-		SCRIPT='cp -r /src /w && cd /w && rm -rf build && make release -j"$(nproc)" CFLAGS="$CF" 2>&1 | grep -E "warning:" | grep -v "^/opt/|portlibs/" | sed -E "s|^/w/||" | sort -u'
+		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make release -j"$(nproc)" CFLAGS="$CF" 2>&1 | grep -E "warning:" | grep -v "^/opt/|portlibs/" | sed -E "s|^/w/||" | sort -u'
 		;;
 	gc-sections)
 		CF="$BASE_CFLAGS -ffunction-sections -fdata-sections"
 		LF="$BASE_LDFLAGS,--gc-sections,--print-gc-sections"
-		SCRIPT='cp -r /src /w && cd /w && rm -rf build && make release -j"$(nproc)" CFLAGS="$CF" LDFLAGS="$LF" 2>&1 | grep -i "removing unused" | grep -v "portlibs/\|/opt/" | sed -E "s/.*section .(\.[a-z]+)\.([^ ]*). in file .([^ ]*)\.o.*/\3 \1 \2/" | while read -r f s n; do echo "$f $s $(echo "$n" | powerpc-eabi-c++filt)"; done'
+		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make release -j"$(nproc)" CFLAGS="$CF" LDFLAGS="$LF" 2>&1 | grep -i "removing unused" | grep -v "portlibs/\|/opt/" | sed -E "s/.*section .(\.[a-z]+)\.([^ ]*). in file .([^ ]*)\.o.*/\3 \1 \2/" | while read -r f s n; do echo "$f $s $(echo "$n" | powerpc-eabi-c++filt)"; done'
 		;;
 	*)
 		echo "Usage: $0 [warnings|gc-sections]" >&2

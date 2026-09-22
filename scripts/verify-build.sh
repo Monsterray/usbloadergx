@@ -33,14 +33,22 @@ if [ "${GX_IN_CONTAINER:-}" != "1" ]; then
 fi
 
 # ---- inside the container, on a throwaway copy ----------------------------
-cp -r /src /w && cd /w && rm -rf build boot.dol boot.elf usbloader_gx usbloader_gx.zip
+mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && rm -f boot.dol boot.elf
 J="$(nproc)"
 fail=0
 ok()  { echo "PASS: $1"; }
 bad() { echo "FAIL: $1"; fail=1; }
 
 echo "=== make all on a clean tree"
-if make all -j"$J" >/tmp/all.log 2>&1 && [ -s boot.dol ]; then ok "make all"; else bad "make all"; tail -5 /tmp/all.log; fi
+# "all" builds the binary and then the language and theme files. The language
+# step needs xgettext and msgmerge, which the CI image does not carry: Windows
+# contributors get them from the bundled gettext-bin. Check whichever half this
+# machine can actually run, and say so.
+if command -v xgettext >/dev/null 2>&1 && command -v msgmerge >/dev/null 2>&1; then
+	if make all -j"$J" >/tmp/all.log 2>&1 && [ -s boot.dol ]; then ok "make all"; else bad "make all"; tail -5 /tmp/all.log; fi
+else
+	if make -j"$J" >/tmp/all.log 2>&1 && [ -s boot.dol ]; then ok "make on a clean tree (no gettext here, so the lang step of 'all' is not covered)"; else bad "make on a clean tree"; tail -5 /tmp/all.log; fi
+fi
 
 echo
 echo "=== switching build mode starts from clean"

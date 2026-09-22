@@ -222,25 +222,53 @@ struct BNSDecObj
 	s16 coeff[8][2];
 };
 
-static void loadBNSInfo(BNSInfo &bnsInfo, const u8 *buffer)
+//! avail is how many bytes of the file are left from the start of the INFO chunk.
+//! Every offset used below is a value the file chose, so each read is checked
+//! against avail before it is made into a pointer.
+static void loadBNSInfo(BNSInfo &bnsInfo, const u8 *buffer, u32 avail)
 {
-	const u8 *ptr = buffer + 8;
-	bnsInfo = *(const BNSInfo *)buffer;
+	memset(&bnsInfo, 0, sizeof(BNSInfo));
+	memcpy(&bnsInfo, buffer, avail < sizeof(BNSInfo) ? avail : sizeof(BNSInfo));
+
 	if (bnsInfo.offsetToChanStarts == 0x18 && bnsInfo.chan1StartOffset == 0x20 && bnsInfo.chan2StartOffset == 0x2C
 		&& bnsInfo.coeff1Offset == 0x38 && bnsInfo.coeff2Offset == 0x68)
 		return;
+
+	const u8 *ptr = buffer + 8;
+	const u32 ptrAvail = (avail > 8) ? avail - 8 : 0;
+	//! One whole per channel block: the coefficients and the gain and scale
+	//! fields that follow them.
+	const u32 coeffSize = (u32)((u8 *)bnsInfo.coefficients2 - (u8 *)&bnsInfo.coefficients1);
+
+	if ((u64)bnsInfo.offsetToChanStarts + 4 > ptrAvail)
+		return;
 	bnsInfo.chan1StartOffset = *(const u32 *)(ptr + bnsInfo.offsetToChanStarts);
+
+	if ((u64)bnsInfo.chan1StartOffset + 8 > ptrAvail)
+		return;
 	bnsInfo.chan1Start = *(const u32 *)(ptr + bnsInfo.chan1StartOffset);
 	bnsInfo.coeff1Offset = *(const u32 *)(ptr + bnsInfo.chan1StartOffset + 4);
+
+	if ((u64)bnsInfo.coeff1Offset + coeffSize > ptrAvail)
+		return;
 	if ((u8 *)bnsInfo.coefficients1 != ptr + bnsInfo.coeff1Offset)
-		memcpy(bnsInfo.coefficients1, ptr + bnsInfo.coeff1Offset, (u8 *)bnsInfo.coefficients2 - (u8 *)&bnsInfo.coefficients1);
+		memcpy(bnsInfo.coefficients1, ptr + bnsInfo.coeff1Offset, coeffSize);
+
 	if (bnsInfo.chanCount == 2)
 	{
+		if ((u64)bnsInfo.offsetToChanStarts + 8 > ptrAvail)
+			return;
 		bnsInfo.chan2StartOffset = *(const u32 *)(ptr + bnsInfo.offsetToChanStarts + 4);
+
+		if ((u64)bnsInfo.chan2StartOffset + 8 > ptrAvail)
+			return;
 		bnsInfo.chan2Start = *(const u32 *)(ptr + bnsInfo.chan2StartOffset);
 		bnsInfo.coeff2Offset = *(const u32 *)(ptr + bnsInfo.chan2StartOffset + 4);
+
+		if ((u64)bnsInfo.coeff2Offset + coeffSize > ptrAvail)
+			return;
 		if ((u8 *)bnsInfo.coefficients2 != ptr + bnsInfo.coeff2Offset)
-			memcpy(bnsInfo.coefficients2, ptr + bnsInfo.coeff2Offset, (u8 *)bnsInfo.coefficients2 - (u8 *)&bnsInfo.coefficients1);
+			memcpy(bnsInfo.coefficients2, ptr + bnsInfo.coeff2Offset, coeffSize);
 	}
 }
 
@@ -316,19 +344,28 @@ SoundBlock DecodefromBNS(const u8 *buffer, u32 size)
 	SoundBlock OutBlock;
 	memset(&OutBlock, 0, sizeof(SoundBlock));
 
-	const BNSHeader &hdr = *(BNSHeader *)buffer;
-	if (size < sizeof hdr)
+	if (size < sizeof(BNSHeader))
 		return OutBlock;
+
+	const BNSHeader &hdr = *(BNSHeader *)buffer;
 	if (hdr.fccBNS != 'BNS ')
 		return OutBlock;
+
+	//! Check both offsets and both sizes before either one becomes a pointer.
+	//! The sums are done in 64 bit because a u32 pair can wrap past the check.
+	if (size < hdr.size
+		|| (u64)hdr.infoOffset + hdr.infoSize > size
+		|| (u64)hdr.dataOffset + hdr.dataSize > size
+		|| hdr.infoSize < 0x60 || hdr.dataSize < sizeof(BNSData))
+		return OutBlock;
+
 	// Find info and data
 	BNSInfo infoChunk;
-	loadBNSInfo(infoChunk, buffer + hdr.infoOffset);
+	loadBNSInfo(infoChunk, buffer + hdr.infoOffset, size - hdr.infoOffset);
 	const BNSData &dataChunk = *(const BNSData *)(buffer + hdr.dataOffset);
-	// Check sizes
-	if (size < hdr.size || size < hdr.infoOffset + hdr.infoSize || size < hdr.dataOffset + hdr.dataSize
-		|| hdr.infoSize < 0x60 || hdr.dataSize < sizeof dataChunk
-		|| infoChunk.size != hdr.infoSize || dataChunk.size > hdr.dataSize)
+
+	//! decodeBNS() takes size - 8 as a block count, so a size below 8 wraps.
+	if (infoChunk.size != hdr.infoSize || dataChunk.size > hdr.dataSize || dataChunk.size < 8)
 		return OutBlock;
 	// Check format
 	if (infoChunk.codecNum != 0)	// Only codec i've found : 0 = ADPCM. Maybe there's also 1 and 2 for PCM 8 or 16 bits ?
@@ -364,6 +401,14 @@ SoundBlock DecodefromBNS(const u8 *buffer, u32 size)
 	OutBlock.loopStart = infoChunk.loopStart;
 	OutBlock.loopEnd = infoChunk.loopEnd;
 	OutBlock.loopFlag = infoChunk.loopFlag;
+
+	//! Read() turns both of these into an offset into the decoded buffer, so a
+	//! loop point the file made up has to be cut down to what was decoded.
+	u32 factor = (format == VOICE_STEREO_16BIT) ? 4 : 2;
+	if (OutBlock.loopEnd > length / factor)
+		OutBlock.loopEnd = length / factor;
+	if (OutBlock.loopStart >= OutBlock.loopEnd)
+		OutBlock.loopFlag = 0;
 
 	return OutBlock;
 }

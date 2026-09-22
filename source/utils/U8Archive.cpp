@@ -30,7 +30,10 @@
 U8Archive::U8Archive(const u8 *stuff, u32 len )
 	: fst( NULL ),
 	  name_table( NULL ),
-	  data( NULL )
+	  data( NULL ),
+	  fst_count( 0 ),
+	  name_table_len( 0 ),
+	  data_len( 0 )
 {
 	if( stuff )
 	{
@@ -43,24 +46,48 @@ void U8Archive::SetData( const u8 *stuff, u32 len )
 	fst = NULL;
 	name_table = NULL;
 	data = NULL;
+	fst_count = 0;
+	name_table_len = 0;
+	data_len = 0;
 	if( !stuff || len < 0x40 )
 	{
 		gprintf( "SetData(): !stuff || len < 0x40  %p %08x\n", stuff, len );
 		return;
 	}
-	stuff = FindU8Tag( stuff, len );
-	if( !stuff )
+	const u8 *base = FindU8Tag( stuff, len );
+	if( !base )
 	{
 		gprintf( "U8 tag not found\n" );
 		return;
 	}
-	const U8Header * binHdr = (const U8Header *)stuff;
 
-	const u8* fst_buffer = stuff + binHdr->rootNodeOffset;
+	//! Offsets below are relative to the tag, so drop whatever came before it.
+	len -= (u32)( base - stuff );
+
+	const U8Header * binHdr = (const U8Header *)base;
+
+	if( (u64)binHdr->rootNodeOffset + sizeof( FstEntry ) > len )
+	{
+		gprintf( "U8: root node is outside the archive\n" );
+		return;
+	}
+
+	const u8* fst_buffer = base + binHdr->rootNodeOffset;
+	const FstEntry *root = (const FstEntry *)fst_buffer;
+	u64 name_table_offset = (u64)root->filelen * 0xC;
+
+	if( (u64)binHdr->rootNodeOffset + name_table_offset > len )
+	{
+		gprintf( "U8: fst is outside the archive\n" );
+		return;
+	}
+
 	fst = (FstEntry *)fst_buffer;
-	u32 name_table_offset = fst->filelen * 0xC;
+	fst_count = root->filelen;
 	name_table = (char *)( fst_buffer + name_table_offset );
-	data = (u8*)stuff;
+	name_table_len = len - binHdr->rootNodeOffset - (u32)name_table_offset;
+	data = (u8*)base;
+	data_len = len;
 }
 
 const u8 *U8Archive::FindU8Tag( const u8* stuff, u32 len )
@@ -102,9 +129,14 @@ u8 *U8Archive::GetFile( const char *path, u32 *size ) const
 		//gprintf( "U8: entry wasn\'t found in the archive  \"%s\"\n", path );
 		return NULL;
 	}
-	if( fst[ entryNo ].filetype )
+	if( (u32)entryNo >= fst_count || fst[ entryNo ].filetype )
 	{
 		gprintf( "U8: \"%s\" is a folder\n", path );
+		return NULL;
+	}
+	if( !InArchive( fst[ entryNo ].fileoffset, fst[ entryNo ].filelen ) )
+	{
+		gprintf( "U8: \"%s\" points outside the archive\n", path );
 		return NULL;
 	}
 	if( size )
@@ -121,9 +153,14 @@ u8 *U8Archive::GetFile( u32 fstIdx, u32 *size ) const
 		return NULL;
 	}
 
-	if( fstIdx >= fst[0].filelen || fst[ fstIdx ].filetype )
+	if( fstIdx >= fst_count || fst[ fstIdx ].filetype )
 	{
 		gprintf( "%i is a folder\n", fstIdx );
+		return NULL;
+	}
+
+	if( !InArchive( fst[ fstIdx ].fileoffset, fst[ fstIdx ].filelen ) )
+	{
 		return NULL;
 	}
 
@@ -251,13 +288,17 @@ u32 U8Archive::FileDescriptor( const char *path ) const
 
 u8* U8Archive::GetFileFromFd( u32 fd, u32 *size )const
 {
-	if( !fst || !name_table || fd >= fst[ 0 ].filelen )
+	if( !fst || !name_table || fd >= fst_count )
 	{
 		return NULL;
 	}
 	if( fst[ fd ].filetype )
 	{
 		gprintf( "U8: \"%s\" is a folder\n", FstName( &fst[ fd ] ) );
+		return NULL;
+	}
+	if( !InArchive( fst[ fd ].fileoffset, fst[ fd ].filelen ) )
+	{
 		return NULL;
 	}
 	if( size )
@@ -269,12 +310,20 @@ u8* U8Archive::GetFileFromFd( u32 fd, u32 *size )const
 
 char *U8Archive::FstName( const FstEntry *entry ) const
 {
-	if( entry == &fst[ 0 ] )
+	if( !fst || !name_table || entry == &fst[ 0 ] )
 	{
 		return NULL;
 	}
 
-	return (char*)name_table + ( *((u32 *)entry) & 0x00ffffff );
+	//! The name offset is 24 bits out of the archive, so it can point anywhere
+	//! up to 16 MB past the table.
+	u32 offset = *((u32 *)entry) & 0x00ffffff;
+	if( offset >= name_table_len )
+	{
+		return NULL;
+	}
+
+	return (char*)name_table + offset;
 }
 
 int U8Archive::strcasecmp_slash( const char *s1, const char *s2 )
@@ -303,8 +352,11 @@ int U8Archive::strlen_slash( const char *s )
 
 u32 U8Archive::NextEntryInFolder( u32 current, u32 directory ) const
 {
+	if( !fst || current >= fst_count || directory >= fst_count )
+		return 0;
+
 	u32 next = ( fst[ current ].filetype ? fst[ current ].filelen : current + 1 );
-	if( next < fst[ directory ].filelen )
+	if( next < fst[ directory ].filelen && next < fst_count )
 		return next;
 
 	return 0;
@@ -318,21 +370,25 @@ s32 U8Archive::EntryFromPath( const char *path, int d ) const
 		path++;
 	}
 
-	if( !fst[ d ].filetype )
+	if( !fst || d < 0 || (u32)d >= fst_count || !fst[ d ].filetype )
 	{
-		gprintf("ERROR!!  %s is not a directory\n", FstName( &fst[ d ] ) );
+		gprintf("ERROR!!  %s is not a directory\n", ( fst && (u32)d < fst_count ) ? FstName( &fst[ d ] ) : NULL );
 		return -1;
 	}
 
 	u32 next = d + 1;
 
-	FstEntry *entry = &fst[ next ];
-
-	while( next )
+	while( next && next < fst_count )
 	{
+		FstEntry *entry = &fst[ next ];
+		char *name = FstName( entry );
+
 		//does this entry match.
 		//strlen_slash is used because if looking for "dvd:/gameboy/" it would return a false positive if it hit "dvd:/gameboy advance/" first
-		if( !strcasecmp_slash( path, FstName( entry ) ) && ( strlen( FstName( entry ) ) == (u32)strlen_slash( path ) ) )
+		//! The name table is not guaranteed to terminate the last name, so the
+		//! length is taken against what is left of the table.
+		u32 nameMax = name ? name_table_len - (u32)( name - name_table ) : 0;
+		if( name && !strcasecmp_slash( path, name ) && ( strnlen( name, nameMax ) == (u32)strlen_slash( path ) ) )
 		{
 			char *slash = strchr( path, '/' );
 			if( slash && *( slash + 1 ) )
@@ -346,7 +402,6 @@ s32 U8Archive::EntryFromPath( const char *path, int d ) const
 
 		//find the next entry in this folder
 		next = NextEntryInFolder( next, d );
-		entry = &fst[ next ];
 	}
 
 	//no entry with the given path was found
@@ -381,11 +436,10 @@ bool U8NandArchive::SetFile( const char* nandPath )
 		fst = NULL;
 	}
 
-	if(name_table)
-	{
-		free(name_table);
-		name_table = NULL;
-	}
+	//! name_table points into the fst allocation that was just released.
+	name_table = NULL;
+	fst_count = 0;
+	name_table_len = 0;
 	CloseFile();
 
 	// open file
@@ -437,10 +491,12 @@ bool U8NandArchive::SetFile( const char* nandPath )
 	dataOffset = ( (u8*)tagStart - buffer );
 
 	// allocate memory and read the fst
-	if( !(fst = (FstEntry *)memalign( 32, RU( tagStart->dataOffset - dataOffset, 32 ) ) )
+	u32 fstSize = ( tagStart->dataOffset > dataOffset ) ? tagStart->dataOffset - dataOffset : 0;
+	if( fstSize < sizeof( FstEntry )
+			|| !(fst = (FstEntry *)memalign( 32, RU( fstSize, 32 ) ) )
 			|| ( ISFS_Seek( fd, dataOffset + tagStart->rootNodeOffset, SEEK_SET ) != (s32)( dataOffset + tagStart->rootNodeOffset ) )
-			|| ( ISFS_Read( fd, fst, tagStart->dataOffset - dataOffset ) != (s32)( tagStart->dataOffset - dataOffset ) )
-			|| ( fst->filelen * 0xC > tagStart->dataOffset ) )
+			|| ( ISFS_Read( fd, fst, fstSize ) != (s32)fstSize )
+			|| ( (u64)fst->filelen * 0xC > fstSize ) )
 	{
 		dataOffset = 0;
 		free( buffer );
@@ -455,8 +511,10 @@ bool U8NandArchive::SetFile( const char* nandPath )
 	}
 
 	// set name table pointer
-	u32 name_table_offset = fst->filelen * 0xC;
+	fst_count = fst->filelen;
+	u32 name_table_offset = fst_count * 0xC;
 	name_table = ((char *)fst) + name_table_offset;
+	name_table_len = fstSize - name_table_offset;
 
 	free( buffer );
 	return true;
@@ -472,7 +530,7 @@ u8* U8NandArchive::GetFileAllocated( const char *path, u32 *size ) const
 
 	// find file
 	int f = EntryFromPath( path, 0 );
-	if( f < 1 || f >= (int)fst[ 0 ].filelen )
+	if( f < 1 || f >= (int)fst_count )
 	{
 		gprintf( "U8: \"%s\" wasn't found in the archive.\n", path );
 		return NULL;

@@ -29,15 +29,20 @@
 
 #define NAME_OFFSET_DB "wiitdb_offsets.bin"
 #define MAXREADSIZE 1024 * 1024 // Cache size only for parsing the offsets: 1MB
+//! More entries than any wiitdb.xml has ever held. The count is read from the
+//! offsets cache on the card, and it sizes an allocation.
+#define MAX_OFFSET_ENTRIES 500000
 
 GameTDB::GameTDB()
 	: file(0), LangCode("EN")
 {
+	GameIDCache[0] = '\0';
 }
 
 GameTDB::GameTDB(const char *filepath)
 	: file(0), LangCode("EN")
 {
+	GameIDCache[0] = '\0';
 	OpenFile(filepath);
 }
 
@@ -57,9 +62,9 @@ bool GameTDB::OpenFile(const char *filepath)
 		int pos;
 		std::string OffsetsPath(filepath);
 		if ((pos = OffsetsPath.find_last_of('/')) != (int)std::string::npos)
-			OffsetsPath[pos] = '\0';
+			OffsetsPath.erase(pos);
 		else
-			OffsetsPath.clear(); //! Relative path
+			OffsetsPath = "."; //! Relative path
 
 		LoadGameOffsets(OffsetsPath.c_str());
 	}
@@ -83,7 +88,7 @@ bool GameTDB::LoadGameOffsets(const char *path)
 		return false;
 
 	std::string OffsetDBPath(path);
-	if (OffsetDBPath.back() != '/')
+	if (OffsetDBPath.empty() || OffsetDBPath.back() != '/')
 		OffsetDBPath += '/';
 	OffsetDBPath += NAME_OFFSET_DB;
 
@@ -115,7 +120,9 @@ bool GameTDB::LoadGameOffsets(const char *path)
 
 	fread(&NodeCount, 1, sizeof(NodeCount), fp);
 
-	if (NodeCount == 0)
+	//! NodeCount comes out of the cache file, and one entry is 15 bytes. Anything
+	//! that could not have come from a wiitdb.xml means the cache is not usable.
+	if (NodeCount == 0 || NodeCount > MAX_OFFSET_ENTRIES)
 	{
 		fclose(fp);
 		bool result = ParseFile();
@@ -127,7 +134,9 @@ bool GameTDB::LoadGameOffsets(const char *path)
 
 	OffsetMap.resize(NodeCount);
 
-	if ((int)fread(&OffsetMap[0], 1, NodeCount * sizeof(GameOffsets), fp) < 0)
+	//! fread returns a size_t, so the old test for a negative result never fired
+	//! and a truncated cache left the rest of the entries reading offset zero.
+	if (fread(&OffsetMap[0], 1, NodeCount * sizeof(GameOffsets), fp) != NodeCount * sizeof(GameOffsets))
 	{
 		fclose(fp);
 		bool result = ParseFile();
@@ -225,6 +234,9 @@ char *GameTDB::LoadGameNode(const char *id)
 	if (!offset)
 		return NULL;
 
+	if (offset->nodesize == 0 || offset->nodesize > MAXREADSIZE)
+		return NULL;
+
 	char *data = new (std::nothrow) char[offset->nodesize + 1];
 	if (!data)
 		return NULL;
@@ -316,6 +328,13 @@ bool GameTDB::ParseFile()
 			if (!idNode || !gameEndNode)
 			{
 				//! We are in the middle of the game node, reread complete node and more
+				if (gameNode == Line)
+				{
+					//! The node does not end inside a whole window, so rereading
+					//! from here would read the same bytes again for ever.
+					delete[] Line;
+					return OffsetMap.size() > 0;
+				}
 				currentPos += (gameNode - Line);
 				fseek(file, currentPos, SEEK_SET);
 				readnew = true;
@@ -328,7 +347,9 @@ bool GameTDB::ParseFile()
 			int size = OffsetMap.size();
 			OffsetMap.resize(size + 1);
 
-			for (i = 0; i < 7 && *idNode != '<'; ++i, ++idNode)
+			//! gameID is char[7]: six characters and a terminator. This used to
+			//! run seven times and put the terminator in the next field.
+			for (i = 0; i < 6 && *idNode != '<'; ++i, ++idNode)
 				OffsetMap[size].gameID[i] = *idNode;
 			OffsetMap[size].gameID[i] = '\0';
 			OffsetMap[size].gamenode = currentPos + (gameNode - Line);
@@ -621,7 +642,7 @@ bool GameTDB::GetGenreList(const char *id, std::vector<std::string> &genre)
 	{
 		pos = the_genre.find_first_of(delims, beg + 1);
 		std::string cat = the_genre.substr(beg, pos - beg);
-		cat[0] = toupper(int(cat[0]));
+		cat[0] = toupper((unsigned char) cat[0]);
 		genre.push_back(cat);
 	}
 
@@ -672,7 +693,7 @@ void GameTDB::TranslateGenres(std::vector<std::string> &GenreList)
 
 		if (!trans.empty())
 		{
-			trans[0] = toupper((int)trans[0]);
+			trans[0] = toupper((unsigned char) trans[0]);
 			GenreList[n] = trans;
 		}
 	}
@@ -683,6 +704,9 @@ void GameTDB::TranslateGenres(std::vector<std::string> &GenreList)
 int GameTDB::GetRating(const char *id)
 {
 	int rating = -1;
+
+	if (!id)
+		return rating;
 
 	if (!ParseGameNode(id))
 		return rating;
@@ -856,7 +880,14 @@ unsigned long GameTDB::GetCaseColor(const char *id)
 	if (color.empty())
 		return -1;
 
-	return std::stoul(color, nullptr, 16);
+	//! std::stoul throws for a colour that is not hex or does not fit, and the
+	//! value comes out of the downloaded xml. Nothing up the stack catches it.
+	char *end = NULL;
+	unsigned long value = strtoul(color.c_str(), &end, 16);
+	if (!end || *end != '\0')
+		return -1;
+
+	return value;
 }
 
 bool GameTDB::GetGameType(const char *id, std::string &GameType)

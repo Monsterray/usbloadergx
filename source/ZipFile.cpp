@@ -110,26 +110,6 @@ bool ZipFile::FindFilePart(const char *partfilename, std::string &realname)
 	return false;
 }
 
-//! wiitdb.zip and txt.zip are downloaded, so an entry name is not trusted. It
-//! may not start at the root, name a device, or step out of the destination.
-static bool SafeZipName(const char *name)
-{
-	if (!name || name[0] == '\0' || name[0] == '/' || strchr(name, ':') != NULL)
-		return false;
-
-	for (const char *part = name; part != NULL; )
-	{
-		if (part[0] == '.' && part[1] == '.' && (part[2] == '/' || part[2] == '\0'))
-			return false;
-
-		part = strchr(part, '/');
-		if (part)
-			part++;
-	}
-
-	return true;
-}
-
 bool ZipFile::ExtractAll(const char *dest)
 {
 	if (!File) return false;
@@ -162,7 +142,8 @@ bool ZipFile::ExtractAll(const char *dest)
 
 		if (!Stop && namelen > 0 && filename[namelen - 1] != '/')
 		{
-			if (!SafeZipName(filename))
+			//! wiitdb.zip and txt.zip are downloaded, so an entry name is not trusted
+			if (!IsSafeRelativePath(filename))
 			{
 				gprintf("Skipped unsafe zip entry: %s\n", filename);
 				failed = true;

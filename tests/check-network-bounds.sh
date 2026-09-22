@@ -40,7 +40,9 @@ grep -q 'domainlength <= 0 || domainlength > 255' "$SRC/network/https.c" \
 
 # 5. wiitdb.zip and txt.zip are downloaded and extracted. An entry name may not
 #    step out of the destination directory.
-grep -q 'SafeZipName' "$SRC/ZipFile.cpp" \
+#    The check is shared with the other extractor and with the wiiload receiver;
+#    tests/check-thirdparty-bounds.sh covers the other two call sites.
+grep -q 'IsSafeRelativePath' "$SRC/ZipFile.cpp" \
 	|| fail "ExtractAll() writes a zip entry name straight into the destination path"
 grep -q 'u32 blocksize = uncompressed_size - done < maxblocksize' "$SRC/ZipFile.cpp" \
 	|| fail "the zip block size is shared between entries, so one empty entry empties the rest"

@@ -47,6 +47,11 @@ bool RenameFile(const char * srcpath, const char * destpath);
 bool RemoveFile(const char * filepath);
 bool RemoveDirectory(const char *path);
 
+//! true when name may be joined to a destination directory without leaving it.
+//! Everything that names a file inside a zip, or that arrives over the network,
+//! goes through this: the name is chosen by whoever sent the archive.
+bool IsSafeRelativePath(const char *name);
+
 #ifdef __cplusplus
 }
 #endif

@@ -436,6 +436,11 @@ extern unzFile ZEXPORT unzOpen2(const char *path, zlib_filefunc_def *pzlib_filef
     us.encrypted = 0;
 
     s = (unz_s *)ALLOC(sizeof(unz_s));
+    if (s == NULL)
+    {
+        ZCLOSE(us.z_filefunc, us.filestream);
+        return NULL;
+    }
     *s = us;
     unzGoToFirstFile((unzFile)s);
     return (unzFile)s;

@@ -104,7 +104,7 @@ void ParentalControlSM::SetOptionValues()
 	if (strcmp(Settings.unlockCode, "") == 0)
 		Options->SetValue(Idx++, "%s", tr( "Not set" ));
 	else
-		Options->SetValue(Idx++, Settings.unlockCode);
+		Options->SetValue(Idx++, "%s", Settings.unlockCode);
 
 	//! Settings: Control Level
 	Options->SetValue(Idx++, "%s", tr(ParentalText[Settings.parentalcontrol]));
@@ -234,12 +234,12 @@ int ParentalControlSM::GetMenuInternal()
 	{
 		char entered[20];
 		SetState(STATE_DISABLED);
-		snprintf(entered, sizeof(entered), Settings.unlockCode);
+		snprintf(entered, sizeof(entered), "%s", Settings.unlockCode);
 		int result = OnScreenKeyboard(entered, 20, 0);
 		SetState(STATE_DEFAULT);
 		if (result == 1)
 		{
-			snprintf(Settings.unlockCode, sizeof(Settings.unlockCode), entered);
+			snprintf(Settings.unlockCode, sizeof(Settings.unlockCode), "%s", entered);
 			WindowPrompt(tr( "Password Changed" ), tr( "Password has been changed" ), tr( "OK" ));
 		}
 	}

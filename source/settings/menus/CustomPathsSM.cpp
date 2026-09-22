@@ -44,29 +44,29 @@ CustomPathsSM::CustomPathsSM()
 	: SettingsMenu(tr("Custom Paths"), &GuiOptions, MENU_NONE)
 {
 	int Idx = 0;
-	Options->SetName(Idx++, tr("3D Cover Path"));
-	Options->SetName(Idx++, tr("2D Cover Path"));
-	Options->SetName(Idx++, tr("Full Cover Path"));
-	Options->SetName(Idx++, tr("Disc Artwork Path"));
-	Options->SetName(Idx++, tr("Theme Path"));
-	Options->SetName(Idx++, tr("Titles Path"));
-	Options->SetName(Idx++, tr("GCT Cheat Codes Path"));
-	Options->SetName(Idx++, tr("TXT Cheat Codes Path"));
-	Options->SetName(Idx++, tr("DOL Path"));
-	Options->SetName(Idx++, tr("Homebrew Apps Path"));
-	Options->SetName(Idx++, tr("BCA Codes Path"));
-	Options->SetName(Idx++, tr("WIP Patches Path"));
-	Options->SetName(Idx++, tr("Languages Path"));
-	Options->SetName(Idx++, tr("WDM Files Path"));
-	Options->SetName(Idx++, tr("Wiinnertag Path"));
-	Options->SetName(Idx++, tr("EmuNAND Save Path"));
-	Options->SetName(Idx++, tr("EmuNAND Channel Path"));
-	Options->SetName(Idx++, tr("Main GameCube Path"));
-	Options->SetName(Idx++, tr("SD GameCube Path"));
-	Options->SetName(Idx++, tr("Devolution Loader Path"));
-	Options->SetName(Idx++, tr("Nintendont Loader Path"));
-	Options->SetName(Idx++, tr("Cache BNR Files Path"));
-	Options->SetName(Idx++, tr("Cache Path"));
+	Options->SetName(Idx++, "%s", tr("3D Cover Path"));
+	Options->SetName(Idx++, "%s", tr("2D Cover Path"));
+	Options->SetName(Idx++, "%s", tr("Full Cover Path"));
+	Options->SetName(Idx++, "%s", tr("Disc Artwork Path"));
+	Options->SetName(Idx++, "%s", tr("Theme Path"));
+	Options->SetName(Idx++, "%s", tr("Titles Path"));
+	Options->SetName(Idx++, "%s", tr("GCT Cheat Codes Path"));
+	Options->SetName(Idx++, "%s", tr("TXT Cheat Codes Path"));
+	Options->SetName(Idx++, "%s", tr("DOL Path"));
+	Options->SetName(Idx++, "%s", tr("Homebrew Apps Path"));
+	Options->SetName(Idx++, "%s", tr("BCA Codes Path"));
+	Options->SetName(Idx++, "%s", tr("WIP Patches Path"));
+	Options->SetName(Idx++, "%s", tr("Languages Path"));
+	Options->SetName(Idx++, "%s", tr("WDM Files Path"));
+	Options->SetName(Idx++, "%s", tr("Wiinnertag Path"));
+	Options->SetName(Idx++, "%s", tr("EmuNAND Save Path"));
+	Options->SetName(Idx++, "%s", tr("EmuNAND Channel Path"));
+	Options->SetName(Idx++, "%s", tr("Main GameCube Path"));
+	Options->SetName(Idx++, "%s", tr("SD GameCube Path"));
+	Options->SetName(Idx++, "%s", tr("Devolution Loader Path"));
+	Options->SetName(Idx++, "%s", tr("Nintendont Loader Path"));
+	Options->SetName(Idx++, "%s", tr("Cache BNR Files Path"));
+	Options->SetName(Idx++, "%s", tr("Cache Path"));
 
 	SetOptionValues();
 }
@@ -76,73 +76,73 @@ void CustomPathsSM::SetOptionValues()
 	int Idx = 0;
 
 	//! Settings: 3D Cover Path
-	Options->SetValue(Idx++, Settings.covers_path);
+	Options->SetValue(Idx++, "%s", Settings.covers_path);
 
 	//! Settings: 2D Cover Path
-	Options->SetValue(Idx++, Settings.covers2d_path);
+	Options->SetValue(Idx++, "%s", Settings.covers2d_path);
 
 	//! Settings: Full Cover Path
-	Options->SetValue(Idx++, Settings.coversFull_path);
+	Options->SetValue(Idx++, "%s", Settings.coversFull_path);
 
 	//! Settings: Disc Artwork Path
-	Options->SetValue(Idx++, Settings.disc_path);
+	Options->SetValue(Idx++, "%s", Settings.disc_path);
 
 	//! Settings: Theme Path
-	Options->SetValue(Idx++, Settings.theme_path);
+	Options->SetValue(Idx++, "%s", Settings.theme_path);
 
 	//! Settings: Titles Path
-	Options->SetValue(Idx++, Settings.titlestxt_path);
+	Options->SetValue(Idx++, "%s", Settings.titlestxt_path);
 
 	//! Settings: GCT Cheat Codes Path
-	Options->SetValue(Idx++, Settings.Cheatcodespath);
+	Options->SetValue(Idx++, "%s", Settings.Cheatcodespath);
 
 	//! Settings: TXT Cheat Codes Path
-	Options->SetValue(Idx++, Settings.TxtCheatcodespath);
+	Options->SetValue(Idx++, "%s", Settings.TxtCheatcodespath);
 
 	//! Settings: DOL Path
-	Options->SetValue(Idx++, Settings.dolpath);
+	Options->SetValue(Idx++, "%s", Settings.dolpath);
 
 	//! Settings: Homebrew Apps Path
-	Options->SetValue(Idx++, Settings.homebrewapps_path);
+	Options->SetValue(Idx++, "%s", Settings.homebrewapps_path);
 
 	//! Settings: BCA Codes Path
-	Options->SetValue(Idx++, Settings.BcaCodepath);
+	Options->SetValue(Idx++, "%s", Settings.BcaCodepath);
 
 	//! Settings: WIP Patches Path
-	Options->SetValue(Idx++, Settings.WipCodepath);
+	Options->SetValue(Idx++, "%s", Settings.WipCodepath);
 
 	//! Settings: Languages Path
-	Options->SetValue(Idx++, Settings.languagefiles_path);
+	Options->SetValue(Idx++, "%s", Settings.languagefiles_path);
 
 	//! Settings: WDM Files Path
-	Options->SetValue(Idx++, Settings.WDMpath);
+	Options->SetValue(Idx++, "%s", Settings.WDMpath);
 
 	//! Settings: Wiinnertag Path
-	Options->SetValue(Idx++, Settings.WiinnertagPath);
+	Options->SetValue(Idx++, "%s", Settings.WiinnertagPath);
 
 	//! Settings: EmuNAND Save Path
-	Options->SetValue(Idx++, Settings.NandEmuPath);
+	Options->SetValue(Idx++, "%s", Settings.NandEmuPath);
 
 	//! Settings: EmuNAND Channel Path
-	Options->SetValue(Idx++, Settings.NandEmuChanPath);
+	Options->SetValue(Idx++, "%s", Settings.NandEmuChanPath);
 
 	//! Settings: GameCube Games Path
-	Options->SetValue(Idx++, Settings.GameCubePath);
+	Options->SetValue(Idx++, "%s", Settings.GameCubePath);
 
 	//! Settings: SD GameCube Games Path
-	Options->SetValue(Idx++, Settings.GameCubeSDPath);
+	Options->SetValue(Idx++, "%s", Settings.GameCubeSDPath);
 
 	//! Settings: GameCube Devolution loader.bin Path
-	Options->SetValue(Idx++, Settings.DEVOLoaderPath);
+	Options->SetValue(Idx++, "%s", Settings.DEVOLoaderPath);
 
 	//! Settings: GameCube Nintendont boot.dol Path
-	Options->SetValue(Idx++, Settings.NINLoaderPath);
+	Options->SetValue(Idx++, "%s", Settings.NINLoaderPath);
 
 	//! Settings: Cache BNR Files Path
-	Options->SetValue(Idx++, Settings.BNRCachePath);
+	Options->SetValue(Idx++, "%s", Settings.BNRCachePath);
 
 	//! Settings: Cache Path
-	Options->SetValue(Idx++, Settings.GameHeaderCachePath);
+	Options->SetValue(Idx++, "%s", Settings.GameHeaderCachePath);
 }
 
 int CustomPathsSM::GetMenuInternal()
@@ -280,13 +280,13 @@ int CustomPathsSM::GetMenuInternal()
 	else if (ret == ++Idx)
 	{
 		char oldPath[sizeof(Settings.NandEmuPath)];
-		snprintf(oldPath, sizeof(oldPath), Settings.NandEmuPath);
+		snprintf(oldPath, sizeof(oldPath), "%s", Settings.NandEmuPath);
 
 		titleTxt->SetText(tr( "EmuNAND Save Path" ));
 		ChangePath(Settings.NandEmuPath, sizeof(Settings.NandEmuPath));
 		if(strncasecmp(DeviceHandler::PathToFSName(Settings.NandEmuPath), "FAT", 3) != 0)
 		{
-			snprintf(Settings.NandEmuPath, sizeof(Settings.NandEmuPath), oldPath);
+			snprintf(Settings.NandEmuPath, sizeof(Settings.NandEmuPath), "%s", oldPath);
 			WindowPrompt(tr("Error:"), tr("NAND emulation only works on FAT/FAT32 partitions!"), tr("OK"));
 		}
 	}
@@ -295,13 +295,13 @@ int CustomPathsSM::GetMenuInternal()
 	else if (ret == ++Idx)
 	{
 		char oldPath[sizeof(Settings.NandEmuChanPath)];
-		snprintf(oldPath, sizeof(oldPath), Settings.NandEmuChanPath);
+		snprintf(oldPath, sizeof(oldPath), "%s", Settings.NandEmuChanPath);
 
 		titleTxt->SetText(tr( "EmuNAND Channel Path" ));
 		int result = ChangePath(Settings.NandEmuChanPath, sizeof(Settings.NandEmuChanPath));
 		if(strncasecmp(DeviceHandler::PathToFSName(Settings.NandEmuChanPath), "FAT", 3) != 0)
 		{
-			snprintf(Settings.NandEmuChanPath, sizeof(Settings.NandEmuChanPath), oldPath);
+			snprintf(Settings.NandEmuChanPath, sizeof(Settings.NandEmuChanPath), "%s", oldPath);
 			WindowPrompt(tr("Error:"), tr("NAND emulation only works on FAT/FAT32 partitions!"), tr("OK"));
 		}
 		else if(result == 1)
@@ -380,7 +380,7 @@ int CustomPathsSM::GetMenuInternal()
 int CustomPathsSM::ChangePath(char * SettingsPath, int SizeOfPath)
 {
 	char entered[300];
-	snprintf(entered, sizeof(entered), SettingsPath);
+	snprintf(entered, sizeof(entered), "%s", SettingsPath);
 
 	HaltGui();
 	GuiWindow * parent = (GuiWindow *) parentElement;
@@ -399,7 +399,7 @@ int CustomPathsSM::ChangePath(char * SettingsPath, int SizeOfPath)
 		if (entered[strlen(entered)-1] != '/')
 			strcat(entered, "/");
 
-		snprintf(SettingsPath, SizeOfPath, entered);
+		snprintf(SettingsPath, SizeOfPath, "%s", entered);
 		WindowPrompt(tr( "Path Changed" ), 0, tr( "OK" ));
 	}
 

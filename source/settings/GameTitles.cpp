@@ -43,7 +43,7 @@ void CGameTitles::SetGameTitle(const char *id, const char *title, char TitleType
 	}
 
 	GameTitle newTitle;
-	snprintf(newTitle.GameID, sizeof(newTitle.GameID), id);
+	snprintf(newTitle.GameID, sizeof(newTitle.GameID), "%s", id);
 	newTitle.Title = title;
 	newTitle.Region = region;
 	newTitle.ParentalRating = ParentalRating;

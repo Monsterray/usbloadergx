@@ -1112,7 +1112,7 @@ char *readable_size(float size, char *buf)
 {
 	int i = 0;
 	const char *suffix[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
-	while (size > 1024 && i < 9)
+	while (size > 1024 && i < 8)
 	{
 		size /= 1024;
 		i++;

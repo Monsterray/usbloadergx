@@ -170,9 +170,9 @@ GCGameLoadSM::~GCGameLoadSM()
 void GCGameLoadSM::SetDefaultConfig()
 {
 	char id[7];
-	snprintf(id, sizeof(id), GameConfig.id);
+	snprintf(id, sizeof(id), "%s", GameConfig.id);
 	GameSettings.SetDefault(GameConfig);
-	snprintf(GameConfig.id, sizeof(GameConfig.id), id);
+	snprintf(GameConfig.id, sizeof(GameConfig.id), "%s", id);
 }
 
 void GCGameLoadSM::SetOptionNames()
@@ -262,7 +262,7 @@ void GCGameLoadSM::SetOptionValues()
 
 	//! Settings: Game Language
 	if(GameConfig.language == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(LanguageText[GameConfig.language]));
 
@@ -271,7 +271,7 @@ void GCGameLoadSM::SetOptionValues()
 
 	//! Settings: GameCube Mode
 	if(GameConfig.GameCubeMode == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(GCMode[GameConfig.GameCubeMode]));
 	
@@ -283,13 +283,13 @@ void GCGameLoadSM::SetOptionValues()
 	
 		//! Settings: DML + NIN Video Mode
 		if(GameConfig.DMLVideo == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(DMLVideoText[GameConfig.DMLVideo]));
 
 		//! Settings: DML + NIN Progressive Patch
 		if(GameConfig.DMLProgPatch == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DMLProgPatch]));
 
@@ -297,38 +297,38 @@ void GCGameLoadSM::SetOptionValues()
 		if(IosLoader::GetDMLVersion() >= DML_VERSION_DM_2_1)
 		{
 			if(GameConfig.DMLWidescreen == INHERIT)
-				Options->SetValue(Idx++, tr("Use global"));
+				Options->SetValue(Idx++, "%s", tr("Use global"));
 			else
 				Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DMLWidescreen]));
 		}
 
 		//! Settings: Ocarina
 		if(GameConfig.ocarina == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffAskText[GameConfig.ocarina]));
 
 		//! Settings: DML + NIN NMM Mode
 		if(GameConfig.DMLNMM == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(DMLNMMMode[GameConfig.DMLNMM]));
 
 		//! Settings: DML + NIN Debug
 		if(GameConfig.DMLDebug == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(DMLDebug[GameConfig.DMLDebug]));
 		
 		//! Settings: DML LED Activity
 		if(GameConfig.DMLActivityLED == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DMLActivityLED]));
 
 		//! Settings: DML PAD Hook
 		if(GameConfig.DMLPADHOOK == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DMLPADHOOK]));
 
@@ -336,7 +336,7 @@ void GCGameLoadSM::SetOptionValues()
 		if(IosLoader::GetDMLVersion() >= DML_VERSION_DM_2_2_2 && IosLoader::GetDMLVersion() <= DML_VERSION_DML_2_2_1)
 		{
 			if(GameConfig.DMLNoDisc2 == INHERIT)
-				Options->SetValue(Idx++, tr("Use global"));
+				Options->SetValue(Idx++, "%s", tr("Use global"));
 			else
 				Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DMLNoDisc2]));
 		}
@@ -345,14 +345,14 @@ void GCGameLoadSM::SetOptionValues()
 		if(IosLoader::GetDMLVersion() >= DML_VERSION_DM_2_5)
 		{
 			if(GameConfig.DMLScreenshot == INHERIT)
-				Options->SetValue(Idx++, tr("Use global"));
+				Options->SetValue(Idx++, "%s", tr("Use global"));
 			else
 				Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DMLScreenshot]));
 		}
 
 		//! Settings: DML Japanese Patch
 		if(GameConfig.DMLJPNPatch == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DMLJPNPatch]));
 	}
@@ -365,45 +365,45 @@ void GCGameLoadSM::SetOptionValues()
 
 		//! Settings: DML + NIN Video Mode
 		if(GameConfig.DMLVideo == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(DMLVideoText[GameConfig.DMLVideo]));
 
 		//! Settings: DML + NIN Progressive Patch
 		if(GameConfig.DMLProgPatch == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DMLProgPatch]));
 
 		//! Settings: NIN Video Deflicker
 		if(GameConfig.NINDeflicker == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINDeflicker]));
 
 		//! Settings: NIN PAL50 Patch
 		if(GameConfig.NINPal50Patch == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINPal50Patch]));
 
 		//! Settings: DML + NIN Force Widescreen
 		if(GameConfig.DMLWidescreen == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DMLWidescreen]));
 
 		//! Settings: Wii U Widescreen
 		if(GameConfig.NINWiiUWide == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINWiiUWide]));	
 
 		//! Settings: NIN VideoScale
 		if(GameConfig.NINVideoScale == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else if(GameConfig.NINVideoScale == 0)
-			Options->SetValue(Idx++, tr("Auto"));
+			Options->SetValue(Idx++, "%s", tr("Auto"));
 		else
 			Options->SetValue(Idx++, "Manual (40~120)");
 
@@ -412,117 +412,117 @@ void GCGameLoadSM::SetOptionValues()
 
 		//! Settings: NIN VideoOffset
 		if(GameConfig.NINVideoOffset == INHERIT-20)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%d (-20~20)", GameConfig.NINVideoOffset);
 
 		//! Settings: Ocarina
 		if(GameConfig.ocarina == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffAskText[GameConfig.ocarina]));
 
 		//! Settings: Remove Read Speed Limiter
 		if(GameConfig.NINRemlimit == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINRemlimit]));
 
 		//! Settings: NIN Arcade Mode
 		if(GameConfig.NINArcadeMode == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINArcadeMode]));
 
 		//! Settings: NIN CC Rumble
 		if (GameConfig.NINCCRumble == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINCCRumble]));
 
 		//! Settings: NIN Skip IPL
 		if (GameConfig.NINSkipIPL == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINSkipIPL]));
 
 		//! Settings: NIN BBA Emulation
 		if (GameConfig.NINBBA == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINBBA]));
 
 		//! Settings: NIN BBA Net Profile
 		if(GameConfig.NINBBAProfile == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else if(GameConfig.NINBBAProfile == 0)
-			Options->SetValue(Idx++, tr("Auto"));
+			Options->SetValue(Idx++, "%s", tr("Auto"));
 		else
 			Options->SetValue(Idx++, "%i", GameConfig.NINBBAProfile);
 
 		//! Settings: NIN Memory Card Emulation
 		if(GameConfig.NINMCEmulation == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(NINMCText[GameConfig.NINMCEmulation]));
 
 		//! Settings: NIN Memory Card Blocks Size
 		if(GameConfig.NINMCSize == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%d", MEM_CARD_BLOCKS(GameConfig.NINMCSize));
 
 		//! Settings: NIN USB-HID Controller
 		if(GameConfig.NINUSBHID == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINUSBHID]));
 
 		//! Settings: NIN MaxPads - Number of GameCube Controllers
 		if(GameConfig.NINMaxPads == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%i", GameConfig.NINMaxPads);
 
 		//! Settings: NIN Wii U GamePad Slot
 		if(GameConfig.NINWiiUGamepadSlot == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(NINGamepadText[GameConfig.NINWiiUGamepadSlot]));
 
 		//! Settings: NIN Native Controller
 		if(GameConfig.NINNativeSI == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINNativeSI]));
 
 		//! Settings: NIN LED Activity
 		if(GameConfig.NINLED == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINLED]));
 
 		//! Settings: DML + NIN Debug
 		if(GameConfig.DMLDebug == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(DMLDebug[GameConfig.DMLDebug]));
 
 		//! Settings: NIN OS Report
 		if(GameConfig.NINOSReport == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINOSReport]));
 
 		//! Settings: NIN Log to file
 		if(GameConfig.NINLog == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINLog]));
 
 		//! Settings: NIN Individual Loader path setting
 		if(GameConfig.NINLoaderPath.size() == 0)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", GameConfig.NINLoaderPath.c_str());
 
@@ -536,55 +536,55 @@ void GCGameLoadSM::SetOptionValues()
 
 		//! Settings: DEVO Memory Card Emulation
 		if(GameConfig.DEVOMCEmulation == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(DEVOMCText[GameConfig.DEVOMCEmulation]));
 
 		//! Settings: DEVO Widescreen Patch
 		if(GameConfig.DEVOWidescreen == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DEVOWidescreen]));
 
 		//! Settings: DEVO Activity LED
 		if(GameConfig.DEVOActivityLED == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DEVOActivityLED]));
 
 		//! Settings: DEVO F-Zero AX unlock patch
 		if(GameConfig.DEVOFZeroAX == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DEVOFZeroAX]));
 
 		//! Settings: DEVO Timer Fix
 		if(GameConfig.DEVOTimerFix == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DEVOTimerFix]));
 
 		//! Settings: DEVO Direct Button Mapping
 		if(GameConfig.DEVODButtons == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DEVODButtons]));
 
 		//! Settings: DEVO Crop Overscan
 		if(GameConfig.DEVOCropOverscan == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DEVOCropOverscan]));
 
 		//! Settings: DEVO Disc Read Delay
 		if(GameConfig.DEVODiscDelay == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DEVODiscDelay]));
 
 		//! Settings: DML + NIN + DEVO Progressive Patch
 		if(GameConfig.DMLProgPatch == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.DMLProgPatch]));
 
@@ -924,7 +924,7 @@ int GCGameLoadSM::GetMenuInternal()
 	else if (currentGCmode == GC_MODE_NINTENDONT && ret == ++Idx)
 	{
 		char entered[100];
-		snprintf(entered, sizeof(entered), GameConfig.NINLoaderPath.c_str());
+		snprintf(entered, sizeof(entered), "%s", GameConfig.NINLoaderPath.c_str());
 
 		HaltGui();
 		GuiWindow * parent = (GuiWindow *) parentElement;

@@ -102,9 +102,9 @@ int CheatMenu(const char * gameID)
 				cheatslst.SetValue(i, "%s", gctCheats.getCheatName(i).c_str());
 				// search after header and before footer
 				if(gctBuf && gctCheats.IsCheatIncluded(i, gctBuf, gctSize))
-					cheatslst.SetName(i, tr("ON"));
+					cheatslst.SetName(i, "%s", tr("ON"));
 				else
-					cheatslst.SetName(i, tr("OFF"));
+					cheatslst.SetName(i, "%s", tr("OFF"));
 			}
 
 			HaltGui();
@@ -155,7 +155,7 @@ int CheatMenu(const char * gameID)
 								RemoveFile(gctPath);
 								w.Remove(&chtBrowser);
 								for (int i = 0; i < gctCheats.getCnt(); i++)
-									cheatslst.SetName(i, tr("OFF"));
+									cheatslst.SetName(i, "%s", tr("OFF"));
 								w.Append(&chtBrowser);
 							}
 						}
@@ -195,9 +195,9 @@ int CheatMenu(const char * gameID)
 							cheatslst.SetValue(i, "%s", gctCheats.getCheatName(i).c_str());
 							// Search after header and before footer
 							if(gctBuf && gctCheats.IsCheatIncluded(i, gctBuf, gctSize))
-								cheatslst.SetName(i, tr("ON"));
+								cheatslst.SetName(i, "%s", tr("ON"));
 							else
-								cheatslst.SetName(i, tr("OFF"));
+								cheatslst.SetName(i, "%s", tr("OFF"));
 						}
 						w.Append(&chtBrowser);
 					}

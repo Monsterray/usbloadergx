@@ -756,8 +756,8 @@ void Wbfs_Fat::mk_gameid_title(struct discHdr *header, char *name, int re_space,
 	char title[100];
 	char id[7];
 
-	snprintf(id, sizeof(id), (char *)header->id);
-	snprintf(title, sizeof(title), header->title);
+	snprintf(id, sizeof(id), "%s", (char *)header->id);
+	snprintf(title, sizeof(title), "%s", header->title);
 	CleanTitleCharacters(title);
 
 	if (layout == 0)

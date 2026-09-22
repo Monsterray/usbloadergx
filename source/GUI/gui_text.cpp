@@ -439,7 +439,7 @@ void GuiText::ScrollText()
 	int ch = textScrollPos;
 	int pos = textDyn.size() - 1;
 
-	if (!textDyn[pos]) new wchar_t[maxWidth];
+	if (!textDyn[pos]) textDyn[pos] = new wchar_t[maxWidth];
 
 	int i = 0, currentWidth = 0;
 

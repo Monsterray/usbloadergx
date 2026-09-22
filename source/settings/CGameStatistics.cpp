@@ -220,7 +220,7 @@ void CGameStatistics::ParseLine(char *line)
 	GameStatus NewGame;
 	memset(&NewGame, 0, sizeof(GameStatus));
 
-	snprintf(NewGame.id, sizeof(NewGame.id), GameID);
+	strlcpy(NewGame.id, GameID, sizeof(NewGame.id));
 
 	char * LinePtr = strchr(line, '=');
 
@@ -268,7 +268,7 @@ void CGameStatistics::SetPlayCount(const char * id, int count)
 		return;
 
 	GameStatus NewStatus;
-	snprintf(NewStatus.id, sizeof(NewStatus.id), id);
+	snprintf(NewStatus.id, sizeof(NewStatus.id), "%s", id);
 	NewStatus.FavoriteRank = 0;
 	NewStatus.PlayCount = count;
 
@@ -287,7 +287,7 @@ void CGameStatistics::SetFavoriteRank(const char * id, int rank)
 		return;
 
 	GameStatus NewStatus;
-	snprintf(NewStatus.id, sizeof(NewStatus.id), id);
+	snprintf(NewStatus.id, sizeof(NewStatus.id), "%s", id);
 	NewStatus.FavoriteRank = rank;
 	NewStatus.PlayCount = 0;
 

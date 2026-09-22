@@ -7,7 +7,7 @@ static int defaultDolSelected = 0;
 void defaultDolPrompt(const char *gameid)
 {
 	char id[7];
-	snprintf(id, sizeof(id), gameid);
+	snprintf(id, sizeof(id), "%s", gameid);
 	defaultDolSelected = 0;
 
 	//Metroid Prime Trilogy
@@ -46,7 +46,7 @@ int defaultAltDol(const char *gameid)
 		return defaultDolSelected;
 
 	char id[7];
-	snprintf(id, sizeof(id), gameid);
+	snprintf(id, sizeof(id), "%s", gameid);
 
 	//Boogie
 	if (strcmp(id, "RBOP69") == 0) return 675;//previous value was 657
@@ -103,7 +103,7 @@ int defaultAltDol(const char *gameid)
 int autoSelectDolPrompt(const char *gameid)
 {
 	char id[7];
-	snprintf(id, sizeof(id), gameid);
+	snprintf(id, sizeof(id), "%s", gameid);
 
 	//Indiana Jones and the Staff of Kings (Fate of Atlantis)
 	if (strcmp(id, "RJ8E64") == 0 || strcmp(id, "RJ8P64") == 0)

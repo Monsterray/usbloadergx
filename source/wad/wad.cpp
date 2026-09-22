@@ -147,7 +147,7 @@ bool Wad::Open(const char *wadpath)
 
 	// Read title tmd
 	p_tmd = (u8 *) malloc(header->tmd_len);
-	if(!p_tik)
+	if(!p_tmd)
 	{
 		if(showPrompt)
 			ShowError(tr("Not enough memory."));

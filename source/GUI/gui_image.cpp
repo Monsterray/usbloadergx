@@ -180,6 +180,9 @@ GuiImage::GuiImage(GuiImage *srcimage) :
 
 GuiImage &GuiImage::operator=(GuiImage & srcimage)
 {
+	if (this == &srcimage)
+		return *this;
+
 	if ((imgType == IMAGE_COLOR || imgType == IMAGE_COPY) && image)
 	{
 		free(image);

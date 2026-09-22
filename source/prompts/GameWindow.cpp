@@ -466,9 +466,9 @@ void GameWindow::ChangeGame(int EffectDirection)
 	if (header->tid != 0)
 	{
 		if(header->type == TYPE_GAME_NANDCHAN)
-			sizeTxt->SetTextf(tr("Real NAND"));
+			sizeTxt->SetTextf("%s", tr("Real NAND"));
 		else if(header->type == TYPE_GAME_EMUNANDCHAN)
-			sizeTxt->SetTextf(tr("Emulated NAND"));
+			sizeTxt->SetTextf("%s", tr("Emulated NAND"));
 
 	}
 	else if(header->type == TYPE_GAME_WII_IMG)

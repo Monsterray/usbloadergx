@@ -67,6 +67,8 @@ static MSG *setMSG(const char *msgid, const char *msgstr)
 	if(!msg)
 	{
 		msg = (MSG *)malloc(sizeof(MSG));
+		if (!msg)
+			return NULL;
 		msg->id		= id;
 		msg->msgstr = NULL;
 		msg->next	= baseMSG;

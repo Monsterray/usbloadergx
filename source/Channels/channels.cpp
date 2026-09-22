@@ -731,7 +731,7 @@ u8 *Channels::GetOpeningBnr(const u64 &title, u32 *outsize, const char *prefix)
 
     char filepath[PATH_MAX];
 
-    snprintf(filepath, sizeof(filepath), "%s/title/%08x/%08x/content/title.tmd", prefix, (unsigned int)high, (unsigned int)low);
+    snprintf(filepath, sizeof(filepath), "%s/title/%08x/%08x/content/title.tmd", prefix ? prefix : "", (unsigned int)high, (unsigned int)low);
 
     u8 *buffer = NULL;
     u32 filesize = 0;
@@ -765,7 +765,7 @@ u8 *Channels::GetOpeningBnr(const u64 &title, u32 *outsize, const char *prefix)
     if (!found)
         return banner;
 
-    snprintf(filepath, sizeof(filepath), "%s/title/%08x/%08x/content/%08x.app", prefix, (unsigned int)high, (unsigned int)low, (unsigned int)bootcontent);
+    snprintf(filepath, sizeof(filepath), "%s/title/%08x/%08x/content/%08x.app", prefix ? prefix : "", (unsigned int)high, (unsigned int)low, (unsigned int)bootcontent);
 
     if (prefix && *prefix != 0)
         ret = LoadFileToMem(filepath, &buffer, &filesize);

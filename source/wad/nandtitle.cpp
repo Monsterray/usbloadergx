@@ -700,7 +700,7 @@ int NandTitle::ExtractDir(const char *nandPath, const char *filepath)
 	if(!internNandPath)
 		return -666;
 
-	snprintf(internNandPath, ISFS_MAXPATH, nandPath);
+	snprintf(internNandPath, ISFS_MAXPATH, "%s", nandPath);
 
 	int ret = InternalExtractDir(internNandPath, internFilePath);
 

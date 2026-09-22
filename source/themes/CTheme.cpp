@@ -159,7 +159,7 @@ bool Theme::Load(const char *theme_file_path)
 	std::string themePath(theme_file_path);
 	size_t lastSlash = themePath.find_last_of('/');
 	if (lastSlash != std::string::npos)
-		themePath = themePath.substr(0, lastSlash);
+		themePath.resize(lastSlash);
 	themePath += "/";
 	themePath += Foldername;
 
@@ -173,10 +173,10 @@ bool Theme::Load(const char *theme_file_path)
 										: themeFilePathStr;
 		size_t dot = themeFilename.find_last_of('.');
 		if (dot != std::string::npos)
-			themeFilename = themeFilename.substr(0, dot);
+			themeFilename.resize(dot);
 		lastSlash = themePath.find_last_of('/');
 		if (lastSlash != std::string::npos)
-			themePath = themePath.substr(0, lastSlash);
+			themePath.resize(lastSlash);
 		themePath += "/";
 		themePath += themeFilename;
 		Resources::LoadFiles(themePath.c_str());

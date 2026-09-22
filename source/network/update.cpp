@@ -57,7 +57,9 @@ int DownloadFileToPath(const char *url, const char *dest, const bool showprogres
 {
 	if (showprogress)
 	{
-		const char *filename = strrchr(url, '/') + 1;
+		// The update URL comes out of a downloaded text file
+		const char *slashPos = strrchr(url, '/');
+		const char *filename = slashPos ? slashPos + 1 : url;
 		ProgressCancelEnable(true);
 		StartProgress(tr("Downloading file..."), 0, filename, true, true);
 	}
@@ -77,9 +79,21 @@ int DownloadFileToPath(const char *url, const char *dest, const bool showprogres
 			ProgressCancelEnable(false);
 			return -7;
 		}
-		fwrite(file.data, 1, file.size, savefile);
+		size_t written = fwrite(file.data, 1, file.size, savefile);
 		fclose(savefile);
 		MEM2_free(file.data);
+		// A full card writes a short file, and the caller would install it
+		if (written != file.size)
+		{
+			remove(dest);
+			if (showprogress)
+			{
+				ShowError(tr("Can't write to destination."));
+				ProgressStop();
+				ProgressCancelEnable(false);
+			}
+			return -7;
+		}
 	}
 	if (showprogress)
 	{
@@ -263,9 +277,21 @@ int ApplicationDownload()
 		RemoveFile(tmppath);
 #else
 		gprintf("%s\n%s\n", realpath, tmppath);
-		RemoveFile(realpath);
+		char bakpath[250];
+		snprintf(bakpath, sizeof(bakpath), "%sboot.bak", Settings.ConfigPath);
+		RemoveFile(bakpath);
+		bool haveBackup = CheckFile(realpath) && RenameFile(realpath, bakpath);
+		if (!haveBackup)
+			RemoveFile(realpath);
 		if (!RenameFile(tmppath, realpath))
+		{
 			update_error = true;
+			// Put the loader that works back
+			if (haveBackup)
+				RenameFile(bakpath, realpath);
+		}
+		else
+			RemoveFile(bakpath);
 #endif
 	}
 

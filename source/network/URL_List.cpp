@@ -46,7 +46,7 @@ URL_List::URL_List(const char * url)
 	while (cnt < file.size)
 	{
 
-		if (file.data[cnt] == '"' && file.data[cnt - 1] == '=' && file.data[cnt - 2] == 'f' && file.data[cnt - 3]
+		if (cnt >= 5 && file.data[cnt] == '"' && file.data[cnt - 1] == '=' && file.data[cnt - 2] == 'f' && file.data[cnt - 3]
 				== 'e' && file.data[cnt - 4] == 'r' && file.data[cnt - 5] == 'h')
 		{
 
@@ -71,7 +71,6 @@ URL_List::URL_List(const char * url)
 				}
 				free(Links);
 				Links = NULL;
-				MEM2_free(file.data);
 				urlcount = -4;
 				break;
 			}
@@ -90,7 +89,6 @@ URL_List::URL_List(const char * url)
 				}
 				free(Links);
 				Links = NULL;
-				MEM2_free(file.data);
 				urlcount = -5;
 				break;
 			}
@@ -126,7 +124,7 @@ URL_List::~URL_List()
 
 char * URL_List::GetURL(int ind)
 {
-	if (ind > urlcount || ind < 0 || !Links || urlcount <= 0)
+	if (ind >= urlcount || ind < 0 || !Links || urlcount <= 0)
 		return NULL;
 	else return Links[ind].URL;
 }

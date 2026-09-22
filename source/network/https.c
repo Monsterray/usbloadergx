@@ -118,13 +118,22 @@ void https_close(HTTP_INFO *httpinfo)
 #endif
 }
 
-bool get_header_value(struct phr_header *headers, size_t num_headers, char *dst, char *header)
+// The name and the value both come off the network. value_len is whatever the
+// server sent, the value is not terminated, and dst is a fixed buffer, so the
+// copy needs the size of dst and cannot use strlcpy, which reads to a NUL.
+bool get_header_value(struct phr_header *headers, size_t num_headers, char *dst, size_t dst_size, char *header)
 {
+    size_t header_len = strlen(header);
     for (size_t i = 0; i != num_headers; ++i)
     {
-        if (strncasecmp(header, headers[i].name, headers[i].name_len) == 0)
+        // Without the length test a header named "t" matches "transfer-encoding"
+        if (headers[i].name_len == header_len && strncasecmp(header, headers[i].name, header_len) == 0)
         {
-            strlcpy(dst, headers[i].value, headers[i].value_len + 1);
+            size_t len = headers[i].value_len;
+            if (len >= dst_size)
+                len = dst_size - 1;
+            memcpy(dst, headers[i].value, len);
+            dst[len] = '\0';
             return true;
         }
     }
@@ -134,17 +143,30 @@ bool get_header_value(struct phr_header *headers, size_t num_headers, char *dst,
 u64 get_header_value_int(struct phr_header *headers, size_t num_headers, char *header)
 {
     char header_value[30];
-    if (!get_header_value(headers, num_headers, header_value, header))
+    if (!get_header_value(headers, num_headers, header_value, sizeof(header_value), header))
         return 0;
     return strtoull(header_value, NULL, 0);
 }
 
 bool is_chunked(struct phr_header *headers, size_t num_headers)
 {
-    char encoding[9];
-    if (!get_header_value(headers, num_headers, encoding, "transfer-encoding"))
+    char encoding[32];
+    if (!get_header_value(headers, num_headers, encoding, sizeof(encoding), "transfer-encoding"))
         return false;
     return (strcasecmp(encoding, "chunked") == 0);
+}
+
+// Several callers read the download as text, so keep a terminator after the end.
+// A shrinking realloc that fails must not be reported as a finished download.
+static bool finish_download(struct download *buffer, size_t size)
+{
+    char *shrunk = MEM2_realloc(buffer->data, size + 1);
+    if (!shrunk)
+        return false;
+    buffer->data = shrunk;
+    buffer->data[size] = '\0';
+    buffer->size = size;
+    return true;
 }
 
 bool read_chunked(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos)
@@ -171,8 +193,9 @@ bool read_chunked(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos
             gprintf("Increased buffer size\n");
 #endif
             capacity *= 2;
-            buffer->data = MEM2_realloc(buffer->data, capacity);
-            if (!buffer->data) // A custom theme is using too much memory
+            // realloc leaves the old block allocated when it fails
+            char *grown = MEM2_realloc(buffer->data, capacity + 1);
+            if (!grown) // A custom theme is using too much memory
             {
 #ifdef DEBUG_NETWORK
                 gprintf("Out of memory!\n");
@@ -180,6 +203,7 @@ bool read_chunked(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos
                 errno = ENOMEM;
                 return false;
             }
+            buffer->data = grown;
         }
         if ((ret = https_read(httpinfo, &buffer->data[start_pos], capacity - start_pos, false)) < 1)
             return false;
@@ -194,9 +218,7 @@ bool read_chunked(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos
         }
         start_pos += rsize;
     } while (pret == -2);
-    buffer->size = start_pos;
-    buffer->data = MEM2_realloc(buffer->data, buffer->size);
-    return true;
+    return finish_download(buffer, start_pos);
 }
 
 bool read_all(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos)
@@ -220,8 +242,9 @@ bool read_all(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos)
             gprintf("Increased buffer size\n");
 #endif
             capacity *= 2;
-            buffer->data = MEM2_realloc(buffer->data, capacity);
-            if (!buffer->data) // A custom theme is using too much memory
+            // realloc leaves the old block allocated when it fails
+            char *grown = MEM2_realloc(buffer->data, capacity + 1);
+            if (!grown) // A custom theme is using too much memory
             {
 #ifdef DEBUG_NETWORK
                 gprintf("Out of memory!\n");
@@ -229,6 +252,7 @@ bool read_all(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos)
                 errno = ENOMEM;
                 return false;
             }
+            buffer->data = grown;
         }
         if ((ret = https_read(httpinfo, &buffer->data[start_pos], capacity - start_pos, false)) == 0)
             break;
@@ -236,8 +260,8 @@ bool read_all(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos)
             return false;
         start_pos += ret;
     };
-    buffer->size = start_pos;
-    buffer->data = MEM2_realloc(buffer->data, buffer->size);
+    if (!finish_download(buffer, start_pos))
+        return false;
     return (buffer->content_length > 0 && buffer->content_length == start_pos);
 }
 
@@ -382,9 +406,10 @@ void downloadfile(const char *url, struct download *buffer)
         return;
     // Get the host
     int domainlength = path - url - 7 - httpinfo.use_https;
-    if (domainlength <= 0)
+    // A redirect chooses this length, and it used to size a stack array
+    if (domainlength <= 0 || domainlength > 255)
         return;
-    char host[domainlength + 1];
+    char host[256];
     strlcpy(host, url + 7 + httpinfo.use_https, domainlength + 1);
     // Start connecting
     if (getProxyAddress() && getProxyPort() > 0)
@@ -557,7 +582,7 @@ void downloadfile(const char *url, struct download *buffer)
         }
         loop++;
         char location[2049];
-        if (!get_header_value(response.headers, response.num_headers, location, "location"))
+        if (!get_header_value(response.headers, response.num_headers, location, sizeof(location), "location"))
             return;
 #ifdef DEBUG_NETWORK
         gprintf("Redirect #%i - %s\n", loop, location);
@@ -577,7 +602,12 @@ void downloadfile(const char *url, struct download *buffer)
     // We got what we wanted
     if (response.status == 200)
     {
-        buffer->data = MEM2_alloc(4096);
+        buffer->data = MEM2_alloc(4096 + 1);
+        if (!buffer->data)
+        {
+            https_close(&httpinfo);
+            return;
+        }
         memcpy(buffer->data, &response.data[response.pret], response.buflen - response.pret);
         // Determine how to read the data
         bool dl_valid;

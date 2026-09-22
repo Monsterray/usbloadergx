@@ -146,36 +146,40 @@ const char * FullpathToFilename(const char *path)
 	return Filename;
 }
 
-int replaceString(char *string, const char *replace, const char *replacement)
+//! The replacement can be longer than what it replaces, and both the string and
+//! the replacement come out of the user's Wiinnertag.xml, so this needs the size
+//! of the buffer it is writing into.
+int replaceString(char *string, size_t size, const char *replace, const char *replacement)
 {
-	if(!string || !replace || !replacement)
+	if(!string || !replace || !replacement || size == 0)
 		return -1;
 
 	char *strCpy = strdup(string);
 	if(!strCpy)
 		return -1;
 
-	char *ptr;
-	int replacelen = strlen(replace);
+	size_t replacelen = strlen(replace);
+	size_t replacementlen = strlen(replacement);
+	size_t out = 0;
+	char *ptr = strCpy;
 
-	for(ptr = strCpy; *ptr != 0; string++, ptr++)
+	while(*ptr != 0 && out + 1 < size)
 	{
-		if(strncasecmp(ptr, replace, replacelen) == 0)
+		if(replacelen > 0 && strncasecmp(ptr, replace, replacelen) == 0)
 		{
-			const char *ptr2 = replacement;
-			while(*ptr2 != 0)
-			{
-				*string = *ptr2;
-				string++;
-				ptr2++;
-			}
+			if(out + replacementlen + 1 > size)
+				break;
+
+			memcpy(&string[out], replacement, replacementlen);
+			out += replacementlen;
 			ptr += replacelen;
+			continue;
 		}
 
-		*string = *ptr;
+		string[out++] = *ptr++;
 	}
 
-	*string = 0;
+	string[out] = 0;
 
 	free(strCpy);
 

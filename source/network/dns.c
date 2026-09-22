@@ -27,7 +27,7 @@ u32 getipbyname(char *domain)
 	struct hostent *host = net_gethostbyname(domain);
 	LWP_MutexUnlock(dns_mutex);
 
-	if (host == NULL)
+	if (host == NULL || host->h_addr_list == NULL || host->h_addr_list[0] == NULL)
 		return 0;
 
 	return *(u32*)host->h_addr_list[0];
@@ -87,6 +87,9 @@ u32 getipbynamecached(char *domain)
 	}
 	LWP_MutexUnlock(dns_mutex);
 	u32 ip = getipbyname(domain);
+	if (ip == 0)
+		return 0;
+
 	LWP_MutexLock(dns_mutex);
 
 	//No cache of this domain could be found, create a cache node and add it to the front of the cache
@@ -114,32 +117,23 @@ u32 getipbynamecached(char *domain)
 	//If the cache grows too big delete the last (and probably least important) node of the list
 	if (dnsentrycount > MAX_DNS_CACHE_ENTRIES)
 	{
-		struct dnsentry *node = firstdnsentry;
-		struct dnsentry *previousnode = NULL;
+		struct dnsentry *oldest = firstdnsentry;
+		struct dnsentry *beforeoldest = NULL;
 
 		//Fetch the last two elements of the list
-		while (node->nextnode != NULL)
+		while (oldest->nextnode != NULL)
 		{
-			previousnode = node;
-			node = node->nextnode;
+			beforeoldest = oldest;
+			oldest = oldest->nextnode;
 		}
 
-		if (node == NULL)
-		{
-			printf("Configuration error, MAX_DNS_ENTRIES reached while the list is empty\n");
-			exit(1);
-		}
-		else if (previousnode == NULL)
-		{
+		if (beforeoldest == NULL)
 			firstdnsentry = NULL;
-		}
 		else
-		{
-			previousnode->nextnode = NULL;
-		}
+			beforeoldest->nextnode = NULL;
 
-		free(node->domain);
-		free(node);
+		free(oldest->domain);
+		free(oldest);
 		dnsentrycount--;
 	}
 

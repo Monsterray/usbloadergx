@@ -37,7 +37,7 @@ const wchar_t * wfmt(const char * format, ...);
 bool char2wchar_t(const char * src, wchar_t * dest);
 int strtokcmp(const char * string, const char * compare, const char * separator);
 const char * FullpathToFilename(const char *path);
-int replaceString(char *string, const char *replace, const char *replacement);
+int replaceString(char *string, size_t size, const char *replace, const char *replacement);
 
 #ifdef __cplusplus
 }

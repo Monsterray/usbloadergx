@@ -1,16 +1,22 @@
 #ifndef _SPLITS_H
 #define _SPLITS_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C"
 {
 #endif
 
 #define MAX_SPLIT 10
+// Longest game path split_init() keeps.
+#define SPLIT_FNAME_LEN 1024
+// split_get_fname() may append ".tmp", so its output needs the extra room.
+#define SPLIT_PATH_LEN (SPLIT_FNAME_LEN + 8)
 
 	typedef struct split_info
 	{
-			char fname[1024];
+			char fname[SPLIT_FNAME_LEN];
 			//FILE *f[MAX_SPLIT];
 			int fd[MAX_SPLIT];
 			//u64 fsize[MAX_SPLIT];
@@ -22,7 +28,7 @@ extern "C"
 			int max_split;
 	} split_info_t;
 
-	void split_get_fname(split_info_t *s, int idx, char *fname);
+	void split_get_fname(split_info_t *s, int idx, char *fname, size_t size);
 	//FILE *split_open_file(split_info_t *s, int idx);
 	//FILE *split_get_file(split_info_t *s, u32 lba, u32 *sec_count, int fill);
 	int split_open_file(split_info_t *s, int idx);

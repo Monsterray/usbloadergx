@@ -155,6 +155,8 @@ int GCDumper::ReadDiscInfo(const u64 &game_offset)
 	else
 	{
 		u8 *FSTBuffer = (u8 *)memalign(32, ALIGN32(FSTSize));
+		if(!FSTBuffer)
+			return -3;
 
 		ret = __ReadDVDPlain(FSTBuffer, ALIGN32(FSTSize), game_offset+FSTOffset);
 		if(ret < 0)

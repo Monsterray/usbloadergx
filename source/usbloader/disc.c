@@ -254,7 +254,8 @@ s32 Disc_FindPartition(u64 *outbuf)
 
 	/* Get data */
 	nb_partitions = buffer[0];
-	table_offset = buffer[1] << 2;
+	if (nb_partitions > 4) nb_partitions = 4;
+	table_offset = ((u64) buffer[1]) << 2;
 
 	/* Read partition table */
 	ret = WDVD_UnencryptedRead(buffer, 0x20, table_offset);
@@ -266,7 +267,7 @@ s32 Disc_FindPartition(u64 *outbuf)
 		u32 type = buffer[cnt * 2 + 1];
 
 		/* Game partition */
-		if (!type) offset = buffer[cnt * 2] << 2;
+		if (!type) offset = ((u64) buffer[cnt * 2]) << 2;
 	}
 
 	/* No game partition found */
@@ -367,7 +368,8 @@ s32 Disc_Mount(struct discHdr *header)
 	if(ret < 0)
 		return ret;
 
-	memcpy(header, diskid, sizeof(struct discHdr));
+	memset(header, 0, sizeof(struct discHdr));
+	memcpy(header, diskid, 0x60);
 	memcpy(diskid, tmpBuff, 0x60); // Put the backup back, or games won't load
 
 	if(header->magic == 0x5D1C9EA3)

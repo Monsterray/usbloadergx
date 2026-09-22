@@ -50,8 +50,8 @@ private:
 	std::vector<u64> gameOffsets;
 	bool force_align32;
 	bool compressed;
-	u32 discWrote;
-	u32 discTotal;
+	u32 discWrote = 0;
+	u32 discTotal = 0;
 	u8 *ReadBuffer;
 
 	typedef struct

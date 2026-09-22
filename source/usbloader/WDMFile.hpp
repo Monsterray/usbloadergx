@@ -19,7 +19,7 @@ class WDMFile
 		{
 			std::string DolName;
 			std::string ReplaceName;
-			int Parameter;
+			int Parameter = 0;
 		};
 
 		std::vector<WDMEntry> WDMEntries;

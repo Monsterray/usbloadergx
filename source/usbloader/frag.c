@@ -182,6 +182,7 @@ int get_frag_list_for_file(char *fname, u8 *id, const u8 wbfs_part_fs, const u32
 	fs = malloc(sizeof(FragList));
 	fa = malloc(sizeof(FragList));
 	fw = malloc(sizeof(FragList));
+	if (!fs || !fa || !fw) goto out;
 
 	frag_init(fa, MAX_FRAG);
 
@@ -222,7 +223,7 @@ int get_frag_list_for_file(char *fname, u8 *id, const u8 wbfs_part_fs, const u32
 		} else if (wbfs_part_fs == PART_FS_WBFS) {
 			// if wbfs file format, remap.
 			wbfs_disc_t *d = WBFS_OpenDisc(id);
-			if (!d) { ret_val = -4; WBFS_CloseDisc(d); goto out; }
+			if (!d) { ret_val = -4; goto out; }
 			ret = wbfs_get_fragments(d, &frag_append, fs, sector_size);
 			WBFS_CloseDisc(d);
 			if (ret) { ret_val = -5; goto out; }
@@ -231,6 +232,7 @@ int get_frag_list_for_file(char *fname, u8 *id, const u8 wbfs_part_fs, const u32
 	}
 
 	frag_list = memalign(32, (sizeof(FragList)+31)&(~31));
+	if (!frag_list) goto out;
 	frag_init(frag_list, MAX_FRAG);
 	if (is_wbfs) {
 		// if wbfs file format, remap.
@@ -238,8 +240,8 @@ int get_frag_list_for_file(char *fname, u8 *id, const u8 wbfs_part_fs, const u32
 		if (!d) { ret_val = -4; goto out; }
 		frag_init(fw, MAX_FRAG);
 		ret = wbfs_get_fragments(d, &frag_append, fw, sector_size);
-		if (ret) { ret_val = -5; goto out; }
 		WBFS_CloseDisc(d);
+		if (ret) { ret_val = -5; goto out; }
 		// DEBUG: frag_list->num = MAX_FRAG-10; // stress test
 		ret = frag_remap(frag_list, fw, fa);
 		if (ret) { ret_val = -6; goto out; }

@@ -91,7 +91,7 @@ expand_escape(const char *str)
 				++cp;
 				break;
 			case '\\':
-				*rp = '\\';
+				*rp++ = '\\';
 				++cp;
 				break;
 			case '0':
@@ -116,11 +116,11 @@ expand_escape(const char *str)
 						ch += *cp++ - '0';
 					}
 				}
-				*rp = ch;
+				*rp++ = ch;
 			}
 				break;
 			default:
-				*rp = '\\';
+				*rp++ = '\\';
 				break;
 		}
 
@@ -229,6 +229,8 @@ bool gettextLoadLanguage(const char* langFile)
 		}
 
 	}
+
+	if (lastID) free(lastID);
 
 	fclose(f);
 	return true;

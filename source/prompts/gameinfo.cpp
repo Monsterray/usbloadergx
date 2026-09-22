@@ -79,7 +79,7 @@ static int InternalShowGameInfo(struct discHdr *header)
 	mainWindow->SetState(STATE_DISABLED);
 
 	char ID[7];
-	strlcpy(ID, (char *) header->id, sizeof(ID));
+	snprintf(ID, sizeof(ID), "%.6s", (char *) header->id);
 
 	char xmlpath[300];
 	snprintf(xmlpath, sizeof(xmlpath), "%swiitdb.xml", Settings.titlestxt_path);
@@ -695,7 +695,7 @@ static int InternalShowGameInfo(struct discHdr *header)
 		int year = GameInfo.PublishDate >> 16;
 		int day = GameInfo.PublishDate & 0xFF;
 		int month = (GameInfo.PublishDate >> 8) & 0xFF;
-		if (day != 0 && month != 0)
+		if (day != 0 && month >= 1 && month <= 12)
 		{
 			const char *readableMonths[13] = {
 				tr( "Jan" ), tr( "Feb" ), tr( "Mar" ), tr( "Apr" ), tr( "May" ), tr( "June" ),
@@ -1220,7 +1220,7 @@ bool save_gamelist(bool bCSV) // save gamelist
 			char rsize[11];
 			readable_size(size, rsize);
 			// Use spaces because editors can't agree on tab sizes
-			fprintf(f, "%-6s   %-9s   %-18s   %-8s   %s\n", (char*)header->id, rsize, HdrTypeText(header->type), ConsoleFromTitleID((char*)header->id), GameTitles.GetTitle(header));
+			fprintf(f, "%-6.6s   %-9s   %-18s   %-8s   %s\n", (char*)header->id, rsize, HdrTypeText(header->type), ConsoleFromTitleID((char*)header->id), GameTitles.GetTitle(header));
 		}
 	}
 	fclose(f);

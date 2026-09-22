@@ -1802,7 +1802,7 @@ void GameBrowseMenu::UpdateGameInfoText(struct discHdr *header)
 
 	std::string gameregion;
 	char IDfull[7];
-	snprintf(IDfull, sizeof(IDfull), "%s", (char *)header->id);
+	snprintf(IDfull, sizeof(IDfull), "%.6s", (char *)header->id);
 
 	const char *region = GameTitles.GetRegion(IDfull);
 	if (strcmp(region, "NULL") != 0)

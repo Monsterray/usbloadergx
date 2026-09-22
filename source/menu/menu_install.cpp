@@ -269,17 +269,15 @@ int MenuInstall()
 
 	if (choice == 1)
 	{
-		sprintf(gametxt, "%s", tr( "Installing Game:" ));
-
 		if (gamesize/GB_SIZE > freespace)
 		{
-			char errortxt[50];
-			sprintf(errortxt, "%s: %.2fGB, %s: %.2fGB", tr( "Game Size" ), gamesize/GB_SIZE, tr( "Free Space" ), freespace);
+			char errortxt[200];
+			snprintf(errortxt, sizeof(errortxt), "%s: %.2fGB, %s: %.2fGB", tr( "Game Size" ), gamesize/GB_SIZE, tr( "Free Space" ), freespace);
 			WindowPrompt(tr( "Not Enough Free Space!" ), errortxt, tr( "OK" ));
 		}
 		else
 		{
-			StartProgress(gametxt, headerdisc.title, 0, true, true);
+			StartProgress(tr( "Installing Game:" ), headerdisc.title, 0, true, true);
 			ProgressCancelEnable(true);
 			ret = WBFS_AddGame();
 			ProgressCancelEnable(false);

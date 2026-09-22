@@ -759,7 +759,7 @@ void GameWindow::BootGame(struct discHdr *header)
 	GameCFG* game_cfg = GameSettings.GetGameCFG(header->id);
 
 	char IDfull[7];
-	snprintf(IDfull, sizeof(IDfull), "%s", (char *) header->id);
+	snprintf(IDfull, sizeof(IDfull), "%.6s", (char *) header->id);
 
 	s32 gameIOS = game_cfg->ios == INHERIT ? Settings.cios : game_cfg->ios;
 	u8 autoIOS = game_cfg->autoios == INHERIT ? Settings.AutoIOS : game_cfg->autoios;

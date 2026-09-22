@@ -229,8 +229,8 @@ void WDMMenu::CheckGameFiles(const struct discHdr * header)
 
 		if (fileext && strcasecmp(fileext, ".dol") == 0)
 		{
-			char NameCpy[strlen(filename)+1];
-			strcpy(NameCpy, filename);
+			char NameCpy[256];
+			snprintf(NameCpy, sizeof(NameCpy), "%s", filename);
 			char *extension = strrchr(NameCpy, '.');
 			if(extension) *extension = 0;
 

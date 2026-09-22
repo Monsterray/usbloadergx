@@ -1,0 +1,6 @@
+build/
+usbloader_gx/
+usbloader_gx.zip
+boot.dol
+boot.elf
+*.map

@@ -25,6 +25,11 @@ on:
       - 'HBC/**'
       - 'Languages/**'
 
+# A second push to the same branch makes the running build pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,8 +40,34 @@ jobs:
       - name: Configure Git
         run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
 
+      - name: Run static checks
+        run: |
+          for check in tests/*.sh; do
+            echo "== $check"
+            sh "$check" || exit 1
+          done
+
       - name: Compile USB Loader GX
-        run: make release -j2
+        run: |
+          set -o pipefail
+          make release -j$(nproc) 2>&1 | tee build.log
+
+      - name: Check build output
+        run: |
+          ls -l boot.dol boot.elf
+          test -s boot.dol
+
+      - name: Check for compiler warnings
+        run: |
+          # The sources this project maintains compile clean. Third-party trees
+          # are vendored as-is and are not held to that.
+          warnings=$(grep 'warning:' build.log \
+            | grep -v -E 'portlibs/|source/xml/pugi|source/libs/|source/utils/minizip/' || true)
+          if [ -n "$warnings" ]; then
+            echo "$warnings"
+            echo "::error::the build emitted warnings in first-party sources"
+            exit 1
+          fi
 
       - name: Package
         if: ${{ vars.ALLOW_UPLOADS == 'true' }}
@@ -50,13 +81,13 @@ jobs:
       - name: Upload binary
         if: ${{ vars.ALLOW_UPLOADS == 'true' }}
         uses: actions/upload-artifact@v4
-        with: 
+        with:
           name: usbloadergx_${{ env.sha }}
           path: upload
 
       - name: Upload debug binary
         if: ${{ vars.ALLOW_UPLOADS == 'true' }}
         uses: actions/upload-artifact@v4
-        with: 
+        with:
           name: usbloadergx_${{ env.sha }}_debug
           path: boot.elf

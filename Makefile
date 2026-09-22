@@ -59,7 +59,7 @@ INCLUDES	:=	source
 #---------------------------------------------------------------------------------
 # Options for code generation
 #---------------------------------------------------------------------------------
-CFLAGS		=	-ggdb -Os -Wall -Wno-multichar -Wno-unused-parameter -Wextra $(MACHDEP) $(INCLUDE) -D_GNU_SOURCE -DNDEBUG -DWOLFSSL_USER_SETTINGS
+CFLAGS		=	-ggdb -Os -Wall -Wno-multichar -Wno-unused-parameter -Wextra -Wformat-security $(MACHDEP) $(INCLUDE) -D_GNU_SOURCE -DNDEBUG -DWOLFSSL_USER_SETTINGS
 CXXFLAGS	=	$(CFLAGS)
 LDFLAGS		=	-ggdb $(MACHDEP) -Wl,-Map,$(notdir $@).map,--section-start,.init=0x80B00000,-wrap,malloc,-wrap,free,-wrap,memalign,-wrap,calloc,-wrap,realloc,-wrap,malloc_usable_size
 
@@ -139,18 +139,33 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)
 .PHONY: $(BUILD) channel lang theme all clean deploy zip reload release
 
 #---------------------------------------------------------------------------------
+# Object files do not record the BUILDMODE that compiled them, so switching mode
+# would mix -DFULLCHANNEL / -DGITRELEASE objects into the next binary. Remember
+# the mode and start from a clean build directory whenever it changes.
+#---------------------------------------------------------------------------------
+define set_buildmode
+@[ -d $(BUILD) ] || mkdir -p $(BUILD)
+@if [ "$$(cat $(BUILD)/.buildmode 2>/dev/null)" != "$(1)" ]; then \
+	[ ! -f $(BUILD)/.buildmode ] || echo "Build mode changed. Cleaning..."; \
+	rm -rf $(BUILD) $(OUTPUT).elf $(OUTPUT).dol; \
+	mkdir -p $(BUILD); \
+fi
+@echo "$(1)" > $(BUILD)/.buildmode
+endef
+
+#---------------------------------------------------------------------------------
 $(BUILD):
-	@[ -d $@ ] || mkdir -p $@
+	$(call set_buildmode,)
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 #---------------------------------------------------------------------------------
 channel:
-	@[ -d build ] || mkdir -p build
+	$(call set_buildmode,channel)
 	@$(MAKE) BUILDMODE=channel --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 #---------------------------------------------------------------------------------
 release:
-	@[ -d build ] || mkdir -p build
+	$(call set_buildmode,release)
 	@$(MAKE) BUILDMODE=release --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 #---------------------------------------------------------------------------------
@@ -165,22 +180,24 @@ theme:
 
 #---------------------------------------------------------------------------------
 all:
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile lang
+	@$(MAKE) --no-print-directory $(BUILD)
+	@$(MAKE) --no-print-directory lang
 
 #---------------------------------------------------------------------------------
 clean:
 	@echo Cleaning...
-	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).dol usbloader_gx.zip usbloader_gx
+	@rm -fr $(BUILD) $(OUTPUT).elf $(OUTPUT).dol $(OUTPUT).elf.map usbloader_gx.zip usbloader_gx
 
 #---------------------------------------------------------------------------------
 deploy:
 	$(MAKE)
 	@echo Deploying...
-	@[ -d usbloader_gx ] || mkdir -p usbloader_gx
+	@rm -rf usbloader_gx
+	@mkdir -p usbloader_gx
 	@cp $(TARGET).dol usbloader_gx/
 	@cp HBC/icon.png usbloader_gx/
 	@cp HBC/meta.xml usbloader_gx/
+	@rm -f usbloader_gx.zip
 	@zip usbloader_gx.zip usbloader_gx/*
 	@wiiload usbloader_gx.zip
 
@@ -188,11 +205,13 @@ deploy:
 zip:
 	$(MAKE)
 	@echo Creating zip file...
-	@[ -d usbloader_gx ] || mkdir -p usbloader_gx
+	@rm -rf usbloader_gx
+	@mkdir -p usbloader_gx
 	@cp $(TARGET).dol usbloader_gx/
 	@cp $(TARGET).elf usbloader_gx/
 	@cp HBC/icon.png usbloader_gx/
 	@cp HBC/meta.xml usbloader_gx/
+	@rm -f usbloader_gx.zip
 	@zip usbloader_gx.zip usbloader_gx/*
 
 #---------------------------------------------------------------------------------

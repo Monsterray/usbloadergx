@@ -6,6 +6,17 @@
 build/
 usbloader_gx/
 /HBC/meta.xml
-/source/themes/filelist.h
 /source/version.h
 /usbloader_gx.zip
+
+# Agent-facing orientation notes, not project source. The procedure they point
+# at is tracked in .claude/skills/, which is portable; this file is not.
+AGENTS.md
+
+# Local MCP server registration: holds a workstation-specific absolute path to
+# the codebase-memory binary, so it would not work anywhere else.
+.mcp.json
+
+# Machine-local tooling output: the throwaway Dolphin profile that
+# scripts/dolphin_run.sh boots into.
+.dev/

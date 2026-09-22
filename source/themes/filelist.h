@@ -84,10 +84,10 @@
 #include "gameinfo1a_png.h"
 #include "gameinfo2_png.h"
 #include "gameinfo2a_png.h"
-#include "gcncontroller_png.h"
-#include "gcncontrollerR_png.h"
 #include "gc_banner_bg_png.h"
 #include "gc_icon_bg_png.h"
+#include "gcncontroller_png.h"
+#include "gcncontrollerR_png.h"
 #include "guitar_png.h"
 #include "guitarR_png.h"
 #include "gxlogo_png.h"
@@ -296,10 +296,10 @@ RecourceFile Resources::RecourceFiles[] =
 	{"gameinfo1a.png", gameinfo1a_png, gameinfo1a_png_size, NULL, 0},
 	{"gameinfo2.png", gameinfo2_png, gameinfo2_png_size, NULL, 0},
 	{"gameinfo2a.png", gameinfo2a_png, gameinfo2a_png_size, NULL, 0},
-	{"gcncontroller.png", gcncontroller_png, gcncontroller_png_size, NULL, 0},
-	{"gcncontrollerR.png", gcncontrollerR_png, gcncontrollerR_png_size, NULL, 0},
 	{"gc_banner_bg.png", gc_banner_bg_png, gc_banner_bg_png_size, NULL, 0},
 	{"gc_icon_bg.png", gc_icon_bg_png, gc_icon_bg_png_size, NULL, 0},
+	{"gcncontroller.png", gcncontroller_png, gcncontroller_png_size, NULL, 0},
+	{"gcncontrollerR.png", gcncontrollerR_png, gcncontrollerR_png_size, NULL, 0},
 	{"guitar.png", guitar_png, guitar_png_size, NULL, 0},
 	{"guitarR.png", guitarR_png, guitarR_png_size, NULL, 0},
 	{"gxlogo.png", gxlogo_png, gxlogo_png_size, NULL, 0},

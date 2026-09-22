@@ -61,12 +61,12 @@ void NewTitles::Reload(void)
 		if (line[0] == '#' || line[0] == ';')
 			continue;
 
-		Title *title = new Title;
-		memset(title, 0, sizeof(Title));
-
 		char *delimeter = strchr(line, ':');
 		if(!delimeter || ((delimeter-line) > 6)) // check for valid delimiter
 			continue;
+
+		Title *title = new Title;
+		memset(title, 0, sizeof(Title));
 
 		*delimeter = '\0';
 
@@ -92,7 +92,7 @@ void NewTitles::Reload(void)
 
 void NewTitles::CheckGame(const u8 *titleid)
 {
-	if (titleid == NULL || strlen((char *) titleid) == 0)
+	if (titleid == NULL || strnlen((char *) titleid, 6) == 0)
 		return;
 
 	Title *t = firstTitle;
@@ -109,7 +109,7 @@ void NewTitles::CheckGame(const u8 *titleid)
 	t = new Title;
 	memset(t, 0, sizeof(Title));
 
-	snprintf(t->titleId, sizeof(t->titleId), "%s", (char *) titleid);
+	snprintf(t->titleId, sizeof(t->titleId), "%.6s", (char *) titleid);
 	t->timestamp = time(0);
 	t->next = NULL;
 
@@ -168,6 +168,9 @@ void NewTitles::Remove(const u8 *titleid)
 				firstTitle = t->next;
 			else
 				prev->next = t->next;
+
+			if (lastTitle == t)
+				lastTitle = prev;
 
 			delete t;
 			isDirty = true;

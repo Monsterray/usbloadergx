@@ -119,7 +119,7 @@ int UninstallSM::GetMenuInternal()
 			return MENU_NONE;
 
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 
 		std::string Title(GameTitles.GetTitle(DiscHeader));
 		GameSettings.Remove(DiscHeader->id);
@@ -127,13 +127,13 @@ int UninstallSM::GetMenuInternal()
 		GameStatistics.Remove(DiscHeader->id);
 		GameStatistics.Save();
 
-		int ret = 0;
+		int removeRet = 0;
 		char filepath[512];
 
 		if(DiscHeader->type == TYPE_GAME_WII_IMG)
 		{
-			ret = WBFS_RemoveGame((u8 *) GameID);
-			if(ret >= 0)
+			removeRet = WBFS_RemoveGame((u8 *) GameID);
+			if(removeRet >= 0)
 			{
 				wString oldFilter(gameList.GetCurrentFilter());
 				gameList.ReadGameList();
@@ -184,7 +184,7 @@ int UninstallSM::GetMenuInternal()
 			if (CheckFile(filepath)) remove(filepath);
 		}
 
-		if (ret < 0)
+		if (removeRet < 0)
 			WindowPrompt(tr( "Can't delete:" ), Title.c_str(), tr( "OK" ));
 		else
 			WindowPrompt(tr( "Successfully deleted:" ), Title.c_str(), tr( "OK" ));
@@ -211,7 +211,7 @@ int UninstallSM::GetMenuInternal()
 			return MENU_NONE;
 
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 		char filepath[200];
 		snprintf(filepath, sizeof(filepath), "%s%s.png", Settings.covers_path, GameID);
 		if (CheckFile(filepath)) remove(filepath);
@@ -226,7 +226,7 @@ int UninstallSM::GetMenuInternal()
 	else if (ret == ++Idx)
 	{
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 		char filepath[200];
 		snprintf(filepath, sizeof(filepath), "%s%s.png", Settings.disc_path, GameID);
 
@@ -244,7 +244,7 @@ int UninstallSM::GetMenuInternal()
 			return MENU_NONE;
 
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 		char filepath[200];
 		snprintf(filepath, sizeof(filepath), "%s%s.bnr", Settings.BNRCachePath, GameID);
 		if (CheckFile(filepath)) remove(filepath);
@@ -259,7 +259,7 @@ int UninstallSM::GetMenuInternal()
 	else if (ret == ++Idx)
 	{
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 		char filepath[200];
 		snprintf(filepath, sizeof(filepath), "%s%s.txt", Settings.TxtCheatcodespath, GameID);
 
@@ -273,7 +273,7 @@ int UninstallSM::GetMenuInternal()
 	else if (ret == ++Idx)
 	{
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 		char filepath[200];
 		snprintf(filepath, sizeof(filepath), "%s%s.gct", Settings.Cheatcodespath, GameID);
 

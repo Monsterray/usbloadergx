@@ -799,8 +799,8 @@ int GCGameLoadSM::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%i", GameConfig.NINVideoScale);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 		{
 			GameConfig.NINVideoScale = LIMIT(atoi(entry), 40, 120);
 		}
@@ -811,8 +811,8 @@ int GCGameLoadSM::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%i", GameConfig.NINVideoOffset);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			GameConfig.NINVideoOffset = LIMIT(atoi(entry), -21, 20);
 	}
 
@@ -940,7 +940,8 @@ int GCGameLoadSM::GetMenuInternal()
 
 		if (result == 1)
 		{
-			if (entered[strlen(entered)-1] != '/')
+			size_t enteredLen = strlen(entered);
+			if (enteredLen > 0 && entered[enteredLen-1] != '/' && enteredLen + 1 < sizeof(entered))
 				strcat(entered, "/");
 
 			GameConfig.NINLoaderPath = entered;

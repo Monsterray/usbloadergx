@@ -120,6 +120,9 @@ void CSettings::SetDefault()
 	gamesoundvolume = 80;
 	ResampleTo48kHz = ON;
 	tooltips = ON;
+	wsprompt = ON;
+	keyset = 0;
+	gameDisplay = LIST_MODE;
 	gamesound = 0;
 	parentalcontrol = PARENTAL_LVL_ADULT;
 	LayoutVersion = 2;

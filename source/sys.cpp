@@ -268,6 +268,7 @@ bool RebootApp(void)
 	}
 	FreeHomebrewBuffer();
 	CopyHomebrewMemory(buffer, 0, filesize);
+	free(buffer);
 
 	AddBootArgument(filepath);
 

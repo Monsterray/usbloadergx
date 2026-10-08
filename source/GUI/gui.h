@@ -569,25 +569,25 @@ class GuiImage: public GuiElement
 		//!Does not alter the image data
 		//!\param s Alpha amount to draw over the image
 		void SetStripe(int s);
-		s32 z;
+		s32 z = 0;
 		void SetSkew(int XX1, int YY1, int XX2, int YY2, int XX3, int YY3, int XX4, int YY4);
 		void SetSkew(int *skew /* int skew[8] */);
-		int xx1;
-		int yy1;
-		int xx2;
-		int yy2;
-		int xx3;
-		int yy3;
-		int xx4;
-		int yy4;
-		int rxx1;
-		int ryy1;
-		int rxx2;
-		int ryy2;
-		int rxx3;
-		int ryy3;
-		int rxx4;
-		int ryy4;
+		int xx1 = 0;
+		int yy1 = 0;
+		int xx2 = 0;
+		int yy2 = 0;
+		int xx3 = 0;
+		int yy3 = 0;
+		int xx4 = 0;
+		int yy4 = 0;
+		int rxx1 = 0;
+		int ryy1 = 0;
+		int rxx2 = 0;
+		int ryy2 = 0;
+		int rxx3 = 0;
+		int ryy3 = 0;
+		int rxx4 = 0;
+		int ryy4 = 0;
 	protected:
 		int imgType; //!< Type of image data (IMAGE_TEXTURE, IMAGE_COLOR, IMAGE_DATA)
 		u8 * image; //!< Poiner to image data. May be shared with GuiImageData data
@@ -596,7 +596,7 @@ class GuiImage: public GuiElement
 		int tileVertical; //!< Number of times to draw (tile) the image vertically
 		u8 stripe; //!< Alpha value (0-255) to apply a stripe effect to the texture
 		short widescreen; //added
-		bool parentangle;
+		bool parentangle = true;
 };
 //!Display, manage, and manipulate text in the GUI
 class GuiText: public GuiElement

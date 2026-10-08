@@ -334,15 +334,17 @@ void HomebrewBrowser::MainButtonClicked(int button)
 	if (choice == 1)
 	{
 		u8 *buffer = NULL;
-		u32 filesize = 0;
-		LoadFileToMem(HomebrewList->GetFilepath(button), &buffer, &filesize);
+		//! The entry's own size is already in scope as filesize
+		u32 dolsize = 0;
+		LoadFileToMem(HomebrewList->GetFilepath(button), &buffer, &dolsize);
 		if(!buffer)
 		{
 			WindowPrompt(tr("Error:"), tr("Not enough memory."), tr("OK"));
 			return;
 		}
 		FreeHomebrewBuffer();
-		CopyHomebrewMemory(buffer, 0, filesize);
+		CopyHomebrewMemory(buffer, 0, dolsize);
+		free(buffer);
 
 		AddBootArgument(HomebrewList->GetFilepath(button));
 

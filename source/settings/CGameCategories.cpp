@@ -265,11 +265,7 @@ void CGameCategories::RemoveCategory(unsigned int id)
 
 void CGameCategories::RemoveGameCategories(const std::string &gameID)
 {
-	for (std::map<std::string, std::vector<unsigned int>>::iterator itr = List.begin(); itr != List.end(); itr++)
-	{
-		if (gameID == itr->first)
-			List.erase(itr);
-	}
+	List.erase(gameID);
 }
 
 void CGameCategories::RemoveCategory(const char *gameID, unsigned int id)

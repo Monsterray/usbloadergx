@@ -51,7 +51,7 @@ class FlyingButtonsMenu : public GuiWindow
 		int currentPage;
 		int returnMenu;
 		int ParentMenu;
-		int FirstIndicator;
+		int FirstIndicator = 0;
 		std::string MenuTitle;
 		enum
 		{
@@ -71,7 +71,6 @@ class FlyingButtonsMenu : public GuiWindow
 
 		GuiImage * settingsbackground;
 		GuiImage * backBtnImg;
-		GuiImage * PageindicatorImg2;
 		GuiImage * GoLeftImg;
 		GuiImage * GoRightImg;
 
@@ -85,7 +84,6 @@ class FlyingButtonsMenu : public GuiWindow
 
 		GuiText * titleTxt;
 		GuiText * backBtnTxt;
-		GuiText * PageindicatorTxt1;
 
 		GuiButton * backBtn;
 		GuiButton * homeBtn;

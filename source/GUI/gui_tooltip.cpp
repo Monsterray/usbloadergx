@@ -71,7 +71,7 @@ void GuiTooltip::SetText(const char * t)
 	{
 		std::string tooltiptxt(t);
 		if (tooltiptxt.length() > 50)
-			tooltiptxt = tooltiptxt.substr(0, 50) + "...";
+			tooltiptxt.replace(50, std::string::npos, "...");
 		if ((text = new GuiText(tooltiptxt.c_str(), 22, (GXColor){0, 0, 0, 255})))
 		{
 			text->SetParent(this);

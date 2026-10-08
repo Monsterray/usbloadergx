@@ -46,13 +46,13 @@ URL_List::URL_List(const char * url)
 	while (cnt < file.size)
 	{
 
-		if (file.data[cnt] == '"' && file.data[cnt - 1] == '=' && file.data[cnt - 2] == 'f' && file.data[cnt - 3]
+		if (cnt >= 5 && file.data[cnt] == '"' && file.data[cnt - 1] == '=' && file.data[cnt - 2] == 'f' && file.data[cnt - 3]
 				== 'e' && file.data[cnt - 4] == 'r' && file.data[cnt - 5] == 'h')
 		{
 
 			u32 cnt2 = 0;
 			cnt++;
-			while (file.data[cnt] != '"' && cnt2 < 1024)
+			while (cnt < file.size && file.data[cnt] != '"' && cnt2 < sizeof(temp) - 1)
 			{
 				temp[cnt2] = file.data[cnt];
 				cnt2++;
@@ -60,36 +60,35 @@ URL_List::URL_List(const char * url)
 			}
 			temp[cnt2] = '\0';
 
-			Links = (Link_Info *) realloc(Links, (urlcount + 1) * sizeof(Link_Info));
+			Link_Info *newLinks = (Link_Info *) realloc(Links, (urlcount + 1) * sizeof(Link_Info));
 
-			if (!Links)
+			if (!newLinks)
 			{
-				for (int i = 0; i == urlcount; i++)
+				for (int i = 0; i < urlcount; i++)
 				{
-					delete Links[i].URL;
+					delete[] Links[i].URL;
 					Links[i].URL = NULL;
 				}
 				free(Links);
 				Links = NULL;
-				MEM2_free(file.data);
 				urlcount = -4;
 				break;
 			}
 
+			Links = newLinks;
 			memset(&(Links[urlcount]), 0, sizeof(Link_Info));
 
 			Links[urlcount].URL = new char[cnt2 + 1];
 
 			if (!Links[urlcount].URL)
 			{
-				for (int i = 0; i == urlcount; i++)
+				for (int i = 0; i < urlcount; i++)
 				{
-					delete Links[i].URL;
+					delete[] Links[i].URL;
 					Links[i].URL = NULL;
 				}
 				free(Links);
 				Links = NULL;
-				MEM2_free(file.data);
 				urlcount = -5;
 				break;
 			}
@@ -110,9 +109,9 @@ URL_List::URL_List(const char * url)
 
 URL_List::~URL_List()
 {
-	for (int i = 0; i == urlcount; i++)
+	for (int i = 0; i < urlcount; i++)
 	{
-		delete Links[i].URL;
+		delete[] Links[i].URL;
 		Links[i].URL = NULL;
 	}
 
@@ -125,7 +124,7 @@ URL_List::~URL_List()
 
 char * URL_List::GetURL(int ind)
 {
-	if (ind > urlcount || ind < 0 || !Links || urlcount <= 0)
+	if (ind >= urlcount || ind < 0 || !Links || urlcount <= 0)
 		return NULL;
 	else return Links[ind].URL;
 }

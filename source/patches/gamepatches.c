@@ -301,7 +301,7 @@ void patch_width(u8 *addr, u32 len)
 
                     *(u32 *)offset = 0x48000000 + (((u32)patch - (u32)offset) & 0x3ffffff);
                     *(u32 *)(patch + 0x10) = 0x48000000 + ((((u32)offset + 0x04) - ((u32)patch + 16)) & 0x3ffffff);
-                    gprintf("Patched resolution. Branched from 0x%x to 0x%x\n", offset, patch);
+                    gprintf("Patched resolution. Branched from 0x%x to 0x%x\n", (u32) offset, (u32) patch);
                     //hexdump((void *)patch - 32, 92);
                     return;
                 }
@@ -511,7 +511,7 @@ void PatchFix480p()
 
     *(u32 *)offset = 0x48000000 + (((u32)patch - (u32)offset) & 0x3ffffff);
     *(u32 *)(patch + 8) = 0x48000000 + ((((u32)offset + 4) - ((u32)patch + 8)) & 0x3ffffff);
-    gprintf("Applied 480p patch. Branched from 0x%x to 0x%x\n", offset, patch);
+    gprintf("Applied 480p patch. Branched from 0x%x to 0x%x\n", (u32) offset, (u32) patch);
     //hexdump((void *)patch - 32, 92);
     return;
 }

@@ -909,7 +909,7 @@ static bool __usbstorage_ogc_IsInserted(void)
 				// if (*((u32 *)(mbr)) != 0x57424653 && *((u16 *)(mbr + 0x1FE)) != 0x55AA && *((u16 *)(mbr + 0x1FE)) != 0x55AB)
 				// if (*((u32 *)mbr) != 0x57424653 && *((u16 *)mbr + 0x1FE) != 0x55AA && *((u16 *)mbr + 0x1FE) != 0x55AB)
 				{
-					gprintf("No identifier found for USB storage device with vid %lu pid %lu. Skipping...\n", vid, pid);
+					gprintf("No identifier found for USB storage device with vid %u pid %u. Skipping...\n", vid, pid);
 					__lwp_heap_free(&__heap, mbr);
 					__usbstorage_ogc_reset(&__usbfd);
 					continue;

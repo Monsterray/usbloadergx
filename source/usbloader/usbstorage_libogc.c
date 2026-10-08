@@ -211,7 +211,10 @@ s32 USBStorage_OGC_Initialize()
 	if(arena_ptr == NULL)
 		arena_ptr = (u8*)MEM2_alloc(HEAP_SIZE);
 	if(arena_ptr == NULL)
+	{
+		_CPU_ISR_Restore(level);
 		return IPC_ENOMEM;
+	}
 
 	__lwp_heap_init(&__heap, arena_ptr, HEAP_SIZE, 32);
 	cbw_buffer=(u8*)__lwp_heap_allocate(&__heap, 32);
@@ -969,10 +972,12 @@ static bool __usbstorage_ogc_Shutdown(void)
 {
 	if (__vid != 0 || __pid != 0)
 		USBStorage_OGC_Close(&__usbfd);
-	if(arena_ptr != NULL)
-		MEM2_free(arena_ptr);
-	arena_ptr = NULL;
 
+	//! Keep the arena. USBStorage_OGC_Initialize() returns early while __inited
+	//! is set, so the next Startup() would carry on with a freed heap: on IOS58
+	//! every unmount and remount of USB (switching the display type to Wii games
+	//! with none listed, for one) used freed memory, and libogc's heap walks it
+	//! with interrupts disabled, which froze the console, Reset and Power too.
 	return true;
 }
 
@@ -980,6 +985,10 @@ void USBStorage_OGC_Deinitialize()
 {
 	__usbstorage_ogc_Shutdown();
 	LWP_CloseQueue(__usbstorage_ogc_waitq);
+	if(arena_ptr != NULL)
+		MEM2_free(arena_ptr);
+	arena_ptr = NULL;
+	cbw_buffer = NULL;
 	__inited = false;
 }
 

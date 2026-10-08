@@ -38,5 +38,13 @@ grep -q 'strncpy(fname_title, fname, TITLE_LEN);' "$SRC/usbloader/wbfs/wbfs_fat.
 grep -qE '\bstrcpy\(' "$SRC/cache/cache.cpp" \
 	&& fail "cache.cpp uses an unbounded copy for a cached game path"
 
+# 5. On IOS58 USB goes through usbstorage_libogc.c. Shutdown() freed the arena while
+#    __inited stayed set, so Initialize() returned early on the next Startup() and every
+#    remount ran on freed memory; libogc walks that heap with interrupts disabled, and
+#    the console froze, Reset and Power included (switching the display type to Wii games
+#    with none listed did it). Initialize() also returned with interrupts disabled.
+awk '/^static bool __usbstorage_ogc_Shutdown/,/^}/' "$SRC/usbloader/usbstorage_libogc.c" | grep -q 'MEM2_free' 	&& fail "the IOS58 USB Shutdown() frees the arena Initialize() keeps using"
+awk '/^s32 USBStorage_OGC_Initialize/,/^}/' "$SRC/usbloader/usbstorage_libogc.c" | grep -B2 'return IPC_ENOMEM' | grep -q '_CPU_ISR_Restore' 	|| fail "USBStorage_OGC_Initialize() returns with interrupts disabled"
+
 [ "$status" -eq 0 ] && echo "OK: storage bounds guards are in place"
 exit "$status"

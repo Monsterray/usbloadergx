@@ -68,7 +68,7 @@ s32 Apploader_Run(entry_point *entry, char * dolpath, u8 alternatedol, u32 alter
 	while(appldr_main(&dst, &len, &offset))
 	{
 		/* Read data from DVD */
-		WDVD_Read(dst, len, (u64) (offset << 2));
+		WDVD_Read(dst, len, ((u64) offset) << 2);
 
 		RegisterDOL((u8 *) dst, len);
 

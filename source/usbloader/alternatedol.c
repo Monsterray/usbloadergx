@@ -103,8 +103,8 @@ u32 load_dol_image(void *dolstart)
 
 		memmove((void *) dolfile->text_start[i], dolstart + dolfile->text_pos[i], dolfile->text_size[i]);
 		RegisterDOL((u8 *) dolfile->text_start[i], dolfile->text_size[i]);
-		Remove_001_Protection((void *) dolfile->data_start[i], dolfile->data_size[i]);
-		DCFlushRange((void *) dolfile->data_start[i], dolfile->data_size[i]);
+		Remove_001_Protection((void *) dolfile->text_start[i], dolfile->text_size[i]);
+		DCFlushRange((void *) dolfile->text_start[i], dolfile->text_size[i]);
 		ICInvalidateRange((void *) dolfile->text_start[i], dolfile->text_size[i]);
 	}
 

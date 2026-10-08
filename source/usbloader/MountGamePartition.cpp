@@ -67,7 +67,7 @@ static int FindGamePartition()
 		WBFS_Close(i);
 	}
 
-	if(firstValidPartition >= 0)
+	if(firstValidPartition >= 0 && WBFS_OpenPart(firstValidPartition) == 0)
 	{
 		GameTitles.SortTitleList();
 		Settings.partition = firstValidPartition;

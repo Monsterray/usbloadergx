@@ -83,27 +83,52 @@ void WavDecoder::OpenFile()
 		return;
 	}
 
-	DataOffset = sizeof(SWaveHdr)+le32(FmtChunk.size)+8;
-	file_fd->seek(DataOffset, SEEK_SET);
-	SWaveChunk DataChunk;
-	file_fd->read((u8 *) &DataChunk, sizeof(SWaveChunk));
+	//! Every chunk size below comes out of the file. Walk forward only, and stop
+	//! at the end of the file, or a wrapped size makes this loop run forever.
+	u32 FileSize = file_fd->size();
 
-	while(DataChunk.magicDATA != 'data')
+	DataOffset = sizeof(SWaveHdr)+le32(FmtChunk.size)+8;
+	SWaveChunk DataChunk;
+	memset(&DataChunk, 0, sizeof(SWaveChunk));
+
+	while(1)
 	{
-		DataOffset += 8+le32(DataChunk.size);
-		file_fd->seek(DataOffset, SEEK_SET);
-		int ret = file_fd->read((u8 *) &DataChunk, sizeof(SWaveChunk));
-		if(ret <= 0)
+		if(DataOffset + sizeof(SWaveChunk) > FileSize)
 		{
 			CloseFile();
 			return;
 		}
+
+		file_fd->seek(DataOffset, SEEK_SET);
+		if(file_fd->read((u8 *) &DataChunk, sizeof(SWaveChunk)) <= 0)
+		{
+			CloseFile();
+			return;
+		}
+
+		if(DataChunk.magicDATA == 'data')
+			break;
+
+		u32 NextOffset = DataOffset + 8 + le32(DataChunk.size);
+		if(NextOffset <= DataOffset)
+		{
+			CloseFile();
+			return;
+		}
+
+		DataOffset = NextOffset;
 	}
 
 	DataOffset += 8;
 	DataSize = le32(DataChunk.size);
+	if(DataSize > FileSize - DataOffset)
+		DataSize = FileSize - DataOffset;
 	Is16Bit = (le16(FmtChunk.bps) == 16);
-	SampleRate = le32(FmtChunk.freq);
+
+	//! SampleRate is a u16 and reaches ASND, so a rate the file made up must not
+	//! reach it as 0 or as a truncated value.
+	u32 freq = le32(FmtChunk.freq);
+	SampleRate = (freq >= 8000 && freq <= 48000) ? freq : 48000;
 
 	if (le16(FmtChunk.channels) == 1 && le16(FmtChunk.bps) == 8 && le16(FmtChunk.alignment) <= 1)
 		Format = VOICE_MONO_8BIT;

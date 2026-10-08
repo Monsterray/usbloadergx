@@ -138,7 +138,9 @@ bool MusicPlayer::ParsePath(const char *folderpath)
 		}
 	}
 
-	char *LoadedFilename = strrchr(folderpath, '/') + 1;
+	//! Settings.ogg_path starts out empty, and then there is no slash to find.
+	const char *slashPos = strrchr(folderpath, '/');
+	const char *LoadedFilename = slashPos ? slashPos + 1 : folderpath;
 
 	char filename[1024];
 	struct dirent *dirent = NULL;

@@ -695,7 +695,7 @@ static int InternalShowGameInfo(struct discHdr *header)
 		int year = GameInfo.PublishDate >> 16;
 		int day = GameInfo.PublishDate & 0xFF;
 		int month = (GameInfo.PublishDate >> 8) & 0xFF;
-		if (day != 0 && month != 0)
+		if (day != 0 && month >= 1 && month <= 12)
 		{
 			const char *readableMonths[13] = {
 				tr( "Jan" ), tr( "Feb" ), tr( "Mar" ), tr( "Apr" ), tr( "May" ), tr( "June" ),
@@ -1112,7 +1112,7 @@ char *readable_size(float size, char *buf)
 {
 	int i = 0;
 	const char *suffix[] = {"B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"};
-	while (size > 1024 && i < 9)
+	while (size > 1024 && i < 8)
 	{
 		size /= 1024;
 		i++;

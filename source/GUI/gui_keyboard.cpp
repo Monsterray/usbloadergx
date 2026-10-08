@@ -33,7 +33,7 @@ GuiKeyboard::GuiKeyboard(char * t, u32 max, int minimum, int lang)
 	selectable = true;
 	alignmentHor = ALIGN_CENTER;
 	alignmentVert = ALIGN_MIDDLE;
-	kbtextmaxlen = max > sizeof(kbtextstr) ? sizeof(kbtextstr) : max; // limit max up to sizeof(kbtextstr)
+	kbtextmaxlen = (max == 0 || max > sizeof(kbtextstr)) ? sizeof(kbtextstr) : max; // limit max up to sizeof(kbtextstr)
 	memset(kbtextstr, 0, sizeof(kbtextstr));
 	strncpy(kbtextstr, t, kbtextmaxlen); // strncpy is needed to fill the rest with \0
 	kbtextstr[sizeof(kbtextstr) - 1] = 0; // terminate with \0

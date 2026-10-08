@@ -203,7 +203,11 @@ int ParseDirectory(const char* Path, int Flags, FILTERCASCADE *Filter)
 							return -1;
 					}
 				}
-				if (getcwd(fulldir, sizeof(fulldir))) return -1; // gets the concatenated current working dir
+				if (!getcwd(fulldir, sizeof(fulldir))) // gets the concatenated current working dir
+				{
+					chdir(filename); // restore the saved cwd
+					return -1;
+				}
 				chdir(filename); // restore the saved cwd
 			}
 		}
@@ -220,7 +224,7 @@ int ParseDirectory(const char* Path, int Flags, FILTERCASCADE *Filter)
 		{
 			curDevice = i;
 			browser = &browsers[curDevice];
-			strcpy(browser->dir, &fulldir[strlen(browser->rootdir)]);
+			strlcpy(browser->dir, &fulldir[strlen(browser->rootdir)], sizeof(browser->dir));
 		}
 		else if (Flags & FB_TRYSTDDEV)
 		{
@@ -487,10 +491,10 @@ int BrowseDevice(char * Path, int Path_size, int Flags, FILTERCASCADE *Filter/*=
 		else if (usbBtn.GetState() == STATE_CLICKED)
 		{
 			usbBtn.ResetState();
-			for (u32 i = 1; i < browsers.size(); i++)
+			for (u32 dev = 1; dev < browsers.size(); dev++)
 			{
 				LOCK( &fileBrowser );
-				if (ParseDirectory((curDevice + i) % browsers.size(), Flags, Filter) == 0)
+				if (ParseDirectory((curDevice + dev) % browsers.size(), Flags, Filter) == 0)
 				{
 					fileBrowser.ResetState();
 					fileBrowser.UpdateList();
@@ -511,8 +515,8 @@ int BrowseDevice(char * Path, int Path_size, int Flags, FILTERCASCADE *Filter/*=
 			char newfolder[1024 * 5];
 			snprintf(newfolder, sizeof(newfolder), "%s%s", browser->rootdir, browser->dir);
 
-			int result = OnScreenKeyboard(newfolder, sizeof(newfolder), strlen(browser->rootdir));
-			if (result == 1)
+			int keyboardResult = OnScreenKeyboard(newfolder, sizeof(newfolder), strlen(browser->rootdir));
+			if (keyboardResult == 1)
 			{
 				unsigned int len = strlen(newfolder);
 				if (len > 0 && len + 1 < sizeof(newfolder) && newfolder[len - 1] != '/')

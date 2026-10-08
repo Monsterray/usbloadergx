@@ -38,9 +38,11 @@ class CCategoryList
 		void RemoveCategory(unsigned int id);
 		void RemoveCategory(const std::string &name);
 		bool goToFirst() { listIter = nameList.begin(); return true; }
-		bool goToNext() { listIter++; return listIter != nameList.end(); }
-		unsigned int getCurrentID() const { return listIter->first; }
-		const std::string &getCurrentName() const { return listIter->second; }
+		bool goToNext() { if(listIter != nameList.end()) listIter++; return listIter != nameList.end(); }
+		//! Callers step the iterator with a list index that can be stale, so both
+		//! of these must hold at end(). Entry 0 is "All" and always exists.
+		unsigned int getCurrentID() const { return listIter != nameList.end() ? listIter->first : 0; }
+		const std::string &getCurrentName() const { static const std::string none; return listIter != nameList.end() ? listIter->second : none; }
 		const char * operator[](unsigned int id);
 		const char *at(unsigned int id) { return operator[](id); }
 		void goToNextCicle()  { listIter++; if(listIter == nameList.end()) listIter = nameList.begin(); }

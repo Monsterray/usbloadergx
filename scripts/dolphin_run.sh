@@ -5,7 +5,7 @@
 #   env:   DOL=<path>       .dol to boot (default: usbloader_gx/boot.dol from the last scripts/build.sh)
 #          DOLPHIN=<dir>    Dolphin install (default /c/tools/Dolphin-x64)
 #          KEEP=<n>         frames to keep, the last ones (default 60)
-#          DOLPHIN_ARGS     extra arguments appended verbatim, e.g. "-C Dolphin.Core.MMU=True"
+#          DOLPHIN_ARGS     extra arguments appended verbatim, e.g. "-C Dolphin.Core.MMU=False" to turn MMU emulation back off
 #
 # What it proves: the loader boots, the GUI renders, the menus open. What it cannot prove:
 # anything that needs a cIOS, USB storage or a real disc drive (Dolphin has none of them), so
@@ -78,6 +78,11 @@ CFGARGS=(
 	-C Dolphin.Core.WiiSDCardAllowWrites=True
 	-C Dolphin.Core.WiiSDCardEnableFolderSync=True
 	-C Dolphin.Core.AccurateCPUCache=True
+	# MMU emulation faults on a bad address the way the console does. With it off, Dolphin
+	# reads address 0 as zeros, and a NULL dereference runs on as if nothing happened: the
+	# argv[0] read in StartUpProcess::Run() and a theme font FreeType rejects both looked
+	# fine without it and stop at a DSI with it.
+	-C Dolphin.Core.MMU=True
 	# A USB Gecko in slot B (EXIDeviceType::Gecko = 7): GX's gprintf, stdout and stderr
 	# go to it, and scripts/gecko_log.py saves them as gecko.log.
 	-C Dolphin.Core.SlotB=7

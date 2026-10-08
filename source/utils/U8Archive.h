@@ -66,6 +66,17 @@ protected:
 	FstEntry *fst;
 	char *name_table;
 	u8* data;
+	//! Every offset and count in a U8 archive comes out of the archive itself.
+	//! These three are what the buffer really holds, and bound all of them.
+	u32 fst_count;
+	u32 name_table_len;
+	u32 data_len;		//!< 0 when the archive is read from NAND instead of memory
+
+	//! true when [offset, offset + len) lies inside the archive buffer
+	bool InArchive( u32 offset, u32 len ) const
+	{
+		return data && (u64)offset + len <= data_len;
+	}
 
 	u32 NextEntryInFolder( u32 current, u32 directory ) const ;
 	s32 EntryFromPath( const char *path, int d = 0 ) const ;

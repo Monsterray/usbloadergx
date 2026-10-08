@@ -77,7 +77,7 @@ bool SystemMenuResources::Init()
 			}
 
 			// Quickly check that it's a U8 archive
-			if (*(u32 *)(resourceArc) != 0x55AA382D)
+			if (!resourceArc || resourceLen < sizeof(u32) || *(u32 *)(resourceArc) != 0x55AA382D)
 			{
 				free(resourceArc);
 				continue;

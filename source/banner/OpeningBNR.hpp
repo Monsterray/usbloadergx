@@ -42,6 +42,10 @@ typedef struct _GC_OpeningBnr
 	} description[6];              // 6 only on BNR2 => English, German, French, Spanish, Italian, Dutch ??
 } GC_OpeningBnr;
 
+//! The smallest usable opening.bnr: magic, padding, the 96x32 texture and one
+//! description block. A BNR1 file is exactly this long.
+#define BNR_MIN_SIZE (0x1820 + sizeof(((GC_OpeningBnr *)0)->description[0]))
+
 typedef struct _IMETHeader
 {
 	u8 zeroes[64];

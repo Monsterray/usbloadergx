@@ -14,7 +14,9 @@ set -u
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="devkitpro/devkitppc:20250527"
+# The toolchain stage of the Dockerfile: the devkitPPC image plus the packages it
+# adds. Built from the Dockerfile alone, with no context, and cached after the first time.
+IMAGE="usbloadergx-toolchain"
 WSL_DISTRO="${WSL_DISTRO:-Ubuntu-24.04}"
 
 if [ "${GX_IN_CONTAINER:-}" != "1" ]; then
@@ -28,6 +30,7 @@ if [ "${GX_IN_CONTAINER:-}" != "1" ]; then
 		echo "docker not found, natively or through WSL." >&2
 		exit 1
 	fi
+	"${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" - < "$ROOT/Dockerfile" >/dev/null
 	exec "${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" -e GX_IN_CONTAINER=1 \
 		"$IMAGE" bash /src/scripts/verify-build.sh
 fi

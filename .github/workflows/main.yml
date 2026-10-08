@@ -44,7 +44,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
-    container: devkitpro/devkitppc:20250527
+    container: devkitpro/devkitppc:20260503
     # Steps in a container run with sh, which is dash in this image, and dash has no
     # pipefail: the compile step stopped at "set -o pipefail" with exit code 2.
     defaults:
@@ -52,6 +52,11 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+
+      # The image ships devkitppc-crtls 2.0.0, which leaves DOL segment sizes
+      # unaligned. Same package as the toolchain stage of the Dockerfile.
+      - name: Install devkitppc-crtls 2.1.0
+        run: dkp-pacman -U --noconfirm https://pkg.devkitpro.org/packages/devkitppc-crtls-2.1.0-1-any.pkg.tar.zst
 
       - name: Configure Git
         run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
@@ -72,6 +77,7 @@ jobs:
         run: |
           ls -l boot.dol boot.elf
           test -s boot.dol
+          sh scripts/check-dol.sh boot.dol
 
       - name: Check for compiler warnings
         run: |

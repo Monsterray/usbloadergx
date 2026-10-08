@@ -62,7 +62,7 @@ INCLUDES	:=	source
 #---------------------------------------------------------------------------------
 CFLAGS		=	-ggdb -Os -Wall -Wno-multichar -Wno-unused-parameter -Wextra -Wformat-security $(MACHDEP) $(INCLUDE) -D_GNU_SOURCE -DNDEBUG -DWOLFSSL_USER_SETTINGS
 CXXFLAGS	=	$(CFLAGS)
-LDFLAGS		=	-ggdb $(MACHDEP) -Wl,-Map,$(notdir $@).map,--section-start,.init=0x80B00000,-wrap,malloc,-wrap,free,-wrap,memalign,-wrap,calloc,-wrap,realloc,-wrap,malloc_usable_size
+LDFLAGS		=	-ggdb $(MACHDEP) -Wl,-Map,$(notdir $@).map,--section-start,.init=0x80B00000,-wrap,malloc,-wrap,free,-wrap,memalign,-wrap,calloc,-wrap,realloc,-wrap,malloc_usable_size $(PROJECTDIR)/source/gx_symbols.ld
 
 ifeq ($(BUILDMODE),channel)
 	CFLAGS += -DFULLCHANNEL

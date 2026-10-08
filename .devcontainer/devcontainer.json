@@ -1,6 +1,10 @@
 {
     "name": "devkitPPC",
-    "image": "devkitpro/devkitppc:20250527",
+    "build": {
+        "dockerfile": "../Dockerfile",
+        "context": "..",
+        "target": "toolchain"
+    },
     "customizations": {
         "vscode": {
             "settings": {

@@ -83,7 +83,6 @@ extern "C"
 	syssram *__SYS_LockSram();
 	u32 __SYS_UnlockSram(u32 write);
 	u32 __SYS_SyncSram(void);
-	extern void __exception_closeall();
 }
 
 typedef struct
@@ -1305,7 +1304,7 @@ int GameBooter::BootDevolution(struct discHdr *gameHdr)
 	u32 cpu_isr;
 	SYS_ResetSystem(SYS_SHUTDOWN, 0, 0);
 	_CPU_ISR_Disable(cpu_isr);
-	__exception_closeall();
+	CloseExceptionVectors();
 	LAUNCH_DEVO();
 	_CPU_ISR_Restore(cpu_isr);
 	return 0;

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ogcsys.h>
 #include <ogc/lwp_watchdog.h>
+#include <ogc/machine/processor.h>
 
 #include "patches/gamepatches.h"
 #include "patches/wip.h"
@@ -26,6 +27,7 @@
 #pragma GCC diagnostic ignored "-Wstringop-overread"
 #endif
 
+//! From source/gx_symbols.ld: GX's read-only and initialised data
 extern char etext, edata;
 
 // Global app entry point
@@ -387,6 +389,29 @@ s32 Disc_Mount(struct discHdr *header)
 	return -1;
 }
 
+//! What libogc 2's __exception_closeall() did; libogc 3 has no such call. The
+//! program GX starts must not find a handler or breakpoint of GX's: every
+//! exception vector returns at once until that program puts in its own.
+void CloseExceptionVectors(void)
+{
+	static const u32 vectors[] = {
+		0x0100, 0x0200, 0x0300, 0x0400, 0x0500, 0x0600, 0x0700, 0x0800,
+		0x0900, 0x0C00, 0x0D00, 0x0F00, 0x1300, 0x1400, 0x1700
+	};
+
+	mtmsr((mfmsr() & ~MSR_EE) | MSR_FP | MSR_RI);
+	mtspr(IABR, 0);
+	mtspr(DABR, 0);
+
+	for (u32 i = 0; i < sizeof(vectors) / sizeof(vectors[0]); i++)
+	{
+		vu32 *vector = (vu32 *)(0x80000000 | vectors[i]);
+		*vector = 0x4C000064; // rfi
+		DCFlushRange((void *)vector, 32);
+		ICInvalidateRange((void *)vector, 32);
+	}
+}
+
 s32 Disc_JumpToEntrypoint(s32 hooktype, u32 dolparameter)
 {
 	/* Set an appropiate video mode */
@@ -396,10 +421,9 @@ s32 Disc_JumpToEntrypoint(s32 hooktype, u32 dolparameter)
 	__Disc_SetTime();
 
 	/* Shutdown IOS subsystems */
-	extern void __exception_closeall();
 	u32 level = IRQ_Disable();
 	__IOS_ShutdownSubsystems();
-	__exception_closeall();
+	CloseExceptionVectors();
 
 	 /* Originally from tueidj - taken from NeoGamme (thx) */
 	*(vu32*)0xCC003024 = dolparameter != 0 ? dolparameter : 1;

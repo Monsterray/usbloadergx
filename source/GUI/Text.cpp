@@ -254,7 +254,6 @@ void Text::CalcLineOffsets()
 	int ch = 0;
 	int lastSpace = -1;
 	int currWidth = 0;
-	int i = 0;
 
 	while (origTxt[ch])
 	{
@@ -271,7 +270,6 @@ void Text::CalcLineOffsets()
 			TextLines.push_back(TmpLine);
 			currWidth = 0;
 			lastSpace = -1;
-			i = -1;
 			TmpLine.LineOffset = ch + 1;
 		}
 		else if (origTxt[ch] == '\n')
@@ -281,7 +279,6 @@ void Text::CalcLineOffsets()
 			TextLines.push_back(TmpLine);
 			currWidth = 0;
 			lastSpace = -1;
-			i = -1;
 			TmpLine.LineOffset = ch + 1;
 		}
 		else if (origTxt[ch] == ' ')
@@ -290,7 +287,6 @@ void Text::CalcLineOffsets()
 		}
 
 		ch++;
-		i++;
 	}
 
 	TmpLine.CharCount = ch - TmpLine.LineOffset;

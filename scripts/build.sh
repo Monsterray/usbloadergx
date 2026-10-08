@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build USB Loader GX in the CI-pinned devkitPro image (devkitpro/devkitppc:20250527).
-# Same image as .github/workflows/main.yml, Dockerfile and .devcontainer.
+# Build USB Loader GX with the toolchain stage of the Dockerfile (devkitpro/devkitppc
+# plus the packages it adds). CI installs the same; .devcontainer builds the same stage.
 #
 # Usage:
 #   scripts/build.sh              # docker build -o . .  -> usbloader_gx.zip (boot.dol + boot.elf)
@@ -18,7 +18,9 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="devkitpro/devkitppc:20250527"
+# The toolchain stage of the Dockerfile: the devkitPPC image plus the packages it
+# adds. Built from the Dockerfile alone, with no context, and cached after the first time.
+IMAGE="usbloadergx-toolchain"
 WSL_DISTRO="${WSL_DISTRO:-Ubuntu-24.04}"
 
 if command -v docker >/dev/null 2>&1; then
@@ -34,6 +36,10 @@ else
 fi
 
 cd "$ROOT"
+toolchain() {
+	"${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" - < "$ROOT/Dockerfile" >/dev/null
+}
+
 case "${1:-zip}" in
 	zip)
 		"${DOCKER[@]}" build -o . .
@@ -41,9 +47,11 @@ case "${1:-zip}" in
 		;;
 	make)
 		shift
+		toolchain
 		"${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/w" -w /w "$IMAGE" make "$@"
 		;;
 	shell)
+		toolchain
 		"${DOCKER[@]}" run --rm -it -v "$MOUNT_ROOT:/w" -w /w "$IMAGE" bash
 		;;
 	*)

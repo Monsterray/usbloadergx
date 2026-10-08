@@ -15,6 +15,7 @@
 #include "sys.h"
 #include "gecko.h"
 #include "app_booter_bin.h"
+#include "usbloader/disc.h"
 
 #define EXECUTE_ADDR ((u8 *)0x92000000)
 #define BOOTER_ADDR ((u8 *)0x93000000)
@@ -23,10 +24,6 @@
 #define MAX_HOMEBREW_SIZE ((u32)(BOOTER_ADDR - EXECUTE_ADDR))
 
 typedef void (*entrypoint)(void);
-extern "C"
-{
-	void __exception_closeall();
-}
 
 extern bool isWiiVC; // in sys.cpp
 
@@ -156,7 +153,7 @@ static int RunAppbooter()
 
 	SYS_ResetSystem(SYS_SHUTDOWN, 0, 0);
 	u32 level = IRQ_Disable();
-	__exception_closeall();
+	CloseExceptionVectors();
 	entry();
 	IRQ_Restore(level);
 

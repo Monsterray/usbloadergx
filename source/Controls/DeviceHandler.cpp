@@ -321,11 +321,8 @@ const char *DeviceHandler::GetFSName(int dev)
 	else if (dev >= USB1 && dev <= USB8)
 	{
 		int partCount0 = 0;
-		int partCount1 = 0;
 		if (DeviceHandler::instance->usb0)
 			partCount0 += DeviceHandler::instance->usb0->GetPartitionCount();
-		if (DeviceHandler::instance->usb1)
-			partCount1 += DeviceHandler::instance->usb1->GetPartitionCount();
 
 		if (dev - USB1 < partCount0 && DeviceHandler::instance->usb0)
 			return DeviceHandler::instance->usb0->GetFSName(dev - USB1);

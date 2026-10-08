@@ -26,7 +26,7 @@ Slot 251 base 58
 ````
 
 ## Building
-The project is built with the devkitPro toolchain pinned in CI (`devkitpro/devkitppc:20250527`). Use any of the following. They compile with the same flags; builds made outside CI are tagged as unofficial in the version string.
+The project is built with devkitPPC r50 and libogc 3: the image `devkitpro/devkitppc:20260503` plus `devkitppc-crtls` 2.1.0, which the image does not have yet (the `toolchain` stage of the `Dockerfile`; CI installs the same). Use any of the following. They compile with the same flags; builds made outside CI are tagged as unofficial in the version string.
 
 1. **Docker** (Linux, macOS, or Windows via WSL2 with Docker Engine installed):
    ````
@@ -34,7 +34,7 @@ The project is built with the devkitPro toolchain pinned in CI (`devkitpro/devki
    ````
    This compiles inside the pinned image and writes `usbloader_gx.zip` to the repository root. `scripts/build.sh` wraps the same command and finds Docker through WSL on Windows.
 2. **VS Code Dev Container**: open the repository, choose *Reopen in Container*, then run `make release`.
-3. **Native devkitPro**: install the `wii-dev` group with `dkp-pacman`, then run `make release`. Match the toolchain version used by CI if you hit header or link errors.
+3. **Native devkitPro**: install the `wii-dev` group with `dkp-pacman`, update `devkitppc-crtls` to 2.1.0 or later, then run `make release`. With an older `devkitppc-crtls` the DOL sections are not padded to 32 bytes and Dolphin refuses `boot.dol`; `sh scripts/check-dol.sh boot.dol` tells. Match the toolchain version used by CI if you hit header or link errors.
 
 Before opening a pull request, run the static checks in `tests/` (for example `sh tests/check-nintendont-loader-path.sh`) and the host tests (`sh tests/host/run.sh`); CI runs all of them, and fails the build on any compiler warning outside the vendored `portlibs`, `source/xml/pugi*` and `source/libs` code. `scripts/diag.sh warnings` and `scripts/cppcheck.sh` run the extra diagnostics used for code review, and `scripts/verify-build.sh` checks the build system itself after a Makefile change.
 

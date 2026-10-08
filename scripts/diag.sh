@@ -16,7 +16,9 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE="devkitpro/devkitppc:20250527"
+# The toolchain stage of the Dockerfile: the devkitPPC image plus the packages it
+# adds. Built from the Dockerfile alone, with no context, and cached after the first time.
+IMAGE="usbloadergx-toolchain"
 WSL_DISTRO="${WSL_DISTRO:-Ubuntu-24.04}"
 MODE="${1:-warnings}"
 OUT_MOUNT=()
@@ -35,7 +37,7 @@ fi
 # The Makefile's CFLAGS/LDFLAGS are recursive variables, so passing them on the
 # make command line keeps $(MACHDEP)/$(INCLUDE) expansion.
 BASE_CFLAGS='-ggdb -Os -Wall -Wno-multichar -Wno-unused-parameter -Wextra -Wformat-security $(MACHDEP) $(INCLUDE) -D_GNU_SOURCE -DNDEBUG -DWOLFSSL_USER_SETTINGS'
-BASE_LDFLAGS='-ggdb $(MACHDEP) -Wl,-Map,$(notdir $@).map,--section-start,.init=0x80B00000,-wrap,malloc,-wrap,free,-wrap,memalign,-wrap,calloc,-wrap,realloc,-wrap,malloc_usable_size'
+BASE_LDFLAGS='-ggdb $(MACHDEP) -Wl,-Map,$(notdir $@).map,--section-start,.init=0x80B00000,-wrap,malloc,-wrap,free,-wrap,memalign,-wrap,calloc,-wrap,realloc,-wrap,malloc_usable_size $(PROJECTDIR)/source/gx_symbols.ld'
 
 case "$MODE" in
 	warnings)
@@ -61,4 +63,5 @@ case "$MODE" in
 		;;
 esac
 
+"${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" - < "$ROOT/Dockerfile" >/dev/null
 "${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" "${OUT_MOUNT[@]}" -e CF="$CF" -e LF="${LF:-}" "$IMAGE" bash -c "$SCRIPT"

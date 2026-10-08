@@ -45,7 +45,7 @@ void wiilight(int enable) // Toggle wiilight (thanks Bool for wiilight source)
 }
 
 /* Variables */
-u8 shutdown = 0;
+u8 shutdownRequested = 0;
 u8 reset = 0;
 
 /* 
@@ -70,7 +70,7 @@ void __Sys_ResetCallback(__attribute__((unused)) u32 irq, __attribute__((unused)
 void __Sys_PowerCallback(void)
 {
 	/* Poweroff console */
-	shutdown = 1;
+	shutdownRequested = 1;
 }
 
 void Sys_Init(void)
@@ -124,7 +124,7 @@ void AppCleanUp(void)
 
 	ResourceManager::DestroyInstance();
 
-	if (shutdown)
+	if (shutdownRequested)
 		Wpad_Disconnect();
 	else
 		WPAD_Shutdown();

@@ -159,7 +159,7 @@ int HomebrewPrompt::MainLoop()
 	{
 		usleep(100);
 
-		if (shutdown)
+		if (shutdownRequested)
 		{
 			wiilight(0);
 			Sys_Shutdown();

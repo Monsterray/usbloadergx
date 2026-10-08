@@ -451,7 +451,7 @@ void ThemeMenu::MainButtonClicked(int button)
 	{
 		usleep(100);
 
-		if (shutdown)
+		if (shutdownRequested)
 			Sys_Shutdown();
 		else if (reset)
 			Sys_Reboot();

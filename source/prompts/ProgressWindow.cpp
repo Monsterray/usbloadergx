@@ -417,7 +417,7 @@ static void ProgressWindow(const char *title, const char *msg1, const char *msg2
 	{
 		usleep(100000);
 
-		if (shutdown)
+		if (shutdownRequested)
 			Sys_Shutdown();
 		if (reset)
 			Sys_Reboot();

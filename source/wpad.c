@@ -5,12 +5,12 @@
 #include "sys.h"
 #include "wpad.h"
 
-extern u8 shutdown;
+extern u8 shutdownRequested;
 
 void __Wpad_PowerCallback(s32 chan)
 {
 	/* Poweroff console */
-	shutdown = 1;
+	shutdownRequested = 1;
 }
 
 s32 Wpad_Init(void)

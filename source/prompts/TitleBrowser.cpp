@@ -25,7 +25,7 @@
 
 #include "Controls/DeviceHandler.hpp"
 #include "usbloader/NandEmu.h"
-extern u8 shutdown;
+extern u8 shutdownRequested;
 extern u8 reset;
 
 /********************************************************************************
@@ -183,7 +183,7 @@ bool TitleSelector(char output[])
 	{
 		VIDEO_WaitVSync();
 
-		if (shutdown == 1)
+		if (shutdownRequested == 1)
 			Sys_Shutdown();
 		if (reset == 1)
 			Sys_Reboot();
@@ -431,7 +431,7 @@ int TitleBrowser()
 	{
 		VIDEO_WaitVSync();
 
-		if (shutdown == 1)
+		if (shutdownRequested == 1)
 			Sys_Shutdown();
 		if (reset == 1)
 			Sys_Reboot();

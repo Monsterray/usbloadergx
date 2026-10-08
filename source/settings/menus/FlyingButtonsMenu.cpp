@@ -393,7 +393,7 @@ int FlyingButtonsMenu::MainLoop()
 {
 	usleep(50000);
 
-	if(shutdown)
+	if(shutdownRequested)
 		Sys_Shutdown();
 	else if(reset)
 		Sys_Reboot();

@@ -625,7 +625,7 @@ int GameBrowseMenu::Execute()
 	{
 		usleep(50000);
 
-		if (shutdown)
+		if (shutdownRequested)
 			Sys_Shutdown();
 		if (reset)
 			Sys_Reboot();

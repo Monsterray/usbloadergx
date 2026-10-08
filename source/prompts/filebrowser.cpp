@@ -33,7 +33,7 @@
 
 /*** Extern variables ***/
 extern GuiWindow * mainWindow;
-extern u8 shutdown;
+extern u8 shutdownRequested;
 extern u8 reset;
 
 /*** Extern functions ***/
@@ -414,7 +414,7 @@ int BrowseDevice(char * Path, int Path_size, int Flags, FILTERCASCADE *Filter/*=
 	{
 		VIDEO_WaitVSync();
 
-		if (shutdown == 1) Sys_Shutdown();
+		if (shutdownRequested == 1) Sys_Shutdown();
 
 		if (reset == 1) Sys_Reboot();
 

@@ -48,7 +48,7 @@ int GCMultiDiscMenu::ShowSelection()
 	{
 		usleep(10000);
 
-		if (shutdown)
+		if (shutdownRequested)
 			Sys_Shutdown();
 		else if (reset)
 			Sys_Reboot();

@@ -243,7 +243,7 @@ int CheckboxPrompt::Show(const char *title, const char *msg,
 	{
 		usleep(100);
 
-		if (shutdown)
+		if (shutdownRequested)
 			Sys_Shutdown();
 		if (reset)
 			Sys_Reboot();

@@ -549,7 +549,7 @@ void WindowCredits()
 	{
 		usleep(12000);
 
-		if (shutdown)
+		if (shutdownRequested)
 			Sys_Shutdown();
 		if (reset)
 			Sys_Reboot();
@@ -608,7 +608,7 @@ int WindowScreensaver()
 
 	while (!exit)
 	{
-		if (shutdown)
+		if (shutdownRequested)
 			Sys_Shutdown();
 		if (reset)
 			Sys_Reboot();
@@ -666,7 +666,7 @@ int WindowPrompt(const char *title, const char *msg, const char *btn1Label, cons
 	{
 		VIDEO_WaitVSync();
 
-		if (shutdown)
+		if (shutdownRequested)
 		{
 			wiilight(0);
 			Sys_Shutdown();
@@ -928,7 +928,7 @@ int WindowExitPrompt()
 			}
 		}
 
-		if (shutdown)
+		if (shutdownRequested)
 		{
 			wiilight(0);
 			Sys_Shutdown();

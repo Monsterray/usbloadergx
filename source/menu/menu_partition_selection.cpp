@@ -89,7 +89,7 @@ int SelectPartitionMenu()
 	{
 		VIDEO_WaitVSync();
 
-		if (shutdown)
+		if (shutdownRequested)
 			Sys_Shutdown();
 		if (reset)
 			Sys_Reboot();

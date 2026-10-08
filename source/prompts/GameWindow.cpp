@@ -547,7 +547,7 @@ int GameWindow::Run()
 	{
 		usleep(50000);
 
-		if (shutdown) //for power button
+		if (shutdownRequested) //for power button
 			Sys_Shutdown();
 		else if (reset) //for reset button
 			Sys_Reboot();

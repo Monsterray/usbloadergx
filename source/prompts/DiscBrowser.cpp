@@ -147,7 +147,7 @@ int DiscBrowse(const char * GameID, char * alternatedname, int alternatedname_si
 	{
 		usleep(100);
 
-		if (shutdown)
+		if (shutdownRequested)
 			Sys_Shutdown();
 		if (reset)
 			Sys_Reboot();

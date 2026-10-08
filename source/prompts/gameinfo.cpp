@@ -885,7 +885,7 @@ static int InternalShowGameInfo(struct discHdr *header)
 	{
 
 		VIDEO_WaitVSync();
-		if (shutdown == 1)
+		if (shutdownRequested == 1)
 		{
 			wiilight(0);
 			Sys_Shutdown();
@@ -938,7 +938,7 @@ static int InternalShowGameInfo(struct discHdr *header)
 			while(backBtn.GetState() != STATE_CLICKED && homeBtn.GetState() != STATE_CLICKED)
 			{
 				usleep(10000);
-				if (shutdown)
+				if (shutdownRequested)
 					Sys_Shutdown();
 				else if (reset)
 					Sys_Reboot();

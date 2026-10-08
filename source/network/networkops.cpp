@@ -25,7 +25,7 @@ u32 infilesize = 0;
 u32 uncfilesize = 0;
 
 s32 connection = -1;
-static s32 socket = -1;
+static s32 listenSocket = -1;
 static bool networkinitialized = false;
 static bool checkincomming = false;
 static bool waitforanswer = false;
@@ -156,10 +156,10 @@ void CloseConnection()
 		net_close(connection);
 		connection = -1;
 	}
-	if (waitforanswer && socket >= 0)
+	if (waitforanswer && listenSocket >= 0)
 	{
-		net_close(socket);
-		socket = -1;
+		net_close(listenSocket);
+		listenSocket = -1;
 		waitforanswer = false;
 	}
 	NET_UNLOCK();
@@ -209,7 +209,7 @@ int NetworkWait()
 	s32 local_connection = net_accept(local_socket, (struct sockaddr *)&client_address, &addrlen);
 
 	NET_LOCK();
-	socket = local_socket;
+	listenSocket = local_socket;
 	connection = local_connection;
 	snprintf(incommingIP, sizeof(incommingIP), "%s", inet_ntoa(client_address.sin_addr));
 	NET_UNLOCK();
@@ -218,7 +218,7 @@ int NetworkWait()
 	{
 		net_close(local_socket);
 		NET_LOCK();
-		socket = -1;
+		listenSocket = -1;
 		NET_UNLOCK();
 		return -4;
 	}
@@ -251,7 +251,7 @@ int NetworkWait()
 			net_close(local_socket);
 			NET_LOCK();
 			connection = -1;
-			socket = -1;
+			listenSocket = -1;
 			NET_UNLOCK();
 			return -4;
 		}

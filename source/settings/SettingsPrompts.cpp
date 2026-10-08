@@ -21,7 +21,7 @@
 #include "SoundOperations/MusicPlayer.h"
 
 /*** Extern variables ***/
-extern u8 shutdown;
+extern u8 shutdownRequested;
 extern u8 reset;
 
 
@@ -203,7 +203,7 @@ int MenuLanguageSelect()
 	{
 		usleep(100);
 
-		if ( shutdown == 1 )
+		if ( shutdownRequested == 1 )
 			Sys_Shutdown();
 		else if ( reset == 1 )
 			Sys_Reboot();

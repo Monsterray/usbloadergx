@@ -36,6 +36,7 @@ TplImage::TplImage(const char * filepath)
 {
 	TPLBuffer = NULL;
 	TPLSize = 0;
+	TPLHeader = NULL;
 
 	u8 * buffer = NULL;
 	u32 filesize = 0;
@@ -52,6 +53,7 @@ TplImage::TplImage(const u8 * imgBuffer, u32 imgSize)
 {
 	TPLBuffer = NULL;
 	TPLSize = 0;
+	TPLHeader = NULL;
 
 	if(imgBuffer)
 	{
@@ -93,7 +95,9 @@ bool TplImage::LoadImage(const u8 * imgBuffer, u32 imgSize)
 
 bool TplImage::ParseTplFile()
 {
-	if(!TPLBuffer)
+	//! The count and both offsets below come out of the file, so check each one
+	//! against the size that was really read before it is made into a pointer.
+	if(!TPLBuffer || TPLSize < sizeof(TPL_Header))
 		return false;
 
 	TPLHeader = (const TPL_Header *) TPLBuffer;
@@ -108,21 +112,25 @@ bool TplImage::ParseTplFile()
 
 	for(u32 i = 0; i < TPLHeader->num_textures; i++)
 	{
-		Texture.resize(i+1);
-		TextureHeader.resize(i+1);
-		TplTextureBuffer.resize(i+1);
+		if((const u8 *) (curTexture + 1) > TPLBuffer + TPLSize)
+			break;
 
-		Texture[i] = curTexture;
+		if((u64) curTexture->text_header_offset + sizeof(TPL_Texture_Header) > TPLSize)
+			break;
 
-		TextureHeader[i] = (const TPL_Texture_Header *) ((const u8 *) TPLBuffer+Texture[i]->text_header_offset);
+		const TPL_Texture_Header * header = (const TPL_Texture_Header *) (TPLBuffer + curTexture->text_header_offset);
 
-		TplTextureBuffer[i] = TPLBuffer + TextureHeader[i]->offset;
+		if(header->offset >= TPLSize)
+			break;
+
+		Texture.push_back(curTexture);
+		TextureHeader.push_back(header);
+		TplTextureBuffer.push_back(TPLBuffer + header->offset);
 
 		curTexture++;
 	}
 
-	return true;
-
+	return !Texture.empty();
 }
 
 int TplImage::GetWidth(int pos)
@@ -163,6 +171,15 @@ const u8 * TplImage::GetTextureBuffer(int pos)
 	}
 
 	return TplTextureBuffer[pos];
+}
+
+//! Bytes that are really there between the texture offset and the end of the file.
+u32 TplImage::GetAvailableSize(int pos)
+{
+	if(pos < 0 || pos >= (int) TplTextureBuffer.size() || !TPLBuffer)
+		return 0;
+
+	return TPLSize - (u32) (TplTextureBuffer[pos] - TPLBuffer);
 }
 
 int TplImage::GetTextureSize(int pos)
@@ -206,6 +223,10 @@ gdImagePtr TplImage::ConvertToGD(int pos)
 	{
 		return 0;
 	}
+
+	//! The header can claim a bigger texture than the file holds.
+	if((u32) GetTextureSize(pos) > GetAvailableSize(pos))
+		return 0;
 
 	gdImagePtr gdImg = 0;
 

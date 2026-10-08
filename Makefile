@@ -21,6 +21,7 @@ SOURCES		:=	source \
 				source/Controls \
 				source/system \
 				source/libs/libwbfs \
+				source/libs/libdrc \
 				source/libs/libruntimeiospatch \
 				source/language \
 				source/mload \
@@ -79,7 +80,7 @@ endif
 # Any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
 LIBS := -lwolfssl -lcustomfat -lcustomntfs -lcustomext2fs -lvorbisidec -logg \
-		-lmad -lfreetype -lgd -ljpeg -lpng -lm -lz -lwiiuse -lwiidrc \
+		-lmad -lfreetype -lgd -ljpeg -lpng -lm -lz -lwiiuse \
 		-lbte -lasnd -logc
 #---------------------------------------------------------------------------------
 # List of directories containing libraries, this must be the top level containing
@@ -130,7 +131,7 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 #---------------------------------------------------------------------------------
 # Build a list of library paths
 #---------------------------------------------------------------------------------
-export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) -L$(CURDIR)/source/libs/libdrc/ \
+export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) \
 					-L$(CURDIR)/source/libs/libext2fs -L$(CURDIR)/source/libs/libfat \
 					-L$(CURDIR)/source/libs/libntfs \
 					-L$(LIBOGC_LIB)

@@ -289,7 +289,7 @@ void ImageDownloader::DownloadImage(const char *url, const char *gameID, const c
 		default:  // Custom games?
 			sprintf(region, "EN");
 	}
-	sprintf(downloadURL, "%s%s/%s.png", url, region, gameID);
+	snprintf(downloadURL, sizeof(downloadURL), "%s%s/%s.png", url, region, gameID);
 	gprintf(" - Trying: %s\n", downloadURL);
 	downloadfile(downloadURL, file);
 	if (VALID_IMAGE(file))
@@ -317,7 +317,7 @@ void ImageDownloader::DownloadImage(const char *url, const char *gameID, const c
 	}
 	if (syslang[0] != '\0' && strncmp(syslang, region, 2) != 0)
 	{
-		sprintf(downloadURL, "%s%s/%s.png", url, syslang, gameID);
+		snprintf(downloadURL, sizeof(downloadURL), "%s%s/%s.png", url, syslang, gameID);
 		gprintf(" - Trying: %s\n", downloadURL);
 		downloadfile(downloadURL, file);
 		if (VALID_IMAGE(file))
@@ -355,7 +355,7 @@ void ImageDownloader::DownloadImage(const char *url, const char *gameID, const c
 	}
 	if (gameregion[0] != '\0' && strncmp(gameregion, region, 2) != 0 && strncmp(gameregion, syslang, 2) != 0)
 	{
-		sprintf(downloadURL, "%s%s/%s.png", url, gameregion, gameID);
+		snprintf(downloadURL, sizeof(downloadURL), "%s%s/%s.png", url, gameregion, gameID);
 		gprintf(" - Trying: %s\n", downloadURL);
 		downloadfile(downloadURL, file);
 		if (VALID_IMAGE(file))
@@ -367,7 +367,7 @@ void ImageDownloader::DownloadImage(const char *url, const char *gameID, const c
 	{
 		if (strncmp(region, "US", 2) != 0)
 		{
-			sprintf(downloadURL, "%sUS/%s.png", url, gameID);
+			snprintf(downloadURL, sizeof(downloadURL), "%sUS/%s.png", url, gameID);
 			gprintf(" - Trying: %s\n", downloadURL);
 			downloadfile(downloadURL, file);
 			if (VALID_IMAGE(file))
@@ -378,7 +378,7 @@ void ImageDownloader::DownloadImage(const char *url, const char *gameID, const c
 	// The game might only have an English cover available
 	if (strncmp(region, "EN", 2) != 0)
 	{
-		sprintf(downloadURL, "%sEN/%s.png", url, gameID);
+		snprintf(downloadURL, sizeof(downloadURL), "%sEN/%s.png", url, gameID);
 		gprintf(" - Trying: %s\n", downloadURL);
 		downloadfile(downloadURL, file);
 		if (VALID_IMAGE(file))

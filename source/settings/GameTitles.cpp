@@ -192,9 +192,7 @@ u32 CGameTitles::ReadCachedTitles(const char *path)
 
 	u32 revision = 0;
 
-	fread(&revision, 1, 4, f);
-
-	if (revision < VALID_CACHE_REVISION)
+	if (fread(&revision, 1, 4, f) != 4 || revision < VALID_CACHE_REVISION)
 	{
 		fclose(f);
 		return 0;
@@ -203,7 +201,11 @@ u32 CGameTitles::ReadCachedTitles(const char *path)
 	char LangCode[11];
 	memset(LangCode, 0, sizeof(LangCode));
 
-	fread(LangCode, 1, 10, f);
+	if (fread(LangCode, 1, 10, f) != 10)
+	{
+		fclose(f);
+		return 0;
+	}
 
 	//! Check if cache has correct language code
 	if (strcmp(LangCode, Settings.db_language) != 0)
@@ -213,19 +215,48 @@ u32 CGameTitles::ReadCachedTitles(const char *path)
 	}
 
 	u32 count = 0;
-	fread(&count, 1, 4, f);
+	if (fread(&count, 1, 4, f) != 4)
+	{
+		fclose(f);
+		return 0;
+	}
+
+	//! The count comes out of the file. Believe it only as far as the file goes:
+	//! a corrupt value would otherwise size a vector that cannot be allocated.
+	long headerEnd = ftell(f);
+	fseek(f, 0, SEEK_END);
+	long remaining = ftell(f) - headerEnd;
+	fseek(f, headerEnd, SEEK_SET);
+
+	if (headerEnd < 0 || remaining < 0 || count > (u32)(remaining / (long) sizeof(CacheTitle)))
+	{
+		fclose(f);
+		return 0;
+	}
+
+	if (count == 0)
+	{
+		fclose(f);
+		return 0;
+	}
 
 	std::vector<CacheTitle> CachedList(count);
-	TitleList.resize(count);
 
-	fread(&CachedList[0], 1, count * sizeof(CacheTitle), f);
+	if (fread(&CachedList[0], 1, count * sizeof(CacheTitle), f) != count * sizeof(CacheTitle))
+	{
+		fclose(f);
+		return 0;
+	}
+
 	fclose(f);
+	TitleList.resize(count);
 
 	for (u32 i = 0; i < count; ++i)
 	{
-		strcpy(TitleList[i].GameID, CachedList[i].GameID);
-		TitleList[i].Title = CachedList[i].Title;
-		TitleList[i].Region = CachedList[i].Region;
+		//! Every field below was read from the file and carries no terminator of its own.
+		snprintf(TitleList[i].GameID, sizeof(TitleList[i].GameID), "%.6s", CachedList[i].GameID);
+		TitleList[i].Title.assign(CachedList[i].Title, strnlen(CachedList[i].Title, sizeof(CachedList[i].Title)));
+		TitleList[i].Region.assign(CachedList[i].Region, strnlen(CachedList[i].Region, sizeof(CachedList[i].Region)));
 		TitleList[i].ParentalRating = CachedList[i].ParentalRating;
 		TitleList[i].PlayersCount = CachedList[i].PlayersCount;
 		TitleList[i].TitleType = CachedList[i].TitleType;

@@ -121,7 +121,7 @@ rm -f "$SD/autoinput.txt"
 [ -z "$(gx_pids)" ] || echo "WARNING: Dolphin still running: $(gx_pids | tr '\n' ' ')" >&2
 
 # Keep the last KEEP frames.
-ls "$U"/Dump/Frames/*.png 2>/dev/null | tail -n "$KEEP" | while read -r f; do cp "$f" "$OUT/frames/"; done
+ls -v "$U"/Dump/Frames/*.png 2>/dev/null | tail -n "$KEEP" | while read -r f; do cp "$f" "$OUT/frames/"; done
 N=$(ls "$OUT/frames" | wc -l | tr -d ' ')
 cp "$U"/Logs/dolphin.log "$OUT/" 2>/dev/null || true
 # Dolphin closing the socket ends the reader; give it a moment, then stop it regardless.

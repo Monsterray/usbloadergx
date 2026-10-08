@@ -5,6 +5,8 @@
 #   env:   DOL=<path>       .dol to boot (default: usbloader_gx/boot.dol from the last scripts/build.sh)
 #          DOLPHIN=<dir>    Dolphin install (default /c/tools/Dolphin-x64)
 #          KEEP=<n>         frames to keep, the last ones (default 60)
+#          AUTOINPUT=<file> copy it to sd:/autoinput.txt for this run (a .dol from
+#                           scripts/diag.sh autoinput plays it), removed afterwards
 #          DOLPHIN_ARGS     extra arguments appended verbatim, e.g. "-C Dolphin.Core.MMU=False" to turn MMU emulation back off
 #
 # What it proves: the loader boots, the GUI renders, the menus open. What it cannot prove:
@@ -47,6 +49,8 @@ rm -f "$U"/Dump/Frames/*.png "$U"/Logs/dolphin.log
 # see here: Dolphin emulates no USB mass storage and rejects the cIOS nodes the
 # loader uses for USB (/dev/usb2, /dev/usb123), so drop test games in "$SD/wbfs".
 cp "$DOL" "$SD/apps/usbloader_gx/boot.dol"
+rm -f "$SD/autoinput.txt"
+[ -n "${AUTOINPUT:-}" ] && cp "$AUTOINPUT" "$SD/autoinput.txt"
 [ -f "$ROOT/HBC/meta.xml" ] && cp "$ROOT/HBC/meta.xml" "$ROOT/HBC/icon.png" "$SD/apps/usbloader_gx/" 2>/dev/null
 # Analytics consent is a modal dialog on a fresh profile and -C flags do not persist it.
 if ! grep -q "PermissionAsked" "$U/Config/Dolphin.ini" 2>/dev/null; then
@@ -113,6 +117,7 @@ echo "Dolphin PID $(gx_pids | tr '\n' ' '), running $SECS s..."
 sleep "$SECS"
 for p in $(gx_pids); do taskkill //F //PID "$p" >/dev/null 2>&1 || true; done
 sleep 2
+rm -f "$SD/autoinput.txt"
 [ -z "$(gx_pids)" ] || echo "WARNING: Dolphin still running: $(gx_pids | tr '\n' ' ')" >&2
 
 # Keep the last KEEP frames.

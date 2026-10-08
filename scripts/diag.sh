@@ -5,6 +5,8 @@
 # Usage:
 #   scripts/diag.sh warnings     # build with extra GCC diagnostics, print warning lines (sorted, unique)
 #   scripts/diag.sh gc-sections  # build with --gc-sections and list the functions/data the linker dropped
+#   scripts/diag.sh autoinput    # test build with -DAUTOINPUT -> .dev/autoinput/boot.dol and boot.elf
+#                                # (reads sd:/autoinput.txt; see source/utils/AutoInput.cpp)
 #
 # Output goes to stdout; redirect it to a file to keep it.
 set -euo pipefail
@@ -17,6 +19,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 IMAGE="devkitpro/devkitppc:20250527"
 WSL_DISTRO="${WSL_DISTRO:-Ubuntu-24.04}"
 MODE="${1:-warnings}"
+OUT_MOUNT=()
 
 if command -v docker >/dev/null 2>&1; then
 	DOCKER=(docker)
@@ -44,10 +47,18 @@ case "$MODE" in
 		LF="$BASE_LDFLAGS,--gc-sections,--print-gc-sections"
 		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make release -j"$(nproc)" CFLAGS="$CF" LDFLAGS="$LF" 2>&1 | grep -i "removing unused" | grep -v "portlibs/\|/opt/" | sed -E "s/.*section .(\.[a-z]+)\.([^ ]*). in file .([^ ]*)\.o.*/\3 \1 \2/" | while read -r f s n; do echo "$f $s $(echo "$n" | powerpc-eabi-c++filt)"; done'
 		;;
+	autoinput)
+		# Built from a copy inside the container, so these objects never mix with a
+		# normal build; only the .dol and .elf come out.
+		CF="$BASE_CFLAGS -DAUTOINPUT"
+		mkdir -p "$ROOT/.dev/autoinput"
+		OUT_MOUNT=(-v "$MOUNT_ROOT/.dev/autoinput:/out")
+		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make -j"$(nproc)" CFLAGS="$CF" > /out/build.log 2>&1; rc=$?; cp boot.dol boot.elf /out/ 2>/dev/null; grep -E "warning:|error:" /out/build.log | grep -v "portlibs/" | sort -u; exit $rc'
+		;;
 	*)
-		echo "Usage: $0 [warnings|gc-sections]" >&2
+		echo "Usage: $0 [warnings|gc-sections|autoinput]" >&2
 		exit 1
 		;;
 esac
 
-"${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" -e CF="$CF" -e LF="${LF:-}" "$IMAGE" bash -c "$SCRIPT"
+"${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" "${OUT_MOUNT[@]}" -e CF="$CF" -e LF="${LF:-}" "$IMAGE" bash -c "$SCRIPT"

@@ -23,6 +23,7 @@
 #include "GUI/gui.h"
 #include "sys.h"
 #include "gecko.h"
+#include "utils/AutoInput.h"
 
 int rumbleRequest[4] = { 0, 0, 0, 0 };
 GuiTrigger userInput[4];
@@ -93,6 +94,8 @@ void UpdatePads()
 		userInput[0].pad.substickX = WiiDRC_rStickX();
 		userInput[0].pad.substickY = WiiDRC_rStickY();
 	}
+
+	AutoInput_Apply();
 }
 
 /****************************************************************************

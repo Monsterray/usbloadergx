@@ -59,7 +59,8 @@ s32 NandTitle::Get()
 	int language = CONF_GetLanguage();
 	ISFS_Initialize();
 
-	wchar_t name[IMET_MAX_NAME_LEN];
+	//! GetName() fills every element, so keep room for the terminator
+	wchar_t name[IMET_MAX_NAME_LEN + 1];
 
 	for (u32 i = 0; i < titleIds.size(); i++)
 	{
@@ -102,6 +103,7 @@ bool NandTitle::GetName(u64 tid, int language, wchar_t* name)
 	//gprintf("GetName( %016llx ): ", tid );
 	char app[ISFS_MAXPATH] ATTRIBUTE_ALIGN(32);
 	IMET *imet = (IMET*) memalign(32, sizeof(IMET));
+	if (!imet) return false;
 
 	tmd* titleTmd = GetTMD(tid);
 	if (!titleTmd)
@@ -131,7 +133,9 @@ bool NandTitle::GetName(u64 tid, int language, wchar_t* name)
 		(unsigned int)titleTmd->contents[i].cid);
 	//gprintf("%s\n", app );
 
-	if (language > CONF_LANG_KOREAN) language = CONF_LANG_ENGLISH;
+	//! CONF_GetLanguage() returns a negative error code when CONF is unreadable,
+	//! and the language picks one of the ten name arrays in the IMET below.
+	if (language < CONF_LANG_JAPANESE || language > CONF_LANG_KOREAN) language = CONF_LANG_ENGLISH;
 
 	s32 fd = ISFS_Open(app, ISFS_OPEN_READ);
 	if (fd < 0)
@@ -173,19 +177,19 @@ bool NandTitle::GetName(u64 tid, int language, wchar_t* name)
 		return false;
 	}
 
-	if (imet->name_japanese[language * IMET_MAX_NAME_LEN] == 0)
+	if (imet->names[language][0] == 0)
 	{
 		// channel name is not available in system language
-		if (imet->name_english[0] != 0)
+		if (imet->names[CONF_LANG_ENGLISH][0] != 0)
 		{
 			language = CONF_LANG_ENGLISH;
 		}
 		else
 		{
 			// channel name is also not available on english, get ascii name
-			for (int i = 0; i < 4; i++)
+			for (int n = 0; n < 4; n++)
 			{
-				name[i] = (TITLE_LOWER( tid ) >> (24 - i * 8)) & 0xFF;
+				name[n] = (TITLE_LOWER( tid ) >> (24 - n * 8)) & 0xFF;
 			}
 			name[4] = 0;
 			free(imet);
@@ -194,10 +198,12 @@ bool NandTitle::GetName(u64 tid, int language, wchar_t* name)
 	}
 
 	// retrieve channel name in system language or on english
-	for (int i = 0; i < IMET_MAX_NAME_LEN; i++)
+	for (int n = 0; n < IMET_MAX_NAME_LEN; n++)
 	{
-		name[i] = imet->name_japanese[i + (language * IMET_MAX_NAME_LEN)];
+		name[n] = imet->names[language][n];
 	}
+	//! A name that fills the IMET array has no terminator of its own
+	name[IMET_MAX_NAME_LEN] = 0;
 
 	free(imet);
 
@@ -460,6 +466,12 @@ int NandTitle::LoadFileFromNand(const char *filepath, u8 **outbuffer, u32 *outfi
 
 	free(stats);
 
+	if(filesize == 0)
+	{
+		ISFS_Close(fd);
+		return -1;
+	}
+
 	u8 *buffer = (u8 *) memalign(32, ALIGN32(filesize));
 	if(!buffer)
 	{
@@ -471,10 +483,12 @@ int NandTitle::LoadFileFromNand(const char *filepath, u8 **outbuffer, u32 *outfi
 
 	ISFS_Close(fd);
 
-	if (ret < 0)
+	//! Callers are given filesize, so a short read must not be reported as a
+	//! whole file: the tail of the buffer is still uninitialised.
+	if (ret < 0 || (u32) ret != filesize)
 	{
 		free(buffer);
-		return ret;
+		return ret < 0 ? ret : -1;
 	}
 
 	*outbuffer = buffer;
@@ -593,7 +607,11 @@ int NandTitle::ExtractFile(const char *nandPath, const char *filepath)
 				break;
 			}
 
-			fwrite(buffer, 1, ret, pFile);
+			if(fwrite(buffer, 1, ret, pFile) != (size_t) ret)
+			{
+				done = -1;
+				break;
+			}
 
 			done += ret;
 		}
@@ -627,6 +645,9 @@ int NandTitle::InternalExtractDir(char *nandPath, std::string &filepath)
 	if(ret < 0)
 		return ret;
 
+	if(list_len == 0)
+		return 0;
+
 	char * name_list = (char *) memalign(32, ALIGN32(list_len * ISFS_MAXPATH));
 	if(!name_list)
 		return -666;
@@ -648,6 +669,18 @@ int NandTitle::InternalExtractDir(char *nandPath, std::string &filepath)
 		u32 dummy;
 		int posNandPath = strlen(nandPath);
 		int posFilePath = filepath.size();
+
+		//! nandPath is one ISFS_MAXPATH buffer that this recursion appends to,
+		//! so a deep enough NAND folder used to run off the end of it.
+		size_t entrylen = strlen(entry);
+		size_t needed = posNandPath + entrylen + 2;
+		if(needed > ISFS_MAXPATH)
+		{
+			gprintf("InternalExtractDir: path too long for %s/%s\n", nandPath, entry);
+			ret = -2;
+			entry += entrylen + 1;
+			continue;
+		}
 
 		if(posFilePath > 0 && filepath[posFilePath-1] != '/')
 			filepath += '/';

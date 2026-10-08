@@ -58,6 +58,23 @@ typedef struct _dolheader
     u32 padding[7];
 } __attribute__((packed)) dolheader;
 
+//! Every one of these comes out of a title.tmd: from NAND, or from a file under
+//! the emulated NAND path on the user's card. num_contents decides how far
+//! contents[] is walked, so the buffer has to be known to hold that many.
+static tmd *TmdFromBuffer(const u8 *buffer, u32 size)
+{
+    if (!buffer || size < sizeof(signed_blob) + sizeof(tmd))
+        return NULL;
+
+    tmd *titleTmd = (tmd *)SIGNATURE_PAYLOAD((signed_blob *)buffer);
+    u32 used = (u32)((u8 *)titleTmd - buffer) + sizeof(tmd);
+
+    if (used > size || (u64)titleTmd->num_contents * sizeof(tmd_content) > size - used)
+        return NULL;
+
+    return titleTmd;
+}
+
 Channels *Channels::instance = NULL;
 
 u64 HBCTID = 0;
@@ -170,7 +187,7 @@ std::vector<struct discHdr> &Channels::GetEmuHeaders(void)
     return EmuChannels;
 }
 
-u8 *Channels::GetDol(const u64 &title, u8 *tmdBuffer, bool &isForwarder)
+u8 *Channels::GetDol(const u64 &title, u8 *tmdBuffer, u32 tmdSize, bool &isForwarder)
 {
     static const u8 dolsign[6] = {0x00, 0x00, 0x01, 0x00, 0x00, 0x00};
     static u8 dolhead[32] ATTRIBUTE_ALIGN(32);
@@ -180,11 +197,13 @@ u8 *Channels::GetDol(const u64 &title, u8 *tmdBuffer, bool &isForwarder)
     u32 high = TITLE_UPPER(title);
     u32 low = TITLE_LOWER(title);
 
+    _tmd *tmd_file = (_tmd *)TmdFromBuffer(tmdBuffer, tmdSize);
+    if (!tmd_file)
+        return NULL;
+
     char *filepath = (char *)memalign(32, ISFS_MAXPATH);
     if (!filepath)
         return NULL;
-
-    _tmd *tmd_file = (_tmd *)SIGNATURE_PAYLOAD((u32 *)tmdBuffer);
 
     if (tmd_file->title_type == 0 && tmd_file->group_id == 0)
         isForwarder = true;
@@ -235,6 +254,13 @@ u8 *Channels::GetDol(const u64 &title, u8 *tmdBuffer, bool &isForwarder)
     //! Fall back to boot content if dol is not found
     if (bootcontent == 0xDEADBEAF)
     {
+        //! boot_index is a file value and picks an entry of contents[]
+        if (tmd_file->boot_index >= tmd_file->num_contents)
+        {
+            gprintf("Boot content index out of range\n");
+            free(filepath);
+            return NULL;
+        }
         bootcontent = tmd_file->contents[tmd_file->boot_index].cid;
         if (!Settings.UseChanLauncher)
             gprintf("Main dol not found -> ");
@@ -343,7 +369,7 @@ u32 Channels::LoadChannel(const u64 &chantitle)
     }
 
     bool isForwarder = false;
-    u8 *chanDOL = GetDol(chantitle, tmdBuffer, isForwarder);
+    u8 *chanDOL = GetDol(chantitle, tmdBuffer, tmdSize, isForwarder);
     if (!chanDOL)
     {
         ISFS_Deinitialize();
@@ -512,10 +538,13 @@ bool Channels::emuExists(char *tmdpath)
     if (LoadFileToMem(tmdpath, &buffer, &size) < 0)
         return false;
 
-    signed_blob *s_tmd = (signed_blob *)buffer;
-
     u32 i;
-    tmd *titleTmd = (tmd *)SIGNATURE_PAYLOAD(s_tmd);
+    tmd *titleTmd = TmdFromBuffer(buffer, size);
+    if (!titleTmd)
+    {
+        free(buffer);
+        return false;
+    }
 
     for (i = 0; i < titleTmd->num_contents; i++)
         if (!titleTmd->contents[i].index)
@@ -628,10 +657,13 @@ bool Channels::GetEmuChanTitle(char *tmdpath, int language, std::string &Title)
     if (LoadFileToMem(tmdpath, &buffer, &size) < 0)
         return false;
 
-    signed_blob *s_tmd = (signed_blob *)buffer;
-
     u32 i;
-    tmd *titleTmd = (tmd *)SIGNATURE_PAYLOAD(s_tmd);
+    tmd *titleTmd = TmdFromBuffer(buffer, size);
+    if (!titleTmd)
+    {
+        free(buffer);
+        return false;
+    }
 
     for (i = 0; i < titleTmd->num_contents; i++)
         if (!titleTmd->contents[i].index)
@@ -697,10 +729,15 @@ bool Channels::GetEmuChanTitle(char *tmdpath, int language, std::string &Title)
         return false;
     }
 
+    //! CONF_GetLanguage() returns a negative error code when CONF is unreadable,
+    //! and the language picks one of the ten name arrays in the IMET below.
+    if (language < CONF_LANG_JAPANESE || language > CONF_LANG_KOREAN)
+        language = CONF_LANG_ENGLISH;
+
     // names not available
-    if (imet->name_japanese[language * IMET_MAX_NAME_LEN] == 0)
+    if (imet->names[language][0] == 0)
     {
-        if (imet->name_english[0] != 0)
+        if (imet->names[CONF_LANG_ENGLISH][0] != 0)
             language = CONF_LANG_ENGLISH;
         else
         {
@@ -709,11 +746,13 @@ bool Channels::GetEmuChanTitle(char *tmdpath, int language, std::string &Title)
         }
     }
 
-    wchar_t wName[IMET_MAX_NAME_LEN];
+    //! A name that fills the IMET array has no terminator of its own
+    wchar_t wName[IMET_MAX_NAME_LEN + 1];
 
     // retrieve channel name in system language or on english
-    for (int i = 0; i < IMET_MAX_NAME_LEN; i++)
-        wName[i] = imet->name_japanese[i + (language * IMET_MAX_NAME_LEN)];
+    for (int n = 0; n < IMET_MAX_NAME_LEN; n++)
+        wName[n] = imet->names[language][n];
+    wName[IMET_MAX_NAME_LEN] = 0;
 
     wString wsname(wName);
     Title = wsname.toUTF8();
@@ -731,7 +770,7 @@ u8 *Channels::GetOpeningBnr(const u64 &title, u32 *outsize, const char *prefix)
 
     char filepath[PATH_MAX];
 
-    snprintf(filepath, sizeof(filepath), "%s/title/%08x/%08x/content/title.tmd", prefix, (unsigned int)high, (unsigned int)low);
+    snprintf(filepath, sizeof(filepath), "%s/title/%08x/%08x/content/title.tmd", prefix ? prefix : "", (unsigned int)high, (unsigned int)low);
 
     u8 *buffer = NULL;
     u32 filesize = 0;
@@ -745,10 +784,10 @@ u8 *Channels::GetOpeningBnr(const u64 &title, u32 *outsize, const char *prefix)
     if (ret < 0)
         return banner;
 
-    tmd *tmd_file = (tmd *)SIGNATURE_PAYLOAD((u32 *)buffer);
+    tmd *tmd_file = TmdFromBuffer(buffer, filesize);
     bool found = false;
     u32 bootcontent = 0;
-    for (u32 i = 0; i < tmd_file->num_contents; ++i)
+    for (u32 i = 0; tmd_file && i < tmd_file->num_contents; ++i)
     {
         if (tmd_file->contents[i].index == 0)
         {
@@ -765,7 +804,7 @@ u8 *Channels::GetOpeningBnr(const u64 &title, u32 *outsize, const char *prefix)
     if (!found)
         return banner;
 
-    snprintf(filepath, sizeof(filepath), "%s/title/%08x/%08x/content/%08x.app", prefix, (unsigned int)high, (unsigned int)low, (unsigned int)bootcontent);
+    snprintf(filepath, sizeof(filepath), "%s/title/%08x/%08x/content/%08x.app", prefix ? prefix : "", (unsigned int)high, (unsigned int)low, (unsigned int)bootcontent);
 
     if (prefix && *prefix != 0)
         ret = LoadFileToMem(filepath, &buffer, &filesize);
@@ -774,6 +813,14 @@ u8 *Channels::GetOpeningBnr(const u64 &title, u32 *outsize, const char *prefix)
 
     if (ret < 0)
         return banner;
+
+    //! The banner is read before its header, so the file has to be long enough
+    //! to hold an IMET at either of the two offsets that are tried.
+    if (filesize < IMET_OFFSET + sizeof(IMET))
+    {
+        free(buffer);
+        return banner;
+    }
 
     u8 IMET_pos = 0;
     if (((IMET *)(buffer + IMET_OFFSET))->sig == IMET_SIGNATURE)

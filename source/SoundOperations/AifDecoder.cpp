@@ -118,6 +118,7 @@ AifDecoder::~AifDecoder()
 void AifDecoder::OpenFile()
 {
 	SWaveHdr Header;
+	memset(&Header, 0, sizeof(SWaveHdr));
 	file_fd->read((u8 *) &Header, sizeof(SWaveHdr));
 
 	if (Header.magicRIFF != 'FORM')
@@ -151,8 +152,16 @@ void AifDecoder::OpenFile()
 	// seek back to COMM chunk start
 	file_fd->seek(-sizeof(magic), SEEK_CUR);
 
+	//! A file that ends inside the COMM chunk otherwise leaves the sample rate,
+	//! the channel count and the bits per sample as whatever was on the stack.
 	SAIFFCommChunk CommHdr;
-	file_fd->read((u8 *) &CommHdr, sizeof(SAIFFCommChunk));
+	memset(&CommHdr, 0, sizeof(SAIFFCommChunk));
+
+	if(file_fd->read((u8 *) &CommHdr, sizeof(SAIFFCommChunk)) != (int) sizeof(SAIFFCommChunk))
+	{
+		CloseFile();
+		return;
+	}
 
 	if(CommHdr.fccCOMM != 'COMM')
 	{
@@ -163,23 +172,43 @@ void AifDecoder::OpenFile()
 	// Seek to next chunk start
 	file_fd->seek(-sizeof(SAIFFCommChunk) + sizeof(SWaveChunk) + CommHdr.size, SEEK_CUR);
 
+	//! A chunk size out of the file used to be able to seek backwards, which made
+	//! this loop read the same eight bytes forever. Walk forward only.
 	int ret = -1;
 	SWaveChunk chunkHdr;
 	memset(&chunkHdr, 0, sizeof(SWaveChunk));
 
 	do
 	{
-		// Seek to next chunk start
-		file_fd->seek(chunkHdr.size, SEEK_CUR);
+		u32 NextOffset = file_fd->tell() + chunkHdr.size;
+		if(NextOffset < (u32) file_fd->tell() || NextOffset >= (u32) file_fd->size())
+		{
+			CloseFile();
+			return;
+		}
+
+		file_fd->seek(NextOffset, SEEK_SET);
 		ret = file_fd->read((u8 *) &chunkHdr, sizeof(SWaveChunk));
 	}
 	while(ret > 0 && chunkHdr.magicDATA != 'SSND');
 
+	if(chunkHdr.magicDATA != 'SSND')
+	{
+		CloseFile();
+		return;
+	}
+
 	// Seek back to start of SSND chunk
-	file_fd->seek(-sizeof(SWaveChunk), SEEK_CUR);
+	file_fd->seek(file_fd->tell() - (int) sizeof(SWaveChunk), SEEK_SET);
 
 	SAIFFSSndChunk SSndChunk;
-	file_fd->read((u8 *) &SSndChunk, sizeof(SAIFFSSndChunk));
+	memset(&SSndChunk, 0, sizeof(SAIFFSSndChunk));
+
+	if(file_fd->read((u8 *) &SSndChunk, sizeof(SAIFFSSndChunk)) != (int) sizeof(SAIFFSSndChunk))
+	{
+		CloseFile();
+		return;
+	}
 
 	if(SSndChunk.fccSSND != 'SSND')
 	{
@@ -187,9 +216,21 @@ void AifDecoder::OpenFile()
 		return;
 	}
 
+	if(SSndChunk.size < 8)
+	{
+		CloseFile();
+		return;
+	}
+
 	DataOffset = file_fd->tell();
 	DataSize = SSndChunk.size-8;
-	SampleRate = (u32) ConvertFromIeeeExtended(CommHdr.freq);
+	if(DataSize > (u32) file_fd->size() - DataOffset)
+		DataSize = (u32) file_fd->size() - DataOffset;
+
+	//! ConvertFromIeeeExtended can return HUGE_VAL or a negative value, and
+	//! SampleRate is a u16 that reaches ASND.
+	double freq = ConvertFromIeeeExtended(CommHdr.freq);
+	SampleRate = (freq >= 8000.0 && freq <= 48000.0) ? (u16) freq : 48000;
 	Format = VOICE_STEREO_16BIT;
 
 	if(CommHdr.channels == 1 && CommHdr.bps == 8)

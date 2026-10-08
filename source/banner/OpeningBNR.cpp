@@ -71,6 +71,14 @@ bool OpeningBNR::LoadCachedBNR(const char *id)
 	if (!f)
 		return false;
 
+	//! The cache file sits on the user's card. Nothing else checks its length,
+	//! and GetIMETTitle() reads names at the far end of the header.
+	if (filesize < sizeof(IMETHeader))
+	{
+		fclose(f);
+		return false;
+	}
+
 	imetHdr = (IMETHeader *)malloc(filesize);
 	if (!imetHdr)
 	{
@@ -78,12 +86,25 @@ bool OpeningBNR::LoadCachedBNR(const char *id)
 		return false;
 	}
 
-	fread(imetHdr, 1, filesize, f);
+	if (fread(imetHdr, 1, filesize, f) != filesize)
+	{
+		fclose(f);
+		free(imetHdr);
+		imetHdr = NULL;
+		return false;
+	}
 	fclose(f);
 
 	if (imetHdr->fcc != 'IMET')
 	{
 		//! check if it's a channel .app file
+		if (filesize < 0x40 + sizeof(IMETHeader))
+		{
+			free(imetHdr);
+			imetHdr = NULL;
+			return false;
+		}
+
 		IMETHeader *channelImet = (IMETHeader *)(((u8 *)imetHdr) + 0x40);
 		if (channelImet->fcc != 'IMET')
 		{
@@ -94,7 +115,7 @@ bool OpeningBNR::LoadCachedBNR(const char *id)
 		//! just move it 0x40 bytes back, the rest 0x40 bytes will just be unused
 		//! as it's a temporary file usually it's not worth to reallocate
 		filesize -= 0x40;
-		memcpy(imetHdr, channelImet, filesize);
+		memmove(imetHdr, channelImet, filesize);
 	}
 
 	return true;
@@ -237,7 +258,10 @@ bool OpeningBNR::LoadChannelBanner(const discHdr *header)
 
 const u16 *OpeningBNR::GetIMETTitle(int lang)
 {
-	if (!imetHdr || lang < 0 || lang >= 10)
+	//! filesize is whatever opening.bnr was on the disc, in NAND or in the cache.
+	//! names sits about 0x600 bytes into the header, so a short banner has to be
+	//! rejected here and not only by the magic.
+	if (!imetHdr || filesize < sizeof(IMETHeader) || lang < 0 || lang >= 10)
 		return NULL;
 
 	if (imetHdr->fcc != 'IMET')
@@ -271,6 +295,7 @@ u8 *OpeningBNR::LoadGCBNR(const discHdr *header, u32 *len)
 
 	FILE *file = NULL;
 	GC_OpeningBnr *openingBnr = NULL;
+	u32 bnrSize = 0;
 
 	// read from file
 	if ((header->type == TYPE_GAME_GC_IMG) || (header->type == TYPE_GAME_GC_DISC))
@@ -322,8 +347,7 @@ u8 *OpeningBNR::LoadGCBNR(const discHdr *header, u32 *len)
 		}
 
 		openingBnr = (GC_OpeningBnr *)disc->extracted_buffer;
-		if (len)
-			*len = disc->extracted_size;
+		bnrSize = disc->extracted_size;
 
 		gc_close_disc(disc);
 	}
@@ -368,15 +392,19 @@ u8 *OpeningBNR::LoadGCBNR(const discHdr *header, u32 *len)
 			return NULL;
 
 		fseek(file, 0, SEEK_END);
-		int size = ftell(file);
+		long size = ftell(file);
 		rewind(file);
 
-		openingBnr = (GC_OpeningBnr *)malloc(size);
-		if (openingBnr)
+		if (size > 0)
 		{
-			if (len)
-				*len = size;
-			fread(openingBnr, 1, size, file);
+			openingBnr = (GC_OpeningBnr *)malloc(size);
+			if (openingBnr && fread(openingBnr, 1, size, file) != (size_t)size)
+			{
+				free(openingBnr);
+				openingBnr = NULL;
+			}
+			if (openingBnr)
+				bnrSize = (u32)size;
 		}
 	}
 
@@ -386,12 +414,24 @@ u8 *OpeningBNR::LoadGCBNR(const discHdr *header, u32 *len)
 	if (!openingBnr)
 		return NULL;
 
+	//! A BNR1 file holds one description block, a BNR2 holds six. Either way the
+	//! magic, the texture and the first block have to be there before anything
+	//! reads them.
+	if (bnrSize < BNR_MIN_SIZE)
+	{
+		free(openingBnr);
+		return NULL;
+	}
+
 	// check magic of the opening bnr
 	if (openingBnr->magic != 'BNR1' && openingBnr->magic != 'BNR2')
 	{
 		free(openingBnr);
 		return NULL;
 	}
+
+	if (len)
+		*len = bnrSize;
 
 	return (u8 *)openingBnr;
 }
@@ -427,14 +467,15 @@ CustomBanner *OpeningBNR::CreateGCBanner(const discHdr *header)
 			else if (!strcmp(Settings.db_language, "NL"))
 				language = 5;
 
-			if ((0x1820 + sizeof(openingBnr->description[0]) * language) > openingBnrSize)
+			if ((0x1820 + sizeof(openingBnr->description[0]) * (language + 1)) > openingBnrSize)
 			{
 				language = 0;
 			}
 		}
 
 		// sets the developer
-		developer.resize(strlen((char *)openingBnr->description[language].developer));
+		developer.resize(strnlen((char *)openingBnr->description[language].developer,
+								 sizeof(openingBnr->description[language].developer)));
 		for (u32 i = 0; i < developer.size(); i++)
 			developer[i] = *(openingBnr->description[language].developer + i);
 
@@ -444,13 +485,16 @@ CustomBanner *OpeningBNR::CreateGCBanner(const discHdr *header)
 		// sets the description and converts encodings (Japan and Taiwan)
 		if (header->id[3] == 'J' || header->id[3] == 'W')
 		{
-			std::string description((char *)openingBnr->description[language].long_description);
+			std::string description((char *)openingBnr->description[language].long_description,
+									strnlen((char *)openingBnr->description[language].long_description,
+											sizeof(openingBnr->description[language].long_description)));
 			banner->SetBannerText("T_short_descript", sj2utf8(description).c_str());
 		}
 		else
 		{
 			wString description;
-			description.resize(strlen((char *)openingBnr->description[language].long_description));
+			description.resize(strnlen((char *)openingBnr->description[language].long_description,
+									   sizeof(openingBnr->description[language].long_description)));
 			for (u32 i = 0; i < description.size(); i++)
 				description[i] = *(openingBnr->description[language].long_description + i);
 

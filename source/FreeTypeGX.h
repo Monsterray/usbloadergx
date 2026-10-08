@@ -135,6 +135,10 @@ class FreeTypeGX
 		FreeTypeGX(const uint8_t* fontBuffer, FT_Long bufferSize, bool lastFace = false);
 		~FreeTypeGX();
 
+		//! false when FreeType would not take the buffer, which a theme chooses.
+		//! Nothing else in this class works when it is false.
+		bool IsLoaded() const { return ftFace != NULL; }
+
 		void setVertexFormat(uint8_t vertexIndex);
 
 		uint16_t drawText(int16_t x, int16_t y, int16_t z, const wchar_t *text, int16_t pixelSize, GXColor color =

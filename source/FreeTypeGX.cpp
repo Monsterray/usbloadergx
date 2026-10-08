@@ -65,16 +65,21 @@ FreeTypeGX::FreeTypeGX(const uint8_t* fontBuffer, FT_Long bufferSize, bool lastF
 {
 	int faceIndex = 0;
 	ftPointSize = 0;
+	ftFace = NULL;
 
 	FT_Init_FreeType(&ftLibrary);
 	if(lastFace)
 	{
-		FT_New_Memory_Face(ftLibrary, (FT_Byte *)fontBuffer, bufferSize, -1, &ftFace);
-		faceIndex = ftFace->num_faces - 1; // Use the last face
-		FT_Done_Face(ftFace);
+		//! A font that FreeType will not take leaves ftFace null here
+		if(FT_New_Memory_Face(ftLibrary, (FT_Byte *)fontBuffer, bufferSize, -1, &ftFace) == 0 && ftFace)
+		{
+			faceIndex = ftFace->num_faces - 1; // Use the last face
+			FT_Done_Face(ftFace);
+		}
 		ftFace = NULL;
 	}
-	FT_New_Memory_Face(ftLibrary, (FT_Byte *) fontBuffer, bufferSize, faceIndex, &ftFace);
+	if(FT_New_Memory_Face(ftLibrary, (FT_Byte *) fontBuffer, bufferSize, faceIndex, &ftFace) != 0)
+		ftFace = NULL;
 
 	setVertexFormat(GX_VTXFMT1);
 	ftKerningEnabled = false;//FT_HAS_KERNING(ftFace);
@@ -86,7 +91,8 @@ FreeTypeGX::FreeTypeGX(const uint8_t* fontBuffer, FT_Long bufferSize, bool lastF
 FreeTypeGX::~FreeTypeGX()
 {
 	unloadFont();
-	FT_Done_Face(ftFace);
+	if (ftFace)
+		FT_Done_Face(ftFace);
 	FT_Done_FreeType(ftLibrary);
 }
 
@@ -142,6 +148,8 @@ void FreeTypeGX::unloadFont()
  */
 ftgxCharData * FreeTypeGX::cacheGlyphData(wchar_t charCode, int16_t pixelSize)
 {
+	if (!ftFace) return NULL;
+
 	map<int16_t, map<wchar_t, ftgxCharData> >::iterator itr = fontData.find(pixelSize);
 	if (itr != fontData.end())
 	{
@@ -177,6 +185,9 @@ ftgxCharData * FreeTypeGX::cacheGlyphData(wchar_t charCode, int16_t pixelSize)
 		if (ftFace->glyph->format == FT_GLYPH_FORMAT_BITMAP)
 		{
 			FT_Bitmap *glyphBitmap = &ftFace->glyph->bitmap;
+
+			if (ALIGN8(glyphBitmap->width) > 0xFFFF || ALIGN8(glyphBitmap->rows) > 0xFFFF)
+				return NULL;
 
 			textureWidth = ALIGN8(glyphBitmap->width);
 			textureHeight = ALIGN8(glyphBitmap->rows);
@@ -214,6 +225,8 @@ uint16_t FreeTypeGX::cacheGlyphDataComplete(int16_t pixelSize)
 	uint32_t i = 0;
 	FT_UInt gIndex;
 
+	if (!ftFace) return 0;
+
 	FT_ULong charCode = FT_Get_First_Char(ftFace, &gIndex);
 	while (gIndex != 0)
 	{
@@ -238,6 +251,11 @@ void FreeTypeGX::loadGlyphData(FT_Bitmap *bmp, ftgxCharData *charData)
 	int glyphSize = (charData->textureWidth * charData->textureHeight) >> 1;
 
 	uint8_t *glyphData = (uint8_t *) MEM2_alloc(glyphSize);
+	if (!glyphData)
+	{
+		charData->glyphDataTexture = NULL;
+		return;
+	}
 	memset(glyphData, 0x00, glyphSize);
 
 	uint8_t *src = (uint8_t *)bmp->buffer;

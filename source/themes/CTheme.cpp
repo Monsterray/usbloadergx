@@ -216,8 +216,15 @@ bool Theme::LoadFont(const char *path)
 		customFont = new (std::nothrow) FT_Byte[customFontSize];
 		if (customFont)
 		{
-			fread(customFont, 1, customFontSize, pfile);
-			result = true;
+			//! A short read leaves the tail of the buffer uninitialised, and the
+			//! whole buffer is handed to FreeType.
+			result = fread(customFont, 1, customFontSize, pfile) == customFontSize;
+			if (!result)
+			{
+				delete[] customFont;
+				customFont = NULL;
+				customFontSize = 0;
+			}
 		}
 		fclose(pfile);
 	}
@@ -243,6 +250,18 @@ bool Theme::LoadFont(const char *path)
 	delete fontSystem;
 
 	fontSystem = new FreeTypeGX(loadedFont, loadedFontSize, isSystemFont);
+
+	//! A theme chooses font.ttf, so it may be a file FreeType will not parse.
+	//! Fall the rest of the way down the chain rather than keeping a font that
+	//! has no face behind it.
+	if (!fontSystem->IsLoaded())
+	{
+		delete fontSystem;
+		loadedFont = (FT_Byte *)Resources::GetFile("font.ttf");
+		loadedFontSize = Resources::GetFileSize("font.ttf");
+		fontSystem = new FreeTypeGX(loadedFont, loadedFontSize, false);
+		result = false;
+	}
 
 	return result;
 }

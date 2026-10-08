@@ -420,6 +420,13 @@ int PartitionHandle::CheckGPT(u8 PartNum)
 	gpt_header->part_entry_size = le32(gpt_header->part_entry_size);
 	gpt_header->part_entry_checksum = le32(gpt_header->part_entry_checksum);
 
+	if (gpt_header->part_entry_size < sizeof(GUID_PART_ENTRY) ||
+		gpt_header->part_entry_size > BYTES_PER_SECTOR)
+	{
+		free(gpt_header);
+		return -1;
+	}
+
 	u8 *sector_buf = (u8 *)malloc(MAX_BYTES_PER_SECTOR);
 	if (!sector_buf)
 	{
@@ -430,7 +437,7 @@ int PartitionHandle::CheckGPT(u8 PartNum)
 
 	u64 next_lba = gpt_header->part_table_lba;
 	u32 entry = 0;
-	while (entry < gpt_header->part_entries)
+	while (entry < gpt_header->part_entries && PartitionList.size() < MAX_PARTITIONS)
 	{
 		if (!interface->readSectors(next_lba, 1, sector_buf))
 			break;
@@ -461,6 +468,9 @@ int PartitionHandle::CheckGPT(u8 PartNum)
 
 void PartitionHandle::AddPartition(const char *name, u64 lba_start, u64 sec_count, bool bootable, u8 part_type, u8 part_num, u8 part_TableType)
 {
+	if (PartitionList.size() >= MAX_PARTITIONS)
+		return;
+
 	char *buffer = (char *)malloc(MAX_BYTES_PER_SECTOR);
 	if (!buffer)
 		return;

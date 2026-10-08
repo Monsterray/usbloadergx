@@ -159,7 +159,9 @@ void LoadGameHeaderCache(std::vector<struct discHdr> &list)
 	list.reserve(count + list.size());
 	for (u32 i = 0; i < count; ++i)
 	{
-		fread((void *)&tmp, 1, sizeof(struct discHdr), cache);
+		if (fread((void *)&tmp, 1, sizeof(struct discHdr), cache) != sizeof(struct discHdr))
+			break;
+
 		list.push_back(tmp);
 	}
 
@@ -179,7 +181,8 @@ void SaveGameHeaderCache(std::vector<struct discHdr> &list, std::vector<int> &pl
 	std::vector<struct wiiCache> wiictmp;
 	struct wiiCache gtmp;
 
-	for (u32 i = 0; i < list.size(); ++i)
+	u32 entries = list.size() < plist.size() ? list.size() : plist.size();
+	for (u32 i = 0; i < entries; ++i)
 	{
 		memset(&gtmp, 0, sizeof(struct wiiCache));
 		gtmp.header = list[i];
@@ -227,7 +230,9 @@ void LoadGameHeaderCache(std::vector<struct discHdr> &list, std::vector<int> &pl
 	plist.reserve(count + plist.size());
 	for (u32 i = 0; i < count; ++i)
 	{
-		fread((void *)&wiictmp, 1, sizeof(struct wiiCache), cache);
+		if (fread((void *)&wiictmp, 1, sizeof(struct wiiCache), cache) != sizeof(struct wiiCache))
+			break;
+
 		list.push_back(wiictmp.header);
 		plist.push_back(wiictmp.part);
 	}
@@ -248,12 +253,22 @@ void SaveGameHeaderCache(std::vector<struct discHdr> &list, std::vector<std::str
 	std::vector<struct gcCache> gcctmp;
 	struct gcCache gtmp;
 
-	for (u32 i = 0; i < list.size(); ++i)
+	u32 entries = list.size() < plist.size() ? list.size() : plist.size();
+	for (u32 i = 0; i < entries; ++i)
 	{
+		if (plist[i].size() >= sizeof(gtmp.path))
+			continue;
+
 		memset(&gtmp, 0, sizeof(gcCache));
 		gtmp.header = list[i];
-		strcpy((char *)gtmp.path, plist[i].c_str());
+		snprintf((char *)gtmp.path, sizeof(gtmp.path), "%s", plist[i].c_str());
 		gcctmp.push_back(gtmp);
+	}
+
+	if (gcctmp.empty())
+	{
+		RemoveFile(path.c_str());
+		return;
 	}
 
 	CreateSubfolder(Settings.GameHeaderCachePath);
@@ -296,7 +311,10 @@ void LoadGameHeaderCache(std::vector<struct discHdr> &list, std::vector<std::str
 	plist.reserve(count + plist.size());
 	for (u32 i = 0; i < count; ++i)
 	{
-		fread((void *)&gcctmp, 1, sizeof(struct gcCache), cache);
+		if (fread((void *)&gcctmp, 1, sizeof(struct gcCache), cache) != sizeof(struct gcCache))
+			break;
+
+		gcctmp.path[sizeof(gcctmp.path) - 1] = 0;
 		list.push_back(gcctmp.header);
 
 		std::string tmp((char *)gcctmp.path);
@@ -306,7 +324,7 @@ void LoadGameHeaderCache(std::vector<struct discHdr> &list, std::vector<std::str
 	fclose(cache);
 }
 
-bool isCacheFile(std::string filename)
+bool isCacheFile(const std::string &filename)
 {
 	std::string path = std::string(Settings.GameHeaderCachePath) + filename;
 	return CheckFile(path.c_str());

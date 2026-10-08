@@ -1363,7 +1363,7 @@ int GameBooter::BootNintendont(struct discHdr *gameHdr)
 	}
 
 	// Check if Nintendont boot.dol is available
-	char NIN_loader_path[MAX_FAT_PATH];
+	char NIN_loader_path[MAX_FAT_PATH] = "";
 	if (strncmp(RealPath, "usb", 3) == 0) // Nintendont r39 only
 	{
 		snprintf(NIN_loader_path, sizeof(NIN_loader_path), "%sloaderusb.dol", ninLoaderPath);
@@ -1390,7 +1390,7 @@ int GameBooter::BootNintendont(struct discHdr *gameHdr)
 	char NINVersion[7] = "";
 	u32 NINRev = 0;
 	bool NINArgsboot = false;
-	NINRev = nintendontVersion(Settings.NINLoaderPath, NINVersion, sizeof(NINVersion));
+	NINRev = nintendontVersion(ninLoaderPath, NINVersion, sizeof(NINVersion));
 	if (NINRev > 0) // Version available since 3.324
 	{
 		gprintf("NIN: Nintendont revision = %d \n", NINRev);
@@ -1399,7 +1399,7 @@ int GameBooter::BootNintendont(struct discHdr *gameHdr)
 	else
 	{
 		char NINBuildDate[21] = "";
-		if (nintendontBuildDate(Settings.NINLoaderPath, NINBuildDate))
+		if (nintendontBuildDate(ninLoaderPath, NINBuildDate))
 		{
 			// Current build date
 			struct tm time;

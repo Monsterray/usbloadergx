@@ -478,6 +478,21 @@ void GuiButton::Update(GuiTrigger *t)
 			}
 		}
 	}
+	else if (state == STATE_SELECTED && stateChan == t->chan)
+	{
+		//! This channel's pointer selected the button and is gone now, hidden by the
+		//! D-pad or timed out. Without this, A still clicked the button the pointer
+		//! was last over instead of what the D-pad selected. A selection made for
+		//! the D-pad uses channel -1 and is left alone.
+		this->ResetState();
+
+		if (effectTarget == effectTargetOver && effectAmount == effectAmountOver)
+		{
+			effects = effectsOver;
+			effectAmount = -effectAmountOver;
+			effectTarget = 100;
+		}
+	}
 #else
 
 	if (state == STATE_SELECTED && (stateChan == t->chan || stateChan == -1))

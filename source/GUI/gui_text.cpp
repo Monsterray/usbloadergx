@@ -157,7 +157,7 @@ void GuiText::SetText(const char * t)
 
 		if (passChar != 0)
 		{
-			for (u8 i = 0; i < wcslen(text); i++)
+			for (u32 i = 0, len = wcslen(text); i < len; i++)
 				text[i] = passChar;
 		}
 
@@ -167,7 +167,11 @@ void GuiText::SetText(const char * t)
 
 void GuiText::SetTextf(const char *format, ...)
 {
-	if (!format) SetText((char *) NULL);
+	if (!format)
+	{
+		SetText((char *) NULL);
+		return;
+	}
 
 	char *tmp = 0;
 	va_list va;
@@ -203,7 +207,7 @@ void GuiText::SetText(const wchar_t * t)
 
 		if (passChar != 0)
 		{
-			for (u8 i = 0; i < wcslen(text); i++)
+			for (u32 i = 0, len = wcslen(text); i < len; i++)
 				text[i] = passChar;
 		}
 
@@ -366,15 +370,24 @@ bool GuiText::SetFont(const u8 *fontbuffer, const u32 filesize)
 	return true;
 }
 
+//! The textDyn buffers hold maxWidth characters, but maxWidth is a pixel count.
+//! A glyph the font does not have measures zero, so the pixel width alone does
+//! not stop the loops below. Keep a floor so a small maxWidth stays in range.
+static inline int DynTextChars(int maxWidth)
+{
+	return maxWidth > 8 ? maxWidth : 8;
+}
+
 void GuiText::MakeDottedText()
 {
 	int pos = textDyn.size();
 	textDyn.resize(pos + 1);
 
 	int i = 0, currentWidth = 0;
-	textDyn[pos] = new wchar_t[maxWidth];
+	const int maxChars = DynTextChars(maxWidth);
+	textDyn[pos] = new wchar_t[maxChars];
 
-	while (text[i])
+	while (text[i] && i < maxChars - 1)
 	{
 		currentWidth += (font ? font : fontSystem)->getCharWidth(text[i], currentSize, i > 0 ? text[i - 1] : 0);
 		if (currentWidth >= maxWidth && i > 2)
@@ -399,11 +412,12 @@ void GuiText::ScrollText()
 	{
 		int pos = textDyn.size();
 		int i = 0, currentWidth = 0;
+		const int maxChars = DynTextChars(maxWidth);
 		textDyn.resize(pos + 1);
 
-		textDyn[pos] = new wchar_t[maxWidth];
+		textDyn[pos] = new wchar_t[maxChars];
 
-		while (text[i] && currentWidth < maxWidth)
+		while (text[i] && currentWidth < maxWidth && i < maxChars - 1)
 		{
 			textDyn[pos][i] = text[i];
 
@@ -439,14 +453,16 @@ void GuiText::ScrollText()
 	int ch = textScrollPos;
 	int pos = textDyn.size() - 1;
 
-	if (!textDyn[pos]) new wchar_t[maxWidth];
+	const int maxChars = DynTextChars(maxWidth);
+	if (!textDyn[pos]) textDyn[pos] = new wchar_t[maxChars];
 
 	int i = 0, currentWidth = 0;
 
-	while (currentWidth < maxWidth)
+	while (currentWidth < maxWidth && i < maxChars - 1)
 	{
 		if (ch > stringlen - 1)
 		{
+			if (i + 3 > maxChars - 1) break; //! no room for the three spaces and the terminator
 			textDyn[pos][i++] = ' ';
 			currentWidth += (font ? font : fontSystem)->getCharWidth(L' ', currentSize, ch > 0 ? text[ch - 1] : 0);
 			textDyn[pos][i++] = ' ';
@@ -477,13 +493,14 @@ void GuiText::WrapText()
 	int lastSpace = -1;
 	int lastSpaceIndex = -1;
 	int currentWidth = 0;
+	const int maxChars = DynTextChars(maxWidth);
 
 	while (text[ch] && linenum < linestodraw)
 	{
 		if (linenum >= (int) textDyn.size())
 		{
 			textDyn.resize(linenum + 1);
-			textDyn[linenum] = new wchar_t[maxWidth];
+			textDyn[linenum] = new wchar_t[maxChars];
 		}
 
 		textDyn[linenum][i] = text[ch];
@@ -491,7 +508,7 @@ void GuiText::WrapText()
 
 		currentWidth += (font ? font : fontSystem)->getCharWidth(text[ch], currentSize, ch > 0 ? text[ch - 1] : 0x0000);
 
-		if (currentWidth >= maxWidth)
+		if (currentWidth >= maxWidth || i + 2 >= maxChars)
 		{
 			if (lastSpace >= 0)
 			{
@@ -501,7 +518,7 @@ void GuiText::WrapText()
 				lastSpaceIndex = -1;
 			}
 
-			if (linenum + 1 == linestodraw && text[ch + 1] != 0x0000)
+			if (linenum + 1 == linestodraw && text[ch + 1] != 0x0000 && i >= 2)
 			{
 				textDyn[linenum][i - 2] = '.';
 				textDyn[linenum][i - 1] = '.';

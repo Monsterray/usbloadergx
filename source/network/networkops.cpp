@@ -104,7 +104,7 @@ char *GetNetworkIP(void)
 {
 	NET_LOCK();
 	static char ip_copy[16];
-	strncpy(ip_copy, IP, sizeof(ip_copy));
+	strlcpy(ip_copy, IP, sizeof(ip_copy));
 	NET_UNLOCK();
 	return ip_copy;
 }
@@ -116,7 +116,7 @@ char *GetIncommingIP(void)
 {
 	NET_LOCK();
 	static char ip_copy[50];
-	strncpy(ip_copy, incommingIP, sizeof(ip_copy));
+	strlcpy(ip_copy, incommingIP, sizeof(ip_copy));
 	NET_UNLOCK();
 	return ip_copy;
 }
@@ -224,17 +224,37 @@ int NetworkWait()
 	}
 	else
 	{
-		unsigned char haxx[9];
-		net_read(local_connection, &haxx, 8);
-		NET_LOCK();
-		wiiloadVersion[0] = haxx[4];
-		wiiloadVersion[1] = haxx[5];
-		NET_UNLOCK();
+		//! Anything on the network can open this connection, so a short read
+		//! must not leave the version or either size as whatever was there.
+		unsigned char haxx[9] = {0};
+		bool gotHeader = (net_read(local_connection, &haxx, 8) == 8);
 
-		net_read(local_connection, &infilesize, 4);
+		if (gotHeader)
+		{
+			NET_LOCK();
+			wiiloadVersion[0] = haxx[4];
+			wiiloadVersion[1] = haxx[5];
+			NET_UNLOCK();
 
-		if (haxx[4] > 0 || haxx[5] > 4)
-			net_read(local_connection, &uncfilesize, 4);
+			infilesize = 0;
+			uncfilesize = 0;
+
+			gotHeader = (net_read(local_connection, &infilesize, 4) == 4);
+
+			if (gotHeader && (haxx[4] > 0 || haxx[5] > 4))
+				gotHeader = (net_read(local_connection, &uncfilesize, 4) == 4);
+		}
+
+		if (!gotHeader)
+		{
+			net_close(local_connection);
+			net_close(local_socket);
+			NET_LOCK();
+			connection = -1;
+			socket = -1;
+			NET_UNLOCK();
+			return -4;
+		}
 
 		NET_LOCK();
 		waitforanswer = true;

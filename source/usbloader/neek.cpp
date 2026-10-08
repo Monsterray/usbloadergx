@@ -146,8 +146,15 @@ int neekBoot(void)
 	__IOS_ShutdownSubsystems();
 	
 	s32 fd = IOS_Open( "/dev/es", 0 );
+	if( fd < 0 )
+		return fd;
 	
 	u8 *buffer = (u8*)memalign( 32, 0x100 );
+	if( !buffer )
+	{
+		IOS_Close( fd );
+		return -1;
+	}
 	memset( buffer, 0, 0x100 );
 	
 	IOS_IoctlvAsync( fd, 0x1F, 0, 0, (ioctlv*)buffer, NULL, NULL );

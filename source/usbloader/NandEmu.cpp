@@ -197,6 +197,9 @@ s32 Enable_Emu(int selection)
 	if(mounted != 0)
 		return -1;
 
+	if(selection < 0 || selection >= (int) (sizeof(ndevList) / sizeof(ndevList[0])))
+		return -1;
+
 	s32 ret;
 	nandDevice *ndev = NULL;
 	ndev = &ndevList[selection];
@@ -252,7 +255,7 @@ void Set_Path(const char* p)
 		path[i] = p[i];
 		i++;
 	}
-	while(path[i-1] == '/')
+	while(i > 0 && path[i-1] == '/')
 	{
 		path[i-1] = '\0';
 		--i;

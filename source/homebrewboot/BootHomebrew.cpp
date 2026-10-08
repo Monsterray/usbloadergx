@@ -19,6 +19,8 @@
 #define EXECUTE_ADDR ((u8 *)0x92000000)
 #define BOOTER_ADDR ((u8 *)0x93000000)
 #define ARGS_ADDR ((u8 *)0x93200000)
+// The homebrew may not reach the address the app booter is copied to.
+#define MAX_HOMEBREW_SIZE ((u32)(BOOTER_ADDR - EXECUTE_ADDR))
 
 typedef void (*entrypoint)(void);
 extern "C"
@@ -46,6 +48,9 @@ void AddBootArgument(const char *argv, unsigned int size)
 
 int CopyHomebrewMemory(u8 *temp, u32 pos, u32 len)
 {
+	if (pos > MAX_HOMEBREW_SIZE || len > MAX_HOMEBREW_SIZE - pos)
+		return 0;
+
 	homebrewsize += len;
 	memcpy((homebrewbuffer) + pos, temp, len);
 
@@ -167,6 +172,12 @@ int BootHomebrew(const char *filepath)
 	fseek(file, 0, SEEK_END);
 	u32 filesize = ftell(file);
 	rewind(file);
+
+	if (filesize > MAX_HOMEBREW_SIZE)
+	{
+		fclose(file);
+		return -1;
+	}
 
 	if (fread(homebrewbuffer, 1, filesize, file) != filesize)
 	{

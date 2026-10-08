@@ -25,6 +25,8 @@
 #define TITLE_7(x)	  ((u8)((x) >> 56))
 
 #define IMET_MAX_NAME_LEN 0x2a
+//! CONF_LANG_JAPANESE through CONF_LANG_KOREAN, in that order
+#define IMET_LANGUAGE_COUNT 10
 
 #define IMET_OFFSET          0x40
 #define IMET_SIGNATURE       0x494d4554
@@ -41,16 +43,9 @@ typedef struct
 		u32 unk2;
 		u32 filesizes[3];
 		u32 unk3;
-		u16 name_japanese[IMET_MAX_NAME_LEN];
-		u16 name_english[IMET_MAX_NAME_LEN];
-		u16 name_german[IMET_MAX_NAME_LEN];
-		u16 name_french[IMET_MAX_NAME_LEN];
-		u16 name_spanish[IMET_MAX_NAME_LEN];
-		u16 name_italian[IMET_MAX_NAME_LEN];
-		u16 name_dutch[IMET_MAX_NAME_LEN];
-		u16 name_simp_chinese[IMET_MAX_NAME_LEN];
-		u16 name_trad_chinese[IMET_MAX_NAME_LEN];
-		u16 name_korean[IMET_MAX_NAME_LEN];
+		//! One name per language, indexed by CONF_LANG_*. These were ten
+		//! separate fields, and every reader indexed past the first of them.
+		u16 names[IMET_LANGUAGE_COUNT][IMET_MAX_NAME_LEN];
 		u8 zeroes2[0x24c];
 		u8 md5[0x10];
 } IMET;
@@ -94,6 +89,8 @@ class NandTitle
 
 		u64 operator[](u32 i) { return At(i); }
 
+		//! name must hold IMET_MAX_NAME_LEN + 1 characters: an IMET name that
+		//! fills the array carries no terminator of its own.
 		bool GetName(u64 tid, int language, wchar_t* name);
 		
 		tmd* GetTMD(u64 tid);

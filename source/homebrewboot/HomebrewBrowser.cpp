@@ -414,6 +414,18 @@ int HomebrewBrowser::ReceiveFile()
 
 	network_read(connection, (u8*) filename, 100);
 
+	//! Everything below this point uses the buffer and the name, and both come
+	//! from whoever opened the connection. A transfer that stopped part way
+	//! leaves the rest of the buffer as it was allocated.
+	if (read != infilesize || infilesize < 4 || !IsSafeRelativePath(filename))
+	{
+		ProgressStop();
+		free(buffer);
+		CloseConnection();
+		WindowPrompt(tr( "Error:" ), tr( "No data could be read." ), tr( "OK" ));
+		return MENU_NONE;
+	}
+
 	// Do we need to unzip this thing?
 	if (wiiloadVersion[0] > 0 || wiiloadVersion[1] > 4)
 	{
@@ -432,11 +444,18 @@ int HomebrewBrowser::ReceiveFile()
 				return MENU_NONE;
 			}
 
-			fwrite(buffer, 1, infilesize, fp);
+			bool written = fwrite(buffer, 1, infilesize, fp) == infilesize;
 			fclose(fp);
 
 			free(buffer);
 			buffer = NULL;
+
+			if (!written)
+			{
+				remove(zippath);
+				WindowPrompt(tr( "Error writing the data." ), 0, tr( "OK" ));
+				return MENU_NONE;
+			}
 
 			// Now unzip the zip file...
 			unzFile uf = unzOpen(zippath);
@@ -446,10 +465,16 @@ int HomebrewBrowser::ReceiveFile()
 				return MENU_NONE;
 			}
 
-			extractZip(uf, 0, 1, 0, Settings.homebrewapps_path);
+			int unzipped = extractZip(uf, 0, 1, 0, Settings.homebrewapps_path);
 			unzClose(uf);
 
 			remove(zippath);
+
+			if (unzipped < 0)
+			{
+				WindowPrompt(tr( "Error while opening the zip." ), 0, tr( "OK" ));
+				return MENU_HOMEBREWBROWSE;
+			}
 
 			WindowPrompt(tr( "Success:" ),
 					tr( "Uploaded ZIP file installed to homebrew directory." ), tr( "OK" ));
@@ -484,7 +509,7 @@ int HomebrewBrowser::ReceiveFile()
 
 	ProgressStop();
 
-	if (error || read != infilesize || (strcasestr(filename, ".dol") == 0 && strcasestr(filename, ".elf") == 0))
+	if (error || (strcasestr(filename, ".dol") == 0 && strcasestr(filename, ".elf") == 0))
 	{
 		WindowPrompt(tr( "Error:" ), tr( "No data could be read." ), tr( "OK" ));
 		FreeHomebrewBuffer();

@@ -32,6 +32,7 @@
 
 OptionList::OptionList()
 {
+	listChanged = false;
 }
 
 OptionList::~OptionList()
@@ -41,6 +42,9 @@ OptionList::~OptionList()
 
 void OptionList::SetName(int i, const char *format, ...)
 {
+	if(i < 0)
+		return;
+
 	if(i < (int) name.size())
 		name[i].clear();
 
@@ -69,8 +73,14 @@ void OptionList::SetName(int i, const char *format, ...)
 
 void OptionList::SetValue(int i, const char *format, ...)
 {
+	if(i < 0)
+		return;
+
 	if(i < (int) value.size())
 		value[i].clear();
+
+	if(!format)
+		return;
 
 	char *tmp=0;
 	va_list va;

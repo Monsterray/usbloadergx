@@ -93,6 +93,9 @@ static const char * DMLVersions[] =
 	"v2.11+",	// DM 2.11
 };
 
+static_assert(sizeof(DMLVersions) / sizeof(DMLVersions[0]) == DML_VERSION_MAX_VERSION,
+	"DMLVersions needs one entry per DML_VERSION_* value");
+
 
 /****************************************************************************
  * OnScreenNumpad
@@ -326,13 +329,14 @@ void WindowCredits()
 	FILE *f = fopen(DEVO_loader_path, "rb");
 	if(f)
 	{
-		char version[5];
+		char version[5] = "";
 		fseek(f, 23, SEEK_SET);
-		fread(version, 1, 4, f);
+		if(fread(version, 1, 4, f) != 4)
+			version[0] = 0;
 		fclose(f);
+		version[4] = 0;
 		char *ptr = strchr(version, ' ');
 		if(ptr) *ptr = 0;
-		else version[4] = 0;
 		snprintf(GCInfo + strlen(GCInfo), sizeof(GCInfo) - strlen(GCInfo), "%sDevolution r%d", strlen(GCInfo) > 1 ? "  /  " : "", atoi(version));
 	}
 
@@ -456,7 +460,7 @@ void WindowCredits()
 	currentTxt->SetFont(creditsFont, creditsFontSize);
 	txt.push_back(currentTxt);
 
-	sprintf(text, "lustar %s", tr( "for GameTDB and hosting covers / disc images" ));
+	snprintf(text, sizeof(text), "lustar %s", tr( "for GameTDB and hosting covers / disc images" ));
 	currentTxt = new GuiText(text);
 	currentTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
 	currentTxt->SetPosition(160, y);
@@ -464,7 +468,7 @@ void WindowCredits()
 	txt.push_back(currentTxt);
 	y += 20;
 
-	sprintf(text, "Cyan and Shano56 %s", tr( "for their work on the wiki page" ));
+	snprintf(text, sizeof(text), "Cyan and Shano56 %s", tr( "for their work on the wiki page" ));
 	currentTxt = new GuiText(text);
 	currentTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
 	currentTxt->SetPosition(160, y);
@@ -472,7 +476,7 @@ void WindowCredits()
 	txt.push_back(currentTxt);
 	y += 20;
 
-	sprintf(text, "Kinyo %s", tr( "and translators for language files updates" ));
+	snprintf(text, sizeof(text), "Kinyo %s", tr( "and translators for language files updates" ));
 	currentTxt = new GuiText(text);
 	currentTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
 	currentTxt->SetPosition(160, y);
@@ -487,7 +491,7 @@ void WindowCredits()
 	txt.push_back(currentTxt);
 	y += 20;
 
-	sprintf(text, "Waninkoko, Kwiirk & Hermes %s", tr( "for the USB Loader source" ));
+	snprintf(text, sizeof(text), "Waninkoko, Kwiirk & Hermes %s", tr( "for the USB Loader source" ));
 	currentTxt = new GuiText(text);
 	currentTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
 	currentTxt->SetPosition(10, y);
@@ -495,7 +499,7 @@ void WindowCredits()
 	txt.push_back(currentTxt);
 	y += 20;
 
-	sprintf(text, "Tantric %s", tr( "for his awesome tool LibWiiGui" ));
+	snprintf(text, sizeof(text), "Tantric %s", tr( "for his awesome tool LibWiiGui" ));
 	currentTxt = new GuiText(text);
 	currentTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
 	currentTxt->SetPosition(10, y);
@@ -503,7 +507,7 @@ void WindowCredits()
 	txt.push_back(currentTxt);
 	y += 20;
 
-	sprintf(text, "Fishears/Nuke %s", tr( "for Ocarina" ));
+	snprintf(text, sizeof(text), "Fishears/Nuke %s", tr( "for Ocarina" ));
 	currentTxt = new GuiText(text);
 	currentTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
 	currentTxt->SetPosition(10, y);
@@ -511,7 +515,7 @@ void WindowCredits()
 	txt.push_back(currentTxt);
 	y += 20;
 
-	sprintf(text, "WiiPower %s", tr( "for diverse patches" ));
+	snprintf(text, sizeof(text), "WiiPower %s", tr( "for diverse patches" ));
 	currentTxt = new GuiText(text);
 	currentTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
 	currentTxt->SetPosition(10, y);
@@ -519,7 +523,7 @@ void WindowCredits()
 	txt.push_back(currentTxt);
 	y += 20;
 
-	sprintf(text, "Oggzee %s", tr( "for FAT/NTFS support" ));
+	snprintf(text, sizeof(text), "Oggzee %s", tr( "for FAT/NTFS support" ));
 	currentTxt = new GuiText(text);
 	currentTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
 	currentTxt->SetPosition(10, y);
@@ -741,7 +745,7 @@ int WindowExitPrompt()
 
 	for (i = 0; i < 4; i++)
 	{
-		sprintf(txt, "P%d", i + 1);
+		snprintf(txt, sizeof(txt), "P%d", i + 1);
 
 		batteryTxt[i] = new GuiText(txt, 22, ( GXColor ) {255, 255, 255, 255});
 		batteryTxt[i]->SetAlignment(ALIGN_LEFT, ALIGN_MIDDLE);
@@ -943,8 +947,8 @@ int WindowExitPrompt()
 			titleTxt.SetEffect(EFFECT_SLIDE_TOP | EFFECT_SLIDE_OUT, 50);
 			wiimoteImg.SetEffect(EFFECT_SLIDE_BOTTOM | EFFECT_SLIDE_OUT, 50);
 
-			for (int i = 0; i < 4; i++)
-				batteryBtn[i]->SetEffect(EFFECT_SLIDE_BOTTOM | EFFECT_SLIDE_OUT, 50);
+			for (int chan = 0; chan < 4; chan++)
+				batteryBtn[chan]->SetEffect(EFFECT_SLIDE_BOTTOM | EFFECT_SLIDE_OUT, 50);
 
 		}
 		else if (lMusicBtn.GetState() == STATE_CLICKED)
@@ -1072,8 +1076,8 @@ int WindowExitPrompt()
 			titleTxt.SetEffect(EFFECT_SLIDE_TOP | EFFECT_SLIDE_OUT, 50);
 			wiimoteImg.SetEffect(EFFECT_SLIDE_BOTTOM | EFFECT_SLIDE_OUT, 50);
 
-			for (int i = 0; i < 4; i++)
-				batteryBtn[i]->SetEffect(EFFECT_SLIDE_BOTTOM | EFFECT_SLIDE_OUT, 50);
+			for (int chan = 0; chan < 4; chan++)
+				batteryBtn[chan]->SetEffect(EFFECT_SLIDE_BOTTOM | EFFECT_SLIDE_OUT, 50);
 
 			choice = 0;
 		}
@@ -1093,12 +1097,12 @@ int WindowExitPrompt()
 	mainWindow->Remove(&promptWindow);
 	mainWindow->SetState(STATE_DEFAULT);
 
-	for(int i = 0; i < 4; ++i)
+	for(int chan = 0; chan < 4; ++chan)
 	{
-		delete batteryTxt[i];
-		delete batteryImg[i];
-		delete batteryBarImg[i];
-		delete batteryBtn[i];
+		delete batteryTxt[chan];
+		delete batteryImg[chan];
+		delete batteryBarImg[chan];
+		delete batteryBtn[chan];
 	}
 
 	ResumeGui();
@@ -1264,10 +1268,16 @@ int DiscWait(const char *title, const char *msg, const char *btn1Label, const ch
 int FormatingPartition(const char *title, int part_num)
 {
 	PartitionHandle * usbHandle = DeviceHandler::Instance()->GetUSBHandleFromPartition(part_num);
+	if (!usbHandle)
+		return -1;
+
 	int portPart = DeviceHandler::PartitionToPortPartition(part_num);
 
 	char text[255];
-	int n = sprintf(text, "%s: %.2fGB", tr( "Partition" ), usbHandle->GetSize(portPart) / GB_SIZE);
+	int n = snprintf(text, sizeof(text), "%s: %.2fGB", tr( "Partition" ), usbHandle->GetSize(portPart) / GB_SIZE);
+	//! snprintf reports the length it wanted, so clamp before text + n is used below.
+	if (n < 0 || n >= (int) sizeof(text))
+		n = (int) sizeof(text) - 1;
 	int choice = WindowPrompt(tr( "Do you want to format:" ), text, tr( "Yes" ), tr( "No" ));
 	if (choice == 0)
 		return -666;
@@ -1459,12 +1469,12 @@ int CodeDownload(const char *id)
 	}
 
 	char title[50];
-	sprintf(title, "%s", tr( "Code Download" ));
+	snprintf(title, sizeof(title), "%s", tr( "Code Download" ));
 	GuiText titleTxt(title, 26, thColor("r=0 g=0 b=0 a=255 - prompt windows text color"));
 	titleTxt.SetAlignment(ALIGN_CENTER, ALIGN_TOP);
 	titleTxt.SetPosition(0, 50);
 	char msg[50];
-	sprintf(msg, "%s", tr( "Initializing Network" ));
+	snprintf(msg, sizeof(msg), "%s", tr( "Initializing Network" ));
 	GuiText msgTxt(msg, 26, thColor("r=0 g=0 b=0 a=255 - prompt windows text color"));
 	msgTxt.SetAlignment(ALIGN_CENTER, ALIGN_TOP);
 	msgTxt.SetPosition(0, 140);
@@ -1565,9 +1575,10 @@ int CodeDownload(const char *id)
 					pfile = fopen(txtpath, "rb");
 					if (pfile)
 					{
-						char target[7];
+						char target[8] = "";
 						fseek(pfile, 0, SEEK_SET);
-						fread(target, sizeof(char), 7, pfile);
+						if(fread(target, 1, 7, pfile) != 7)
+							target[0] = 0;
 						fclose(pfile);
 						//printf("target=%s  game id=%s\n",target,id);
 						if (strncmp(target, id, 4) == 0 || strncmp(target + 3, id, 4) == 0)

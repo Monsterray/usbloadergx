@@ -42,6 +42,7 @@ void CCategoryList::clear()
 {
 	nameList.clear();
 	nameList[0] = tr("All");
+	listIter = nameList.begin();
 }
 
 const char * CCategoryList::operator[](unsigned int id)

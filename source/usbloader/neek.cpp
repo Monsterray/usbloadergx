@@ -426,7 +426,12 @@ int neek2oSetNAND(const char* nandpath)
 			gprintf("new nandCfg->sel = %d", nandCfg->NandSel);
 			hexdump(nandCfg, NANDCONFIG_HEADER_SIZE);
 #endif
-			freopen(nandconfigPath, "wb", f);
+			f = freopen(nandconfigPath, "wb", f);
+			if (!f)
+			{
+				MEM2_free(nandCfg);
+				return -1;
+			}
 			ret = fwrite(nandCfg, sizeof(char), filesize, f); // Write full file
 		}
 	}
@@ -454,7 +459,13 @@ int neek2oSetNAND(const char* nandpath)
 				i--;
 			}
 			
-			freopen(nandconfigPath, "wb", f);
+			f = freopen(nandconfigPath, "wb", f);
+			if (!f)
+			{
+				MEM2_free(newNand);
+				MEM2_free(nandCfg);
+				return -1;
+			}
 			ret = fwrite(nandCfg, sizeof(char), filesize, f); 	// Write full file
 			ret = fwrite(newNand,1,sizeof(NandInfo),f); 		// append new NANDInfo
 			if(ret != sizeof(NandInfo))
@@ -465,7 +476,12 @@ int neek2oSetNAND(const char* nandpath)
 	}
 	
 	// verify the header is correctly written
-	freopen(nandconfigPath, "rb", f);
+	f = freopen(nandconfigPath, "rb", f);
+	if (!f)
+	{
+		MEM2_free(nandCfg);
+		return -1;
+	}
 	ret = fread (nandCfg, 1, NANDCONFIG_HEADER_SIZE, f);
 	if(ret != NANDCONFIG_HEADER_SIZE)
 	{

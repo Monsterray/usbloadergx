@@ -940,7 +940,8 @@ int GCGameLoadSM::GetMenuInternal()
 
 		if (result == 1)
 		{
-			if (entered[strlen(entered)-1] != '/')
+			size_t enteredLen = strlen(entered);
+			if (enteredLen > 0 && entered[enteredLen-1] != '/' && enteredLen + 1 < sizeof(entered))
 				strcat(entered, "/");
 
 			GameConfig.NINLoaderPath = entered;

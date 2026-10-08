@@ -38,7 +38,8 @@ bool Resources::LoadFiles(const char * path)
 			u8 * buffer = NULL;
 			u32 filesize = 0;
 
-			LoadFileToMem(fullpath, &buffer, &filesize);
+			if(LoadFileToMem(fullpath, &buffer, &filesize) < 0 || !buffer)
+				continue;
 
 			RecourceFiles[i].CustomFile = buffer;
 			RecourceFiles[i].CustomFileSize = (u32) filesize;

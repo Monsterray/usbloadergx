@@ -67,6 +67,8 @@ static MSG *setMSG(const char *msgid, const char *msgstr)
 	if(!msg)
 	{
 		msg = (MSG *)malloc(sizeof(MSG));
+		if (!msg)
+			return NULL;
 		msg->id		= id;
 		msg->msgstr = NULL;
 		msg->next	= baseMSG;
@@ -297,14 +299,14 @@ void LoadNewTheme()
 int getThemeInt(const char *msgid)
 {
 	MSG *msg = findMSG(hash_string(msgid));
-	if(msg) return atoi(msg->msgstr);
+	if(msg && msg->msgstr) return atoi(msg->msgstr);
 	return atoi(msgid);
 }
 
 float getThemeFloat(const char *msgid)
 {
 	MSG *msg = findMSG(hash_string(msgid));
-	if(msg) return atof(msg->msgstr);
+	if(msg && msg->msgstr) return atof(msg->msgstr);
 	return atof(msgid);
 }
 
@@ -313,7 +315,7 @@ int getThemeAlignment(const char *msgid)
 	MSG *msg = findMSG(hash_string(msgid));
 
 	const char * string = msgid;
-	if(msg)
+	if(msg && msg->msgstr)
 		string = msg->msgstr;
 
 	while(*string == ' ') string++;
@@ -344,7 +346,7 @@ GXColor getThemeColor(const char *msgid)
 	MSG *msg = findMSG(hash_string(msgid));
 
 	const char * string = msgid;
-	if(msg)
+	if(msg && msg->msgstr)
 		string = msg->msgstr;
 
 	GXColor color = (GXColor) {0, 0, 0, 0};

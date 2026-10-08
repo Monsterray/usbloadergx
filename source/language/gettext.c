@@ -91,7 +91,7 @@ expand_escape(const char *str)
 				++cp;
 				break;
 			case '\\':
-				*rp = '\\';
+				*rp++ = '\\';
 				++cp;
 				break;
 			case '0':
@@ -116,11 +116,11 @@ expand_escape(const char *str)
 						ch += *cp++ - '0';
 					}
 				}
-				*rp = ch;
+				*rp++ = ch;
 			}
 				break;
 			default:
-				*rp = '\\';
+				*rp++ = '\\';
 				break;
 		}
 
@@ -150,6 +150,8 @@ static MSG *setMSG(const char *msgid, const char *msgstr)
 	if (!msg)
 	{
 		msg = (MSG *) malloc(sizeof(MSG));
+		if (!msg)
+			return NULL;
 		msg->id = id;
 		msg->msgstr = NULL;
 		msg->next = baseMSG;
@@ -227,6 +229,8 @@ bool gettextLoadLanguage(const char* langFile)
 		}
 
 	}
+
+	if (lastID) free(lastID);
 
 	fclose(f);
 	return true;

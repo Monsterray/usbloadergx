@@ -143,11 +143,20 @@ bool Wad::Open(const char *wadpath)
 		return false;
 	}
 
+	//! _decrypt_title_key() reads the key out of the signed ticket
+	if(header->tik_len < 4 || !IS_VALID_SIGNATURE((u32 *) p_tik) ||
+	   SIGNED_TIK_SIZE((u32 *) p_tik) > header->tik_len)
+	{
+		if(showPrompt)
+			ShowError(tr("Invalid WAD file."));
+		return false;
+	}
+
 	offset += round_up( header->tik_len, 64 );
 
 	// Read title tmd
 	p_tmd = (u8 *) malloc(header->tmd_len);
-	if(!p_tik)
+	if(!p_tmd)
 	{
 		if(showPrompt)
 			ShowError(tr("Not enough memory."));
@@ -160,6 +169,17 @@ bool Wad::Open(const char *wadpath)
 	{
 		if(showPrompt)
 			ShowError(tr("Failed to read tmd file."));
+		return false;
+	}
+
+	//! num_contents comes out of this tmd and decides how far contents[] is
+	//! walked, so the buffer has to be known to hold that many entries.
+	if(header->tmd_len < 4 || !IS_VALID_SIGNATURE((u32 *) p_tmd) ||
+	   SIGNATURE_SIZE((u32 *) p_tmd) + sizeof(tmd) > header->tmd_len ||
+	   SIGNED_TMD_SIZE((u32 *) p_tmd) > header->tmd_len)
+	{
+		if(showPrompt)
+			ShowError(tr("Invalid WAD file."));
 		return false;
 	}
 
@@ -179,22 +199,24 @@ bool Wad::UnInstall(const char *installpath)
 	char filepath[1024];
 	tmd *tmd_data = (tmd *) SIGNATURE_PAYLOAD((signed_blob *) p_tmd);
 
-	// trim ending slash
-	while(installpath[strlen(installpath)-1] == '/')
-	{
-		char *pathPtr = strrchr(installpath, '/');
-		if(pathPtr) *pathPtr = 0;
-	}
+	//! The paths below add their own slash. installpath belongs to the caller,
+	//! so trim a copy of it rather than the setting it was passed from.
+	char basepath[960];
+	strlcpy(basepath, installpath, sizeof(basepath));
+
+	size_t baselen = strlen(basepath);
+	while(baselen > 0 && basepath[baselen-1] == '/')
+		basepath[--baselen] = 0;
 	
 	int result = true;
 
 	// Remove ticket
-	snprintf(filepath, sizeof(filepath), "%s/ticket/%08x/%08x.tik", installpath, (unsigned int)(tmd_data->title_id >> 32), (unsigned int) tmd_data->title_id);
+	snprintf(filepath, sizeof(filepath), "%s/ticket/%08x/%08x.tik", basepath, (unsigned int)(tmd_data->title_id >> 32), (unsigned int) tmd_data->title_id);
 	if(!RemoveFile(filepath))
 		result = false;
 
 	// Remove contents / data
-	snprintf(filepath, sizeof(filepath), "%s/title/%08x/%08x/", installpath, (unsigned int) (tmd_data->title_id >> 32), (unsigned int) tmd_data->title_id);
+	snprintf(filepath, sizeof(filepath), "%s/title/%08x/%08x/", basepath, (unsigned int) (tmd_data->title_id >> 32), (unsigned int) tmd_data->title_id);
 	if(!RemoveDirectory(filepath))
 		result = false;
 
@@ -405,8 +427,10 @@ bool Wad::InstallContents(const char *installpath)
 			if(fwrite(outbuf, 1, dec_size, fp) != dec_size)
 				break;
 
-			// Set new iv for next read chunk
-			memcpy(iv, inbuf + blocksize - 16, 16);
+			//! The iv for the next block is the last block of this one, which
+			//! is at the end of what was read, not at the end of the buffer.
+			if(size >= 16)
+				memcpy(iv, inbuf + size - 16, 16);
 
 			// Increase variables
 			done += size;
@@ -555,7 +579,7 @@ bool Wad::SetTitleUID(const char *installpath, const u64 &tid)
 		if(showPrompt)
 			ShowError(tr("Not enough memory."));
 		free(uid_sys);
-		return -1;
+		return false;
 	}
 
 	uid_sys = tmp;

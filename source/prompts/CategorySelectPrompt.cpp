@@ -29,7 +29,7 @@
 #include "gecko.h"
 
 CategorySelectPrompt::CategorySelectPrompt(struct discHdr * header)
-	: CategoryPrompt(fmt("%s - %s", (char *) header->id, tr("Categories"))),
+	: CategoryPrompt(fmt("%.6s - %s", (char *) header->id, tr("Categories"))),
 	  gameHeader(header)
 {
 	browser->checkBoxClicked.connect(this, &CategorySelectPrompt::OnCheckboxClick);

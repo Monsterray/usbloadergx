@@ -111,7 +111,7 @@ void GameSettingsMenu::CreateSettingsMenu(int menuNr)
 	else if(menuNr == Idx++)
 	{
 		char ID[7];
-		snprintf(ID, sizeof(ID), "%s", (char *) DiscHeader->id);
+		snprintf(ID, sizeof(ID), "%.6s", (char *) DiscHeader->id);
 		CheatMenu(ID);
 	}
 

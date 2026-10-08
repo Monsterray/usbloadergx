@@ -40,7 +40,7 @@ const char * fmt(const char * format, ...)
 	va_start(va, format);
 	if((vasprintf(&tmp, format, va) >= 0) && tmp)
 	{
-		snprintf(strChar, sizeof(strChar), tmp);
+		snprintf(strChar, sizeof(strChar), "%s", tmp);
 		free(tmp);
 		va_end(va);
 		return (const char *) strChar;

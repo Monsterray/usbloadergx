@@ -486,7 +486,7 @@ void ThemeMenu::MainButtonClicked(int button)
 	{
 		if (Theme::Load(ThemeList[button].Filepath.c_str()))
 		{
-			snprintf(Settings.theme, sizeof(Settings.theme), ThemeList[button].Filepath.c_str());
+			snprintf(Settings.theme, sizeof(Settings.theme), "%s", ThemeList[button].Filepath.c_str());
 			Theme::Reload();
 			returnMenu = MENU_THEMEMENU;
 		}

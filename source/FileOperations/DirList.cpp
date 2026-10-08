@@ -96,7 +96,7 @@ bool DirList::LoadPath(std::string &folderpath, const char *filter, u32 flags, s
 		if(stat(filename, st) != 0)
 			continue;
 
-		snprintf(filename, MAXPATHLEN, dirent->d_name);
+		snprintf(filename, MAXPATHLEN, "%s", dirent->d_name);
 
 		if(st->st_mode & S_IFDIR)
 		{

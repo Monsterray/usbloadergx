@@ -569,7 +569,7 @@ int FeatureSettingsMenu::GetMenuInternal()
 				if(wadList->GetFilecount())
 				{
 					char found[20];
-					snprintf(found, sizeof(found), fmt(tr("%i WAD found."), wadList->GetFilecount()));
+					snprintf(found, sizeof(found), "%s", fmt(tr("%i WAD found."), wadList->GetFilecount()));
 					choice = WindowPrompt(tr("EmuNAND WAD Manager"), fmt("%s %s", found, tr("What do you want to do?")), tr("Install"), tr("Uninstall"), tr("Cancel"));
 					if(choice == 1) // Folder install
 					{

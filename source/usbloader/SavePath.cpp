@@ -113,7 +113,8 @@ void CreateSavePath(const struct discHdr *hdr, const char *NandEmuPath)
 	snprintf(nandPath, sizeof(nandPath), "%s/%s/%02x%02x%02x%02x/content", NandEmuPath, titlePath, hdr->id[0], hdr->id[1], hdr->id[2], hdr->id[3]);
 	CreateNandPath(nandPath);
 
-	strcat(nandPath, "/title.tmd");
-	if(!CheckFile(nandPath))
-		CreateTitleTMD(nandPath, hdr);
+	char tmdPath[sizeof(nandPath) + 16];
+	snprintf(tmdPath, sizeof(tmdPath), "%s/title.tmd", nandPath);
+	if(!CheckFile(tmdPath))
+		CreateTitleTMD(tmdPath, hdr);
 }

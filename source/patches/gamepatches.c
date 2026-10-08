@@ -81,6 +81,7 @@ void RegisterDOL(u8 *dst, int len)
     if (!tmp)
     {
         MEM2_free(dolList);
+        dolList = NULL;
         dolCount = 0;
         return;
     }

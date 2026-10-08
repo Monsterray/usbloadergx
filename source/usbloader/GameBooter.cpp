@@ -1128,7 +1128,7 @@ int GameBooter::BootDevolution(struct discHdr *gameHdr)
 		fread(loader_bin, 1, size, f);
 
 		// Read Devolution version
-		char version[5];
+		char version[5] = "";
 		fseek(f, 23, SEEK_SET);
 		fread(version, 1, 4, f);
 		char *ptr = strchr(version, ' ');

@@ -14,7 +14,6 @@
 
 #define off64_t off_t
 #define FMT_llu "%llu"
-#define FMT_lld "%lld"
 
 #define split_error(x)	  do { printf("\nsplit error: %s\n\n",x); } while(0)
 
@@ -25,17 +24,14 @@ u64 OPT_split_size = (u64) 4LL * 1024 * 1024 * 1024 - 32 * 1024;
 
 //split_info_t split;
 
-void split_get_fname(split_info_t *s, int idx, char *fname)
+void split_get_fname(split_info_t *s, int idx, char *fname, size_t size)
 {
-	strcpy(fname, s->fname);
-	if (idx == 0 && s->create_mode)
+	snprintf(fname, size, "%s%s", s->fname, (idx == 0 && s->create_mode) ? ".tmp" : "");
+	if (idx > 0)
 	{
-		strcat(fname, ".tmp");
-	}
-	else if (idx > 0)
-	{
-		char *c = fname + strlen(fname) - 1;
-		*c = '0' + idx;
+		size_t len = strlen(fname);
+		if (len > 0)
+			fname[len - 1] = '0' + idx;
 	}
 }
 
@@ -43,8 +39,8 @@ int split_open_file(split_info_t *s, int idx)
 {
 	int fd = s->fd[idx];
 	if (fd >= 0) return fd;
-	char fname[1024];
-	split_get_fname(s, idx, fname);
+	char fname[SPLIT_PATH_LEN];
+	split_get_fname(s, idx, fname, sizeof(fname));
 	//char *mode = s->create_mode ? "wb+" : "rb+";
 	int mode = s->create_mode ? (O_CREAT | O_RDWR) : O_RDWR;
 	//printf("SPLIT OPEN %s %s %d\n", fname, mode, idx); //Wpad_WaitButtons();
@@ -84,7 +80,7 @@ int split_fill(split_info_t *s, int idx, u64 size)
 	off64_t fsize = lseek(fd, 0, SEEK_END);
 	if (fsize < (s64) size)
 	{
-		//printf("TRUNC %d "FMT_lld"\n", idx, size); Wpad_WaitButtons();
+		//printf("TRUNC %d "FMT_llu"\n", idx, size); Wpad_WaitButtons();
 		//ftruncate(fd, size);
 		write_zero(fd, size - fsize);
 		return 1;
@@ -166,7 +162,7 @@ s32 split_read_sector(void *_fp, u32 lba, u32 count, void*buf)
 		fd = split_get_file(s, lba + i, &chunk, 1);
 		if (fd < 0)
 		{
-			fprintf(stderr, "\n\n"FMT_lld" %d %p\n", off, (int)count, _fp);
+			fprintf(stderr, "\n\n"FMT_llu" %d %p\n", off, (int)count, _fp);
 			split_error( "error seeking in disc partition" );
 			return 1;
 		}
@@ -200,7 +196,7 @@ s32 split_write_sector(void *_fp, u32 lba, u32 count, void*buf)
 		//  fprintf(stderr, "WRITE CHUNK %d %d/%d\n", lba+i, chunk, count);
 		if (fd < 0 || !chunk)
 		{
-			fprintf(stderr, "\n\n"FMT_lld" %d %p\n", off, (int)count, _fp);
+			fprintf(stderr, "\n\n"FMT_llu" %d %p\n", off, (int)count, _fp);
 			split_error( "error seeking in disc partition" );
 			return 1;
 		}
@@ -228,7 +224,7 @@ void split_init(split_info_t *s, char *fname)
 	{
 		s->fd[i] = -1;
 	}
-	strcpy(s->fname, fname);
+	strlcpy(s->fname, fname, sizeof(s->fname));
 	s->max_split = 1;
 	p = strrchr(fname, '.');
 	if (p && (strcasecmp(p, ".wbfs") == 0))
@@ -248,8 +244,8 @@ void split_set_size(split_info_t *s, u64 split_size, u64 total_size)
 void split_close(split_info_t *s)
 {
 	int i;
-	char fname[1024];
-	char tmpname[1024];
+	char fname[SPLIT_PATH_LEN];
+	char tmpname[SPLIT_PATH_LEN];
 	for (i = 0; i < s->max_split; i++)
 	{
 		if (s->fd[i] >= 0)
@@ -259,8 +255,8 @@ void split_close(split_info_t *s)
 	}
 	if (s->create_mode)
 	{
-		split_get_fname(s, -1, fname);
-		split_get_fname(s, 0, tmpname);
+		split_get_fname(s, -1, fname, sizeof(fname));
+		split_get_fname(s, 0, tmpname, sizeof(tmpname));
 		rename(tmpname, fname);
 	}
 	memset(s, 0, sizeof(*s));
@@ -270,14 +266,14 @@ int split_create(split_info_t *s, char *fname, u64 split_size, u64 total_size, b
 {
 	int i;
 	int fd;
-	char sname[1024];
+	char sname[SPLIT_PATH_LEN];
 	int error = 0;
 	split_init(s, fname);
 	s->create_mode = 1;
 	// check if any file already exists
 	for (i = -1; i < s->max_split; i++)
 	{
-		split_get_fname(s, i, sname);
+		split_get_fname(s, i, sname, sizeof(sname));
 		if (overwrite)
 		{
 			remove(sname);
@@ -321,7 +317,7 @@ int split_open(split_info_t *s, char *fname)
 		// check previous size - all splits except last must be same size
 		if (i > 0 && size != split_size)
 		{
-			fprintf(stderr, "split %d: invalid size "FMT_lld"", i, size);
+			fprintf(stderr, "split %d: invalid size "FMT_llu"", i, size);
 			goto err;
 		}
 		// get size
@@ -331,7 +327,7 @@ int split_open(split_info_t *s, char *fname)
 		// check sector alignment
 		if (size % 512)
 		{
-			fprintf(stderr, "split %d: size ("FMT_lld") not sector (512) aligned!", i, size);
+			fprintf(stderr, "split %d: size ("FMT_llu") not sector (512) aligned!", i, size);
 		}
 		// first sets split size
 		if (i == 0)

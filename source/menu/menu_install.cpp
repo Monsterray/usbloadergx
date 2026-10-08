@@ -138,7 +138,7 @@ int MenuGCInstall()
 		char installedGamePath[512];
 		if(GCGames::Instance()->IsInstalled((char *)gcDumper.GetDiscHeaders().at(installGames[i]).id, gcDumper.GetDiscHeaders().at(installGames[i]).disc_no == 0 ? 1 : 0))
 		{
-			snprintf(installedGamePath, sizeof(installedGamePath), GCGames::Instance()->GetPath((char *)gcDumper.GetDiscHeaders().at(installGames[i]).id));
+			snprintf(installedGamePath, sizeof(installedGamePath), "%s", GCGames::Instance()->GetPath((char *)gcDumper.GetDiscHeaders().at(installGames[i]).id));
 			char *pathPtr = strrchr(installedGamePath, '/');
 			if(pathPtr) *pathPtr = 0;
 		}

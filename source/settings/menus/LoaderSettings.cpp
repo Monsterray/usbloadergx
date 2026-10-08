@@ -747,7 +747,7 @@ int LoaderSettings::GetMenuInternal()
 			if (strlen(entered) <= 3 || strpbrk(entered, blocked))
 				WindowPrompt(tr("Error:"), tr("Please enter a valid address e.g. wiimmfi.de"), tr("OK"));
 			else
-				snprintf(Settings.CustomAddress, sizeof(Settings.CustomAddress), entered);
+				snprintf(Settings.CustomAddress, sizeof(Settings.CustomAddress), "%s", entered);
 		}
 	}
 

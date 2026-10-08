@@ -303,7 +303,7 @@ int CategoryPrompt::Show()
 				GameCategories.CategoryList.goToNext();
 
 			char entered[512];
-			snprintf(entered, sizeof(entered), tr(GameCategories.CategoryList.getCurrentName().c_str()));
+			snprintf(entered, sizeof(entered), "%s", tr(GameCategories.CategoryList.getCurrentName().c_str()));
 
 			int result = OnScreenKeyboard(entered, sizeof(entered), 0);
 			if(result)

@@ -261,7 +261,7 @@ int MenuLanguageSelect()
 			{
 				if (entered[strlen(entered)-1] != '/')
 					strcat (entered, "/");
-				snprintf(Settings.languagefiles_path, sizeof(Settings.languagefiles_path), entered);
+				snprintf(Settings.languagefiles_path, sizeof(Settings.languagefiles_path), "%s", entered);
 				WindowPrompt(tr("Language Path Changed."), 0, tr("OK"));
 			}
 			pathBtn.ResetState();

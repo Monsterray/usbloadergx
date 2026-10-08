@@ -119,7 +119,7 @@ bool CGameCategories::Load(std::string filepath)
 bool CGameCategories::Save()
 {
 	char filepath[300];
-	snprintf(filepath, sizeof(filepath), configPath.c_str());
+	snprintf(filepath, sizeof(filepath), "%s", configPath.c_str());
 
 	char *ptr = strrchr(filepath, '/');
 	if (ptr)
@@ -204,7 +204,7 @@ bool CGameCategories::SetCategory(const char *gameID, unsigned int id)
 		return false;
 
 	char gameID6[7];
-	snprintf(gameID6, sizeof(gameID6), gameID);
+	snprintf(gameID6, sizeof(gameID6), "%s", gameID);
 
 	std::string stringGameID(gameID6);
 
@@ -234,7 +234,7 @@ bool CGameCategories::ReplaceCategory(const char *gameID, unsigned int id)
 		return false;
 
 	char gameID6[7];
-	snprintf(gameID6, sizeof(gameID6), gameID);
+	snprintf(gameID6, sizeof(gameID6), "%s", gameID);
 
 	List[std::string(gameID6)] = defaultCategory;
 	List[std::string(gameID6)].push_back(id);

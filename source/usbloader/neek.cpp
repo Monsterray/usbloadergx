@@ -443,8 +443,8 @@ int neek2oSetNAND(const char* nandpath)
 		if(newNand)
 		{
 			memset(newNand, 0, sizeof(NandInfo));
-			snprintf(newNand->Path, sizeof(newNand->Path), neekNandPath);
-			snprintf(newNand->Name, sizeof(newNand->Name), strlen(neekNandPath) == 0 ? "root" : strrchr(neekNandPath, '/')+1);
+			strlcpy(newNand->Path, neekNandPath, sizeof(newNand->Path));
+			snprintf(newNand->Name, sizeof(newNand->Name), "%s", strlen(neekNandPath) == 0 ? "root" : strrchr(neekNandPath, '/')+1);
 			snprintf(newNand->DiPath, sizeof(newNand->DiPath), "/sneek");
 			DCFlushRange(newNand, sizeof(NandInfo));
 #ifdef DEBUG

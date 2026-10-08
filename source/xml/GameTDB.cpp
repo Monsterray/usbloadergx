@@ -509,7 +509,7 @@ bool GameTDB::ParseGameNode(const char *id)
 	if (!result)
 		return false;
 
-	snprintf(GameIDCache, sizeof(GameIDCache), id);
+	snprintf(GameIDCache, sizeof(GameIDCache), "%s", id);
 	return true;
 }
 

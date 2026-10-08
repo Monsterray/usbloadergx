@@ -170,7 +170,7 @@ void HardDriveSM::SetOptionValues()
 	if (handle)
 		Options->SetValue(Idx++, "%s (%.2fGB)", handle->GetFSName(checkPart), handle->GetSize(checkPart)/GB_SIZE);
 	else
-		Options->SetValue(Idx++, tr("Not Initialized"));
+		Options->SetValue(Idx++, "%s", tr("Not Initialized"));
 
 	//! Settings: Multiple Partitions
 	Options->SetValue(Idx++, "%s", tr( OnOffText[Settings.MultiplePartitions] ));
@@ -181,7 +181,7 @@ void HardDriveSM::SetOptionValues()
 
 	//! Settings: USB Port
 	if(NewSettingsUSBPort == 2)
-		Options->SetValue(Idx++, tr("Both Ports"));
+		Options->SetValue(Idx++, "%s", tr("Both Ports"));
 	else
 		Options->SetValue(Idx++, "%i", NewSettingsUSBPort);
 

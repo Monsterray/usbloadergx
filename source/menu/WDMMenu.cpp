@@ -213,7 +213,7 @@ void WDMMenu::CheckGameFiles(const struct discHdr * header)
 		{
 			DOLOffsetList.push_back(std::pair<int, int>(0, wdmFile->GetParameter(i)));
 			Options->SetName(position, "%i.", position+1);
-			Options->SetValue(position, wdmFile->GetReplaceName(i));
+			Options->SetValue(position, "%s", wdmFile->GetReplaceName(i));
 			position++;
 		}
 	}
@@ -241,7 +241,7 @@ void WDMMenu::CheckGameFiles(const struct discHdr * header)
 				{
 					DOLOffsetList.push_back(std::pair<int, int>(i, wdmFile->GetParameter(j)));
 					Options->SetName(position, "%i.", position+1);
-					Options->SetValue(position, wdmFile->GetReplaceName(j));
+					Options->SetValue(position, "%s", wdmFile->GetReplaceName(j));
 					position++;
 					break;
 				}
@@ -256,7 +256,7 @@ void WDMMenu::CheckGameFiles(const struct discHdr * header)
 	{
 		DOLOffsetList.push_back(std::pair<int, int>(FilesNotInWDM[i].first, 1));
 		Options->SetName(position, "%i.", position+1);
-		Options->SetValue(position, FilesNotInWDM[i].second.c_str());
+		Options->SetValue(position, "%s", FilesNotInWDM[i].second.c_str());
 		position++;
 	}
 

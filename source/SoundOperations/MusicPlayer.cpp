@@ -154,7 +154,7 @@ bool MusicPlayer::ParsePath(const char *folderpath)
 
 	while ((dirent = readdir(dir)) != 0)
 	{
-		snprintf(filename, sizeof(filename), dirent->d_name);
+		snprintf(filename, sizeof(filename), "%s", dirent->d_name);
 
 		char *fileext = strrchr(filename, '.');
 		if (!fileext)

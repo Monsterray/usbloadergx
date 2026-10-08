@@ -703,11 +703,11 @@ class GuiText: public GuiElement
 		u16 style; //!< FreeTypeGX style attributes
 		GXColor color; //!< Font color
 		FreeTypeGX *font;
-		int textWidth;
+		int textWidth = 0;
 		int currentSize;
 		int linestodraw;
 		wchar_t passChar;
-		bool widescreen;
+		bool widescreen = false;
 };
 
 //!Display, manage, and manipulate tooltips in the GUI.

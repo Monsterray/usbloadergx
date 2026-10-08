@@ -349,28 +349,28 @@ int FeatureSettingsMenu::GetMenuInternal()
 
 				ShowProgress(tr("Extracting files:"), GameTitles.GetTitle(gameList[i]), 0, 0, -1, true, false);
 
-				int ret = NandTitle::ExtractDir(nandPath, filePath);
-				if(ret == PROGRESS_CANCELED)
+				int extractRet = NandTitle::ExtractDir(nandPath, filePath);
+				if(extractRet == PROGRESS_CANCELED)
 				{
 					break;
 				}
-				else if(ret < 0) //! Games with installable channels: Mario Kart, Wii Fit, etc.
+				else if(extractRet < 0) //! Games with installable channels: Mario Kart, Wii Fit, etc.
 				{
 					snprintf(nandPath, sizeof(nandPath), "/title/00010004/%02x%02x%02x%02x", gameList[i]->id[0], gameList[i]->id[1], gameList[i]->id[2], gameList[i]->id[3]);
 					snprintf(filePath, sizeof(filePath), "%s%s", Settings.NandEmuPath, nandPath);
-					ret = NandTitle::ExtractDir(nandPath, filePath);
+					extractRet = NandTitle::ExtractDir(nandPath, filePath);
 				}
-				if(ret < 0 && !skipErrors)
+				if(extractRet < 0 && !skipErrors)
 				{
 					noErrors = false;
 					char text[200];
 					snprintf(text, sizeof(text), "%s %s. %s. %s", tr("Could not extract files for:"), GameTitles.GetTitle(gameList[i]), tr("Savegame might not exist for this game."), tr("Continue?"));
 
 					ProgressStop();
-					int ret = WindowPrompt(tr("Error:"), text, tr("Yes"), tr("No"), tr("Skip Errors"));
-					if(ret == 0)
+					int promptRet = WindowPrompt(tr("Error:"), text, tr("Yes"), tr("No"), tr("Skip Errors"));
+					if(promptRet == 0)
 						skipErrors = true;
-					else if(ret == 2)
+					else if(promptRet == 2)
 						break;
 				}
 			}
@@ -493,22 +493,22 @@ int FeatureSettingsMenu::GetMenuInternal()
 			if(choice)
 			{
 				u32 dummy;
-				int ret = -1;
+				int extractRet = -1;
 				ProgressCancelEnable(true);
 				StartProgress(tr("Extracting NAND files:"), 0, 0, true, false);
 				ShowProgress(tr("Extracting NAND files:"), 0, 0, -1, true, false);
 
 				if(ISFS_ReadDir(nandPath, NULL, &dummy) < 0)
-					ret = NandTitle::ExtractFile(nandPath, filePath);
+					extractRet = NandTitle::ExtractFile(nandPath, filePath);
 				else
-					ret = NandTitle::ExtractDir(nandPath, filePath);
+					extractRet = NandTitle::ExtractDir(nandPath, filePath);
 
 				ProgressStop();
 				ProgressCancelEnable(false);
 
-				if(ret != PROGRESS_CANCELED)
+				if(extractRet != PROGRESS_CANCELED)
 				{
-					if(ret < 0)
+					if(extractRet < 0)
 						WindowPrompt(tr("Process finished."), tr("Errors occurred."), tr("OK"));
 					else
 						WindowPrompt(tr("Success."), tr("All files extracted."), tr("OK"));

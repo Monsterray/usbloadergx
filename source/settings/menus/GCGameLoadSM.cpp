@@ -799,8 +799,8 @@ int GCGameLoadSM::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%i", GameConfig.NINVideoScale);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 		{
 			GameConfig.NINVideoScale = LIMIT(atoi(entry), 40, 120);
 		}
@@ -811,8 +811,8 @@ int GCGameLoadSM::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%i", GameConfig.NINVideoOffset);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			GameConfig.NINVideoOffset = LIMIT(atoi(entry), -21, 20);
 	}
 

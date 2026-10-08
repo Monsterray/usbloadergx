@@ -336,8 +336,8 @@ int GuiSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%g", Settings.ClockFontScaleFactor);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.ClockFontScaleFactor = LIMIT(atof(entry), 0.01f, 1.5f);
 	}
 
@@ -352,8 +352,8 @@ int GuiSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%i", Settings.TooltipDelay);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.TooltipDelay = atoi(entry);
 	}
 
@@ -385,8 +385,8 @@ int GuiSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%g", Settings.WSFactor);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.WSFactor = LIMIT(atof(entry), 0.01f, 1.5f);
 	}
 
@@ -395,8 +395,8 @@ int GuiSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%g", Settings.FontScaleFactor);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.FontScaleFactor = LIMIT(atof(entry), 0.01f, 1.5f);
 	}
 
@@ -500,8 +500,8 @@ int GuiSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%g", Settings.PointerSpeed);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.PointerSpeed = atof(entry);
 	}
 
@@ -510,8 +510,8 @@ int GuiSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%i", Settings.AdjustOverscanX);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 		{
 			Settings.AdjustOverscanX = atoi(entry);
 			AdjustOverscan(Settings.AdjustOverscanX, Settings.AdjustOverscanY);
@@ -523,8 +523,8 @@ int GuiSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%i", Settings.AdjustOverscanY);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 		{
 			Settings.AdjustOverscanY = atoi(entry);
 			AdjustOverscan(Settings.AdjustOverscanX, Settings.AdjustOverscanY);

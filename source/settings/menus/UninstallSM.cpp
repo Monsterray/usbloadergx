@@ -127,13 +127,13 @@ int UninstallSM::GetMenuInternal()
 		GameStatistics.Remove(DiscHeader->id);
 		GameStatistics.Save();
 
-		int ret = 0;
+		int removeRet = 0;
 		char filepath[512];
 
 		if(DiscHeader->type == TYPE_GAME_WII_IMG)
 		{
-			ret = WBFS_RemoveGame((u8 *) GameID);
-			if(ret >= 0)
+			removeRet = WBFS_RemoveGame((u8 *) GameID);
+			if(removeRet >= 0)
 			{
 				wString oldFilter(gameList.GetCurrentFilter());
 				gameList.ReadGameList();
@@ -184,7 +184,7 @@ int UninstallSM::GetMenuInternal()
 			if (CheckFile(filepath)) remove(filepath);
 		}
 
-		if (ret < 0)
+		if (removeRet < 0)
 			WindowPrompt(tr( "Can't delete:" ), Title.c_str(), tr( "OK" ));
 		else
 			WindowPrompt(tr( "Successfully deleted:" ), Title.c_str(), tr( "OK" ));

@@ -45,6 +45,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container: devkitpro/devkitppc:20250527
+    # Steps in a container run with sh, which is dash in this image, and dash has no
+    # pipefail: the compile step stopped at "set -o pipefail" with exit code 2.
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 

@@ -18,7 +18,7 @@ GuiImageData *LoadCoverImage(struct discHdr *header, bool Prefere3D, bool noCove
 	bool flag = Prefere3D;
 
 	memcpy(ID3, (char *)header->id, sizeof(ID3) - 1);
-	snprintf(IDfull, sizeof(IDfull), "%s", (char *)header->id);
+	snprintf(IDfull, sizeof(IDfull), "%.6s", (char *)header->id);
 
 	for (int i = 0; i < 2; ++i)
 	{

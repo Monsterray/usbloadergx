@@ -241,7 +241,7 @@ int ParseDirectory(const char* Path, int Flags, FILTERCASCADE *Filter)
 	{
 		if (Flags & FB_TRYROOTDIR)
 		{
-			snprintf(fulldir, sizeof(fulldir), browser->rootdir);
+			snprintf(fulldir, sizeof(fulldir), "%s", browser->rootdir);
 			browser->dir[0] = 0;
 			if ((dir = opendir(browser->rootdir)) == NULL) return -1;
 		}
@@ -269,7 +269,7 @@ int ParseDirectory(const char* Path, int Flags, FILTERCASCADE *Filter)
 		if(stat(filename, &filestat) != 0)
 			continue;
 
-		snprintf(filename, sizeof(filename), dirent->d_name);
+		snprintf(filename, sizeof(filename), "%s", dirent->d_name);
 
 		if (strcmp(filename, ".") != 0 && strcmp(filename, "..") != 0)
 		{

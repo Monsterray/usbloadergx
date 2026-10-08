@@ -119,7 +119,7 @@ int UninstallSM::GetMenuInternal()
 			return MENU_NONE;
 
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 
 		std::string Title(GameTitles.GetTitle(DiscHeader));
 		GameSettings.Remove(DiscHeader->id);
@@ -211,7 +211,7 @@ int UninstallSM::GetMenuInternal()
 			return MENU_NONE;
 
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 		char filepath[200];
 		snprintf(filepath, sizeof(filepath), "%s%s.png", Settings.covers_path, GameID);
 		if (CheckFile(filepath)) remove(filepath);
@@ -226,7 +226,7 @@ int UninstallSM::GetMenuInternal()
 	else if (ret == ++Idx)
 	{
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 		char filepath[200];
 		snprintf(filepath, sizeof(filepath), "%s%s.png", Settings.disc_path, GameID);
 
@@ -244,7 +244,7 @@ int UninstallSM::GetMenuInternal()
 			return MENU_NONE;
 
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 		char filepath[200];
 		snprintf(filepath, sizeof(filepath), "%s%s.bnr", Settings.BNRCachePath, GameID);
 		if (CheckFile(filepath)) remove(filepath);
@@ -259,7 +259,7 @@ int UninstallSM::GetMenuInternal()
 	else if (ret == ++Idx)
 	{
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 		char filepath[200];
 		snprintf(filepath, sizeof(filepath), "%s%s.txt", Settings.TxtCheatcodespath, GameID);
 
@@ -273,7 +273,7 @@ int UninstallSM::GetMenuInternal()
 	else if (ret == ++Idx)
 	{
 		char GameID[7];
-		snprintf(GameID, sizeof(GameID), "%s", (char *) DiscHeader->id);
+		snprintf(GameID, sizeof(GameID), "%.6s", (char *) DiscHeader->id);
 		char filepath[200];
 		snprintf(filepath, sizeof(filepath), "%s%s.gct", Settings.Cheatcodespath, GameID);
 

@@ -36,7 +36,7 @@ int SelectPartitionMenu()
 		else
 		{
 			options.SetName(counter, "%s %d:", tr( "Partition" ), cnt + 1);
-			options.SetValue(counter, tr( "Can't be formatted" ));
+			options.SetValue(counter, "%s", tr( "Can't be formatted" ));
 		}
 		counter++;
 	}

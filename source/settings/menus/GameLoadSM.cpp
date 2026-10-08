@@ -215,9 +215,9 @@ GameLoadSM::~GameLoadSM()
 void GameLoadSM::SetDefaultConfig()
 {
 	char id[7];
-	snprintf(id, sizeof(id), GameConfig.id);
+	snprintf(id, sizeof(id), "%s", GameConfig.id);
 	GameSettings.SetDefault(GameConfig);
-	snprintf(GameConfig.id, sizeof(GameConfig.id), id);
+	snprintf(GameConfig.id, sizeof(GameConfig.id), "%s", id);
 }
 
 void GameLoadSM::SetOptionNames()
@@ -292,49 +292,49 @@ void GameLoadSM::SetOptionValues()
 
 	//! Settings: Video Mode
 	if (GameConfig.video == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(VideoModeText[GameConfig.video]));
 
 	//! Settings: Dol Video Patch
 	if (GameConfig.videoPatchDol == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(VideoPatchDolText[GameConfig.videoPatchDol]));
 
 	//! Settings: 480p Pixel Fix Patch
 	if (GameConfig.patchFix480p == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.patchFix480p]));
 
 	//! Settings: Sneek Video Patch
 	if (GameConfig.sneekVideoPatch == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.sneekVideoPatch]));
 
 	//! Settings: VIDTV Patch
 	if (GameConfig.vipatch == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.vipatch]));
 
 	//! Settings: Deflicker Filter
 	if (GameConfig.deflicker == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(DeflickerText[GameConfig.deflicker]));
 
 	//! Settings: Video Width
 	if (GameConfig.videoWidth == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(WidthText[GameConfig.videoWidth]));
 
 	//! Settings: Aspect Ratio
 	if (GameConfig.aspectratio == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(AspectText[GameConfig.aspectratio]));
 
@@ -342,32 +342,32 @@ void GameLoadSM::SetOptionValues()
 	if (isWiiU() && Settings.widescreen)
 	{
 		if (GameConfig.ScreenMode == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr(ScreenModeText[GameConfig.ScreenMode]));
 	}
 
 	//! Settings: Game Language
 	if (GameConfig.language == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(LanguageText[GameConfig.language]));
 
 	//! Settings: Patch Country Strings
 	if (GameConfig.patchcountrystrings == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.patchcountrystrings]));
 
 	//! Settings: Ocarina
 	if (GameConfig.ocarina == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(OnOffAskText[GameConfig.ocarina]));
 
 	//! Settings: Private Server
 	if (GameConfig.PrivateServer == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr(PrivServText[GameConfig.PrivateServer]));
 
@@ -375,14 +375,14 @@ void GameLoadSM::SetOptionValues()
 	if (GameConfig.PrivateServer == PRIVSERV_CUSTOM)
 	{
 		if (GameConfig.CustomAddress.size() == 0)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", GameConfig.CustomAddress.c_str());
 	}
 
 	//! Settings: Game IOS
 	if (GameConfig.autoios == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr( GamesIOSText[GameConfig.autoios] ));
 
@@ -390,14 +390,14 @@ void GameLoadSM::SetOptionValues()
 	if (GameConfig.autoios == GAME_IOS_CUSTOM)
 	{
 		if (GameConfig.ios == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%i", GameConfig.ios);
 	}
 
 	//! Settings: Block IOS Reload
 	if (GameConfig.iosreloadblock == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr( OnOffText[GameConfig.iosreloadblock]));
 
@@ -427,38 +427,38 @@ void GameLoadSM::SetOptionValues()
 	{
 		//! Settings: EmuNAND Save/Channel Mode
 		if (GameConfig.NandEmuMode == INHERIT)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", tr( NandEmuText[GameConfig.NandEmuMode] ));
 
 		//! Settings: EmuNAND Save/Channel Path
 		if (GameConfig.NandEmuPath.size() == 0)
-			Options->SetValue(Idx++, tr("Use global"));
+			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%s", GameConfig.NandEmuPath.c_str());
 	}
 
 	//! Settings: Hooktype
 	if (GameConfig.Hooktype == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr( HooktypeText[GameConfig.Hooktype] ));
 
 	//! Settings: Wiird Debugger
 	if (GameConfig.WiirdDebugger == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr( OnOffText[GameConfig.WiirdDebugger] ));
 
 	//! Settings: Disable Wiimote Motor
 	if (GameConfig.wpadMotor == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr( OnOffText[GameConfig.wpadMotor] ));
 
 	//! Settings: Disable Wiimote Speaker
 	if (GameConfig.wpadSpeaker == INHERIT)
-		Options->SetValue(Idx++, tr("Use global"));
+		Options->SetValue(Idx++, "%s", tr("Use global"));
 	else
 		Options->SetValue(Idx++, "%s", tr( OnOffText[GameConfig.wpadSpeaker] ));
 
@@ -470,7 +470,7 @@ void GameLoadSM::SetOptionValues()
 
 		//! Settings: Select DOL Offset
 		if (GameConfig.loadalternatedol != 1)
-			Options->SetValue(Idx++, tr("Not required"));
+			Options->SetValue(Idx++, "%s", tr("Not required"));
 		else
 		{
 			if (GameConfig.alternatedolname.size() != 0)
@@ -704,7 +704,7 @@ int GameLoadSM::GetMenuInternal()
 			else
 			{
 				char entered[300];
-				snprintf(entered, sizeof(entered), GameConfig.NandEmuPath.c_str());
+				snprintf(entered, sizeof(entered), "%s", GameConfig.NandEmuPath.c_str());
 
 				HaltGui();
 				GuiWindow * parent = (GuiWindow *) parentElement;

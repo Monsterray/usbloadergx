@@ -73,21 +73,21 @@ void SoundSettingsMenu::SetOptionValues()
 	//! Settings: Background Music
 	const char * filename = strrchr(Settings.ogg_path, '/');
 	if (filename)
-		Options->SetValue(Idx++, filename+1);
+		Options->SetValue(Idx++, "%s", filename+1);
 	else
-		Options->SetValue(Idx++, tr( "Default" ));
+		Options->SetValue(Idx++, "%s", tr( "Default" ));
 
 	//! Settings: Music Volume
 	if (Settings.volume > 0)
 		Options->SetValue(Idx++, "%i", Settings.volume);
 	else
-		Options->SetValue(Idx++, tr( "OFF" ));
+		Options->SetValue(Idx++, "%s", tr( "OFF" ));
 
 	//! Settings: SFX Volume
 	if (Settings.sfxvolume > 0)
 		Options->SetValue(Idx++, "%i", Settings.sfxvolume);
 	else
-		Options->SetValue(Idx++, tr( "OFF" ));
+		Options->SetValue(Idx++, "%s", tr( "OFF" ));
 
 	//! Settings: Game Sound Mode
 	Options->SetValue(Idx++, "%s", tr( GameSoundText[Settings.gamesound] ));
@@ -96,13 +96,13 @@ void SoundSettingsMenu::SetOptionValues()
 	if (Settings.gamesoundvolume > 0)
 		Options->SetValue(Idx++, "%i", Settings.gamesoundvolume);
 	else
-		Options->SetValue(Idx++, tr( "OFF" ));
+		Options->SetValue(Idx++, "%s", tr( "OFF" ));
 
 	//! Settings: Music Loop Mode
-	Options->SetValue(Idx++, tr( MusicLoopText[Settings.musicloopmode] ));
+	Options->SetValue(Idx++, "%s", tr( MusicLoopText[Settings.musicloopmode] ));
 
 	//! Settings: Resample to 48 kHz
-	Options->SetValue(Idx++, tr( OnOffText[Settings.ResampleTo48kHz] ));
+	Options->SetValue(Idx++, "%s", tr( OnOffText[Settings.ResampleTo48kHz] ));
 
 	//! Settings: Reset BG Music
 	Options->SetValue(Idx++, " ");
@@ -113,9 +113,9 @@ int SoundSettingsMenu::GetMenuInternal()
 	//! Refresh Background Music
 	const char *filename = strrchr(Settings.ogg_path, '/');
 	if (!filename)
-		Options->SetValue(0, tr( "Default" ));
+		Options->SetValue(0, "%s", tr( "Default" ));
 	else if (strcasecmp(Options->GetValue(0), filename + 1) != 0)
-		Options->SetValue(0, filename + 1);
+		Options->SetValue(0, "%s", filename + 1);
 
 	int ret = optionBrowser->GetClickedOption();
 

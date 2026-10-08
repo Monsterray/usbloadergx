@@ -81,7 +81,7 @@ int DiscBrowse(const char * GameID, char * alternatedname, int alternatedname_si
 		if (fileext && strcasecmp(fileext, ".dol") == 0)
 		{
 			options.SetName(position, "%s %03i", tr("Offset"), (int)i);
-			options.SetValue(position, filename);
+			options.SetValue(position, "%s", filename);
 			position++;
 		}
 	}
@@ -159,7 +159,7 @@ int DiscBrowse(const char * GameID, char * alternatedname, int alternatedname_si
 			choice = WindowPrompt(options.GetValue(ret), tr( "Load this DOL as alternate DOL?" ), tr( "OK" ), tr( "Cancel" ));
 			if (choice)
 			{
-				snprintf(alternatedname, alternatedname_size, options.GetValue(ret));
+				snprintf(alternatedname, alternatedname_size, "%s", options.GetValue(ret));
 				const char * offset = options.GetName(ret);
 				if(offset)
 					ret = atoi(offset+strlen("Offset ")); //doloffset

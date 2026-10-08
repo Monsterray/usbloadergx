@@ -109,7 +109,7 @@ void NewTitles::CheckGame(const u8 *titleid)
 	t = new Title;
 	memset(t, 0, sizeof(Title));
 
-	snprintf(t->titleId, sizeof(t->titleId), "%s", (char *) titleid);
+	snprintf(t->titleId, sizeof(t->titleId), "%.6s", (char *) titleid);
 	t->timestamp = time(0);
 	t->next = NULL;
 

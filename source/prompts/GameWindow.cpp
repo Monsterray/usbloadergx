@@ -466,9 +466,9 @@ void GameWindow::ChangeGame(int EffectDirection)
 	if (header->tid != 0)
 	{
 		if(header->type == TYPE_GAME_NANDCHAN)
-			sizeTxt->SetTextf(tr("Real NAND"));
+			sizeTxt->SetTextf("%s", tr("Real NAND"));
 		else if(header->type == TYPE_GAME_EMUNANDCHAN)
-			sizeTxt->SetTextf(tr("Emulated NAND"));
+			sizeTxt->SetTextf("%s", tr("Emulated NAND"));
 
 	}
 	else if(header->type == TYPE_GAME_WII_IMG)
@@ -759,7 +759,7 @@ void GameWindow::BootGame(struct discHdr *header)
 	GameCFG* game_cfg = GameSettings.GetGameCFG(header->id);
 
 	char IDfull[7];
-	snprintf(IDfull, sizeof(IDfull), "%s", (char *) header->id);
+	snprintf(IDfull, sizeof(IDfull), "%.6s", (char *) header->id);
 
 	s32 gameIOS = game_cfg->ios == INHERIT ? Settings.cios : game_cfg->ios;
 	u8 autoIOS = game_cfg->autoios == INHERIT ? Settings.AutoIOS : game_cfg->autoios;

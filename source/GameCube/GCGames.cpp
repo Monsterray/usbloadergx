@@ -487,11 +487,12 @@ bool GCGames::IsInstalled(const char *gameID, u8 disc_number) const
 			else if (disc_number == 1) // Check if the second Game Disc exists in the same folder than Disc1.
 			{
 				char filepath[512];
-				int n = snprintf(filepath, sizeof(filepath), "%s", GetPath(gameID));
+				snprintf(filepath, sizeof(filepath), "%s", GetPath(gameID));
 				char *pathPtr = strrchr(filepath, '/');
 				if (pathPtr)
 					*pathPtr = 0;
-				snprintf(filepath + n, sizeof(filepath) - n, "/disc2.iso");
+				size_t dirLen = strlen(filepath);
+				snprintf(filepath + dirLen, sizeof(filepath) - dirLen, "/disc2.iso");
 				if (CheckFile(filepath))
 					return true;
 			}
@@ -668,14 +669,14 @@ int nintendontBuildDate(const char *NIN_loader_path, char *NINBuildDate)
 		u32 filesize = 0;
 		const char *str = "Nintendont Loader";
 		bool found = false;
+		char NINHeader[100];
 		if (LoadFileToMem(NIN_loader, &buffer, &filesize))
 		{
-			for (u32 i = 0; i < filesize - 100; ++i)
+			for (u32 i = 0; i + sizeof(NINHeader) <= filesize; ++i)
 			{
 				if (memcmp(buffer + i, str, strlen(str)) == 0)
 				{
 					// Write buffer in NINheader
-					char NINHeader[100];
 					for (u8 j = 0; j < 99; j++)
 						NINHeader[j] = *(u8 *)(buffer + i + j) == 0 ? ' ' : *(u8 *)(buffer + i + j); // replace \0 with a space.
 					NINHeader[99] = '\0';
@@ -689,12 +690,12 @@ int nintendontBuildDate(const char *NIN_loader_path, char *NINBuildDate)
 						if (dateStart != NULL)
 							break;
 					}
-					if (dateStart == NULL)
+					if (dateStart == NULL || dateStart + 20 >= NINHeader + sizeof(NINHeader))
 						break;
 
 					dateStart[20] = '\0';
 
-					sprintf(NINBuildDate, "%.20s", dateStart);
+					snprintf(NINBuildDate, 21, "%.20s", dateStart);
 					gprintf("Nintendont Build date : %.20s \n", dateStart);
 
 					found = true;
@@ -724,13 +725,14 @@ int nintendontVersion(const char *NIN_loader_path, char *NINVersion, int len)
 		const char *str = "$$Version:";
 		if (LoadFileToMem(NIN_loader, &buffer, &filesize))
 		{
-			for (u32 i = 0; i < filesize; i += 32)
+			for (u32 i = 0; i + strlen(str) <= filesize; i += 32)
 			{
 				if (memcmp(buffer + i, str, strlen(str)) == 0)
 				{
 					// Write buffer in NINVersion
 					snprintf(NINVersion, len, "%s", buffer + i + strlen(str));
-					NINRev = atoi(strchr(NINVersion, '.') + 1);
+					const char *dot = strchr(NINVersion, '.');
+					NINRev = dot ? atoi(dot + 1) : 0;
 					break;
 				}
 			}

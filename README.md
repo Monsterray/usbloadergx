@@ -24,3 +24,16 @@ Slot 249 base 56
 Slot 250 base 57
 Slot 251 base 58
 ````
+
+## Building
+The project is built with the devkitPro toolchain pinned in CI (`devkitpro/devkitppc:20250527`). Use any of the following. They compile with the same flags; builds made outside CI are tagged as unofficial in the version string.
+
+1. **Docker** (Linux, macOS, or Windows via WSL2 with Docker Engine installed):
+   ````
+   docker build -o . .
+   ````
+   This compiles inside the pinned image and writes `usbloader_gx.zip` to the repository root.
+2. **VS Code Dev Container**: open the repository, choose *Reopen in Container*, then run `make release`.
+3. **Native devkitPro**: install the `wii-dev` group with `dkp-pacman`, then run `make release`. Match the toolchain version used by CI if you hit header or link errors.
+
+CI fails the build on any compiler warning outside the vendored `portlibs`, `source/xml/pugi*` and `source/libs` code.

@@ -25,6 +25,11 @@ on:
       - 'HBC/**'
       - 'Languages/**'
 
+# A second push to the same branch makes the running build pointless.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -36,7 +41,26 @@ jobs:
         run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Compile USB Loader GX
-        run: make release -j2
+        run: |
+          set -o pipefail
+          make release -j$(nproc) 2>&1 | tee build.log
+
+      - name: Check build output
+        run: |
+          ls -l boot.dol boot.elf
+          test -s boot.dol
+
+      - name: Check for compiler warnings
+        run: |
+          # The sources this project maintains compile clean. Third-party trees
+          # are vendored as-is and are not held to that.
+          warnings=$(grep 'warning:' build.log \
+            | grep -v -E 'portlibs/|source/xml/pugi|source/libs/' || true)
+          if [ -n "$warnings" ]; then
+            echo "$warnings"
+            echo "::error::the build emitted warnings in first-party sources"
+            exit 1
+          fi
 
       - name: Package
         if: ${{ vars.ALLOW_UPLOADS == 'true' }}

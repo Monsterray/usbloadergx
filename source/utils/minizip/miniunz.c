@@ -15,6 +15,7 @@
 #include <utime.h>
 
 #include "miniunz.h"
+#include "FileOperations/fileops.h"
 
 #define CASESENSITIVITY (0)
 #define WRITEBUFFERSIZE (8192)
@@ -37,6 +38,8 @@ int makedir(char *newdir)
 		return 0;
 
 	buffer = (char *)malloc(len + 1);
+	if (buffer == NULL)
+		return 0;
 	strcpy(buffer, newdir);
 
 	if (buffer[len - 1] == '/')
@@ -73,14 +76,19 @@ int makedir(char *newdir)
 
 static char *fullfilename(const char *basedir, char *filename)
 {
-	char *file = (char *)malloc(strlen(basedir) + strlen(filename) + 1);
-	if (basedir == NULL)
+	size_t baselen = basedir ? strlen(basedir) : 0;
+	//! One byte for the separator this may write, one for the terminator
+	char *file = (char *)malloc(baselen + strlen(filename) + 2);
+	if (file == NULL)
+		return NULL;
+
+	if (baselen == 0)
 	{
 		strcpy(file, filename);
 	}
 	else
 	{
-		if (basedir[strlen(basedir) - 1] == '/')
+		if (basedir[baselen - 1] == '/')
 			sprintf(file, "%s%s", basedir, filename);
 		else
 			sprintf(file, "%s/%s", basedir, filename);
@@ -108,6 +116,11 @@ static int do_extract_currentfile(unzFile uf, const int *popt_extract_without_pa
 		return err;
 	}
 
+	//! The name is chosen by whoever made the archive, and this one arrives
+	//! over the network, so it may not step out of the destination directory.
+	if (!IsSafeRelativePath(filename_inzip))
+		return UNZ_BADZIPFILE;
+
 	size_buf = WRITEBUFFERSIZE;
 	buf = (void *)malloc(size_buf);
 	if (buf == NULL)
@@ -118,6 +131,11 @@ static int do_extract_currentfile(unzFile uf, const int *popt_extract_without_pa
 
 	p = filename_withoutpath = filename_inzip;
 	filename_withpath = fullfilename(basedir, filename_inzip);
+	if (filename_withpath == NULL)
+	{
+		free(buf);
+		return UNZ_INTERNALERROR;
+	}
 	while ((*p) != '\0')
 	{
 		if (((*p) == '/') || ((*p) == '\\'))
@@ -131,15 +149,20 @@ static int do_extract_currentfile(unzFile uf, const int *popt_extract_without_pa
 		{
 
 			// Fix the path, this will fail if the directoryname is the same as the first filename in the zip
-			char *path = (char *)malloc(strlen(filename_withpath));
-			strcpy(path, filename_withpath);
-			char *ptr = strstr(path, filename_withoutpath);
-			*ptr = '\0';
+			char *path = (char *)malloc(strlen(filename_withpath) + 1);
+			if (path != NULL)
+			{
+				char *ptr;
+				strcpy(path, filename_withpath);
+				ptr = strstr(path, filename_withoutpath);
+				if (ptr != NULL)
+					*ptr = '\0';
 
-			//printf("creating directory: %s\n", path);
-			mymkdir(path);
+				//printf("creating directory: %s\n", path);
+				mymkdir(path);
 
-			free(path);
+				free(path);
+			}
 		}
 	}
 	else
@@ -203,11 +226,16 @@ static int do_extract_currentfile(unzFile uf, const int *popt_extract_without_pa
 
 				// Fix the path, this will fail if the directoryname is the same as the first filename in the zip
 				char *path = (char *)malloc(strlen(write_filename) + 1);
-				strcpy(path, write_filename);
-				char *ptr = strstr(path, filename_withoutpath);
-				*ptr = '\0';
-				makedir(path);
-				free(path);
+				if (path != NULL)
+				{
+					char *ptr;
+					strcpy(path, write_filename);
+					ptr = strstr(path, filename_withoutpath);
+					if (ptr != NULL)
+						*ptr = '\0';
+					makedir(path);
+					free(path);
+				}
 
 				*(filename_withoutpath - 1) = c;
 				fout = fopen(write_filename, "wb");
@@ -275,7 +303,7 @@ int extractZip(unzFile uf, int opt_extract_without_path, int opt_overwrite, cons
 	for (i = 0; i < gi.number_entry; i++)
 	{
 		if (do_extract_currentfile(uf, &opt_extract_without_path, &opt_overwrite, password, basedir) != UNZ_OK)
-			break;
+			return -1;
 
 		if ((i + 1) < gi.number_entry)
 		{
@@ -283,7 +311,7 @@ int extractZip(unzFile uf, int opt_extract_without_path, int opt_overwrite, cons
 			if (err != UNZ_OK)
 			{
 				//printf("error %d with zipfile in unzGoToNextFile\n", err);
-				break;
+				return -1;
 			}
 		}
 	}

@@ -37,10 +37,14 @@
 #include "prompts/ProgressWindow.h"
 #include "FileOperations/fileops.h"
 #include "ZipFile.h"
+#include "gecko.h"
 #include "language/gettext.h"
 
 ZipFile::ZipFile(const char *filepath)
 {
+	memset(&cur_file_info, 0, sizeof(cur_file_info));
+	//! Nothing assigns FileList yet; LoadList() is still a stub.
+	FileList = NULL;
 	File = unzOpen(filepath);
 	if (File) this->LoadList();
 }
@@ -111,9 +115,10 @@ bool ZipFile::ExtractAll(const char *dest)
 	if (!File) return false;
 
 	bool Stop = false;
+	bool failed = false;
 
-	u32 blocksize = 1024 * 50;
-	u8 *buffer = new (std::nothrow) u8[blocksize];
+	const u32 maxblocksize = 1024 * 50;
+	u8 *buffer = new (std::nothrow) u8[maxblocksize];
 	if (!buffer) return false;
 
 	char writepath[MAXPATHLEN];
@@ -127,11 +132,24 @@ bool ZipFile::ExtractAll(const char *dest)
 
 	while (!Stop)
 	{
-		if (unzGetCurrentFileInfo(File, &cur_file_info, filename, sizeof(filename), NULL, 0, NULL, 0) != UNZ_OK) Stop
-				= true;
-
-		if (!Stop && filename[strlen(filename) - 1] != '/')
+		if (unzGetCurrentFileInfo(File, &cur_file_info, filename, sizeof(filename), NULL, 0, NULL, 0) != UNZ_OK)
 		{
+			Stop = true;
+			failed = true;
+		}
+
+		size_t namelen = strlen(filename);
+
+		if (!Stop && namelen > 0 && filename[namelen - 1] != '/')
+		{
+			//! wiitdb.zip and txt.zip are downloaded, so an entry name is not trusted
+			if (!IsSafeRelativePath(filename))
+			{
+				gprintf("Skipped unsafe zip entry: %s\n", filename);
+				failed = true;
+			}
+			else
+			{
 			u32 uncompressed_size = cur_file_info.uncompressed_size;
 
 			u32 done = 0;
@@ -144,7 +162,7 @@ bool ZipFile::ExtractAll(const char *dest)
 			pointer = strrchr(writepath, '/');
 			int position = pointer - writepath + 2;
 
-			char temppath[strlen(writepath)];
+			char temppath[MAXPATHLEN];
 			snprintf(temppath, position, "%s", writepath);
 
 			CreateSubfolder(temppath);
@@ -152,8 +170,10 @@ bool ZipFile::ExtractAll(const char *dest)
 			if (ret == UNZ_OK)
 			{
 				FILE *pfile = fopen(writepath, "wb");
+				if (!pfile)
+					failed = true;
 
-				do
+				while (pfile && done < uncompressed_size)
 				{
 					if(ProgressCanceled()) {
 						Stop = true;
@@ -161,20 +181,34 @@ bool ZipFile::ExtractAll(const char *dest)
 					}
 					ShowProgress(tr( "Extracting files..." ), 0, pointer + 1, done, uncompressed_size, true, false);
 
-					if (uncompressed_size - done < blocksize) blocksize = uncompressed_size - done;
+					//! The block size is per file: shrinking it for a small entry
+					//! used to leave every later entry reading that little.
+					u32 blocksize = uncompressed_size - done < maxblocksize ? uncompressed_size - done : maxblocksize;
 
 					ret = unzReadCurrentFile(File, buffer, blocksize);
 
-					if (ret == 0) break;
+					if (ret <= 0)
+					{
+						failed = true;
+						break;
+					}
 
-					fwrite(buffer, 1, blocksize, pfile);
+					//! Write what was read, not what was asked for
+					if (fwrite(buffer, 1, ret, pfile) != (size_t) ret)
+					{
+						failed = true;
+						break;
+					}
 
 					done += ret;
+				}
 
-				} while (done < uncompressed_size);
-
-				fclose(pfile);
+				if (pfile)
+					fclose(pfile);
 				unzCloseCurrentFile(File);
+			}
+			else
+				failed = true;
 			}
 		}
 		if (unzGoToNextFile(File) != UNZ_OK) Stop = true;
@@ -186,5 +220,5 @@ bool ZipFile::ExtractAll(const char *dest)
 	ProgressStop();
 	ProgressCancelEnable(false);
 
-	return true;
+	return !failed;
 }

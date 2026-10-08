@@ -183,12 +183,20 @@ void GuiImageData::LoadTPL(const u8 *img, int imgSize)
 	if(ImgPtr)
 	{
 		int len =  ALIGN32(TplFile.GetTextureSize(0));
+		if(len <= 0)
+			return;
 
 		data = (u8 *) memalign(32, len);
 		if(!data)
 			return;
 
-		memcpy(data, ImgPtr, len);
+		//! The header can claim more than the file holds, so copy only what is there
+		//! and leave the rest of the aligned block blank.
+		u32 avail = TplFile.GetAvailableSize(0);
+		u32 copyLen = ((u32) len < avail) ? (u32) len : avail;
+
+		memset(data, 0, len);
+		memcpy(data, ImgPtr, copyLen);
 		DCFlushRange(data, len);
 	}
 }

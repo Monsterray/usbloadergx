@@ -26,6 +26,17 @@ on:
       - 'Languages/**'
 
 jobs:
+  # Pure functions that handle data from a file, a drive or the network, compiled
+  # from the exact sources the Wii build uses and run under ASan and UBSan. The
+  # devkitPPC image has no host compiler, so this runs on the runner itself.
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run host tests
+        run: sh tests/host/run.sh
+
   build:
     runs-on: ubuntu-latest
     container: devkitpro/devkitppc:20250527

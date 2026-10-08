@@ -8,3 +8,18 @@ usbloader_gx/
 /HBC/meta.xml
 /source/version.h
 /usbloader_gx.zip
+
+# AI agent files: workstation-local, never part of the project.
+AGENTS.md
+.claude/
+
+# Local MCP server registration: holds a workstation-specific absolute path to
+# the codebase-memory binary, so it would not work anywhere else.
+.mcp.json
+
+# Machine-local tooling output: the throwaway Dolphin profile that
+# scripts/dolphin_run.sh boots into.
+.dev/
+
+# What scripts/wii_install.py stages before it uploads to a Wii.
+.runs/

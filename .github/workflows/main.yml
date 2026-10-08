@@ -51,6 +51,13 @@ jobs:
       - name: Configure Git
         run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
 
+      - name: Run static checks
+        run: |
+          for check in tests/*.sh; do
+            echo "== $check"
+            sh "$check" || exit 1
+          done
+
       - name: Compile USB Loader GX
         run: |
           set -o pipefail
@@ -85,13 +92,13 @@ jobs:
       - name: Upload binary
         if: ${{ vars.ALLOW_UPLOADS == 'true' }}
         uses: actions/upload-artifact@v4
-        with: 
+        with:
           name: usbloadergx_${{ env.sha }}
           path: upload
 
       - name: Upload debug binary
         if: ${{ vars.ALLOW_UPLOADS == 'true' }}
         uses: actions/upload-artifact@v4
-        with: 
+        with:
           name: usbloadergx_${{ env.sha }}_debug
           path: boot.elf

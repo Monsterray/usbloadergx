@@ -30,6 +30,7 @@ class GuiGameCarousel : public GuiGameBrowser
 		int pagesize;
 		int speed;
 		int clickedItem;
+		int focusItem;	//!< the cover the D-pad selects when no pointer is on screen
 
 		int * gameIndex;
 		std::vector<GuiButton *> game;

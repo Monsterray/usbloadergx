@@ -57,6 +57,7 @@ GuiGameCarousel::GuiGameCarousel(int w, int h, const char *themePath, int offset
 	selectable = true;
 	selectedItem = -1;
 	clickedItem = -1;
+	focusItem = (pagesize - 1) / 2; // the cover in the middle
 
 	speed = 0;
 
@@ -300,6 +301,34 @@ void GuiGameCarousel::Update(GuiTrigger * t)
 		return; // skip when rotate
 	}
 
+	//! With no pointer on screen the carousel works like a controller menu: the
+	//! cover in the middle is the selected one, so its name shows and A opens
+	//! it, and the D-pad turns the carousel under it. With six games or fewer
+	//! the carousel does not turn, so left and right move the selection instead.
+	if (!WiiPointer::AnyVisible())
+	{
+		if (gameList.size() <= 6)
+		{
+			if (t->Left() && focusItem > 0)
+				focusItem--;
+			else if (t->Right() && focusItem < pagesize - 1)
+				focusItem++;
+		}
+		else
+			focusItem = (pagesize - 1) / 2;
+
+		for (int i = 0; i < pagesize; i++)
+		{
+			if (i == focusItem)
+			{
+				if (game[i]->GetState() == STATE_DEFAULT)
+					game[i]->SetState(STATE_SELECTED, -1);
+			}
+			else if (game[i]->GetState() == STATE_SELECTED)
+				game[i]->ResetState();
+		}
+	}
+
 	// find selected + clicked
 	int selectedItem_old = selectedItem;
 	selectedItem = -1;
@@ -335,13 +364,17 @@ void GuiGameCarousel::Update(GuiTrigger * t)
 
 		int newspeed = 0;
 		// Left/Right Navigation
+		//! A held D-pad keeps the carousel turning, faster and faster, like a held
+		//! +/- or arrow. GuiTrigger::Left()/Right() repeat with gaps, which stopped it
+		//! after one game.
 		if (btnLeft->GetState() == STATE_CLICKED)
 		{
 			u32 buttons = t->wpad.btns_h;
 			u32 buttonsPAD = t->pad.btns_h;
 			if (!((buttons & WPAD_BUTTON_A) || (buttons & WPAD_BUTTON_MINUS) ||
 				  (buttons & WPAD_CLASSIC_BUTTON_A) || (buttons & WPAD_CLASSIC_BUTTON_MINUS) ||
-				  (buttonsPAD & PAD_BUTTON_A) || (buttonsPAD & PAD_TRIGGER_L)  || t->Left()))
+				  (buttonsPAD & PAD_BUTTON_A) || (buttonsPAD & PAD_TRIGGER_L) ||
+				  (buttons & (WPAD_BUTTON_LEFT | WPAD_CLASSIC_BUTTON_LEFT)) || (buttonsPAD & PAD_BUTTON_LEFT)))
 			{
 				btnLeft->ResetState();
 				return;
@@ -357,7 +390,8 @@ void GuiGameCarousel::Update(GuiTrigger * t)
 			u32 buttonsPAD = t->pad.btns_h;
 			if (!((buttons & WPAD_BUTTON_A) || (buttons & WPAD_BUTTON_PLUS) ||
 				  (buttons & WPAD_CLASSIC_BUTTON_A) || (buttons & WPAD_CLASSIC_BUTTON_PLUS) ||
-				  (buttonsPAD & PAD_BUTTON_A) || (buttonsPAD & PAD_TRIGGER_R)  || t->Right()))
+				  (buttonsPAD & PAD_BUTTON_A) || (buttonsPAD & PAD_TRIGGER_R) ||
+				  (buttons & (WPAD_BUTTON_RIGHT | WPAD_CLASSIC_BUTTON_RIGHT)) || (buttonsPAD & PAD_BUTTON_RIGHT)))
 			{
 				btnRight->ResetState();
 				return;
@@ -415,6 +449,10 @@ void GuiGameCarousel::Update(GuiTrigger * t)
 						/ 2, 1, 0, RADIUS);
 				game[i]->UpdateEffects(); // rotate one step for liquid scrolling
 			}
+			//! The slot stays the same while the game in it changes, so forget it:
+			//! once the carousel stops, the game in the middle is selected afresh
+			//! and its name and grow effect follow.
+			selectedItem = -1;
 		}
 		else if (speed < 0) // rotate left
 		{
@@ -451,6 +489,10 @@ void GuiGameCarousel::Update(GuiTrigger * t)
 						/ 2, 1, 0, RADIUS);
 				game[i]->UpdateEffects(); // rotate one step for liquid scrolling
 			}
+			//! The slot stays the same while the game in it changes, so forget it:
+			//! once the carousel stops, the game in the middle is selected afresh
+			//! and its name and grow effect follow.
+			selectedItem = -1;
 		}
 
 	}

@@ -29,9 +29,18 @@ public:
 	void SetPosition(float x, float y, float a) {posX = x; posY = y; angle = a;}
 	void Draw(GuiTrigger *t);
 	u32 getLastActivCounter(void) { return lastActivity; }
+	//! true when this pointer was drawn in the last Draw()
+	bool IsVisible(void) const { return visible; }
+	//! true when any pointer is on screen, false when the GUI is driven like a
+	//! controller without a pointer (the D-pad was used last)
+	static bool AnyVisible(void);
 private:
 	float posX, posY, angle;
 	u32 lastActivity;
+	u32 pointerTimer;	//!< frames since the stick last moved the virtual pointer
+	bool dpadMode;		//!< the D-pad was used last; the pointer stays hidden
+	float dpadIrX, dpadIrY;	//!< where the Wii Remote pointed when the D-pad was used
+	bool visible;
 	GuiImageData * pointerImg;
 	static Mtx44 projection;
 };

@@ -14,18 +14,31 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  ****************************************************************************/
+#include <math.h>
 #include "WiiPointer.h"
 #include "settings/CSettings.h"
 #include "themes/Resources.h"
 #include "utils/tools.h"
 #include "video.h"
 #include "input.h"
+#include "menu.h"
+
+//! Frames the virtual pointer stays on screen after the stick last moved it
+#define POINTER_TIMEOUT 180 // (3s on 60Hz and 3.6s on 50Hz)
+//! How far a Wii Remote has to move, in pixels, to bring the pointer back
+//! after the D-pad hid it. Smaller than this is hand jitter.
+#define IR_MOVE_THRESHOLD 24.0f
+
+static const u32 WPAD_DPAD = WPAD_BUTTON_UP | WPAD_BUTTON_DOWN | WPAD_BUTTON_LEFT | WPAD_BUTTON_RIGHT |
+	WPAD_CLASSIC_BUTTON_UP | WPAD_CLASSIC_BUTTON_DOWN | WPAD_CLASSIC_BUTTON_LEFT | WPAD_CLASSIC_BUTTON_RIGHT;
+static const u32 PAD_DPAD = PAD_BUTTON_UP | PAD_BUTTON_DOWN | PAD_BUTTON_LEFT | PAD_BUTTON_RIGHT;
 
 Mtx44 WiiPointer::projection;
 
 WiiPointer::WiiPointer(const char *pntrImg)
 	: posX(screenwidth/2), posY(screenheight/2),
-	  angle(0.0f), lastActivity(301)
+	  angle(0.0f), lastActivity(301), pointerTimer(POINTER_TIMEOUT),
+	  dpadMode(false), dpadIrX(0.0f), dpadIrY(0.0f), visible(false)
 {
 	pointerImg = Resources::GetImageData(pntrImg);
 
@@ -51,16 +64,45 @@ void WiiPointer::SetImage(const char *pntrImg)
 	delete temp2;
 }
 
+bool WiiPointer::AnyVisible(void)
+{
+	for (int i = 0; i < 4; ++i)
+		if (pointer[i] && pointer[i]->IsVisible())
+			return true;
+	return false;
+}
+
 void WiiPointer::Draw(GuiTrigger *t)
 {
+	visible = false;
 	if(t && pointerImg)
 	{
+		//! The D-pad drives the GUI like a controller without a pointer: it hides
+		//! the pointer, and only moving the stick or the Wii Remote brings it back.
+		if((t->wpad.btns_d & WPAD_DPAD) || (t->pad.btns_d & PAD_DPAD))
+		{
+			dpadMode = true;
+			dpadIrX = t->wpad.ir.x;
+			dpadIrY = t->wpad.ir.y;
+			pointerTimer = POINTER_TIMEOUT;
+			lastActivity = 0;
+		}
+
 		if(t->wpad.ir.valid)
 		{
 			lastActivity = 0;
-			posX = t->wpad.ir.x;
-			posY = t->wpad.ir.y;
-			angle = t->wpad.ir.angle;
+			if(dpadMode && fabsf(t->wpad.ir.x - dpadIrX) < IR_MOVE_THRESHOLD && fabsf(t->wpad.ir.y - dpadIrY) < IR_MOVE_THRESHOLD)
+			{
+				// still where it was when the D-pad was used
+				t->wpad.ir.valid = 0;
+			}
+			else
+			{
+				dpadMode = false;
+				posX = t->wpad.ir.x;
+				posY = t->wpad.ir.y;
+				angle = t->wpad.ir.angle;
+			}
 		}
 		else
 		{
@@ -72,22 +114,26 @@ void WiiPointer::Draw(GuiTrigger *t)
 			{
 				posX += (t->pad.stickX + PADCAL) * Settings.PointerSpeed;
 				lastActivity = 0;
+				pointerTimer = 0;
 			}
 			else if(t->pad.stickX > PADCAL)
 			{
 				posX += (t->pad.stickX - PADCAL) * Settings.PointerSpeed;
 				lastActivity = 0;
+				pointerTimer = 0;
 			}
 			// y-axis
 			if(t->pad.stickY < -PADCAL)
 			{
 				posY -= (t->pad.stickY + PADCAL) * Settings.PointerSpeed;
 				lastActivity = 0;
+				pointerTimer = 0;
 			}
 			else if(t->pad.stickY > PADCAL)
 			{
 				posY -= (t->pad.stickY - PADCAL) * Settings.PointerSpeed;
 				lastActivity = 0;
+				pointerTimer = 0;
 			}
 
 			s8 wpadX = t->WPAD_Stick(0, 0);
@@ -99,38 +145,50 @@ void WiiPointer::Draw(GuiTrigger *t)
 			{
 				posX += (wpadX + PADCAL) * Settings.PointerSpeed;
 				lastActivity = 0;
+				pointerTimer = 0;
 			}
 			else if(wpadX > PADCAL)
 			{
 				posX += (wpadX - PADCAL) * Settings.PointerSpeed;
 				lastActivity = 0;
+				pointerTimer = 0;
 			}
 			// y-axis
 			if(wpadY < -PADCAL)
 			{
 				posY -= (wpadY + PADCAL) * Settings.PointerSpeed;
 				lastActivity = 0;
+				pointerTimer = 0;
 			}
 			else if(wpadY > PADCAL)
 			{
 				posY -= (wpadY - PADCAL) * Settings.PointerSpeed;
 				lastActivity = 0;
+				pointerTimer = 0;
 			}
 
+			//! A button keeps a pointer that is already on screen there (move,
+			//! then press A), but no longer brings back one that timed out or
+			//! that the D-pad hid: it used to reappear where it was last left.
 			if(t->pad.btns_h || t->wpad.btns_h)
+			{
 				lastActivity = 0;
+				if(pointerTimer < POINTER_TIMEOUT)
+					pointerTimer = 0;
+			}
 
 			posX = LIMIT(posX, -50.0f, screenwidth+50.0f);
 			posY = LIMIT(posY, -50.0f, screenheight+50.0f);
 
-			if(lastActivity < 180) { // (3s on 60Hz and 3.6s on 50Hz)
+			if(pointerTimer < POINTER_TIMEOUT) {
 				t->wpad.ir.valid = 1;
 				t->wpad.ir.x = posX;
 				t->wpad.ir.y = posY;
 			}
 		}
 
-		if(t->wpad.ir.valid)
+		visible = t->wpad.ir.valid;
+		if(visible)
 		{
 			GXTexObj texObj;
 			GX_InitTexObj(&texObj, pointerImg->GetImage(), pointerImg->GetWidth(), pointerImg->GetHeight(), GX_TF_RGBA8, GX_CLAMP, GX_CLAMP, GX_FALSE);
@@ -179,4 +237,6 @@ void WiiPointer::Draw(GuiTrigger *t)
 	}
 
 	++lastActivity;
+	if(pointerTimer < POINTER_TIMEOUT)
+		++pointerTimer;
 }

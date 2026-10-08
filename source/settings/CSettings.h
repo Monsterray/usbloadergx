@@ -174,7 +174,7 @@ class CSettings
 		std::vector<u32> EnabledCategories;
 		std::vector<u32> RequiredCategories;
 		std::vector<u32> ForbiddenCategories;
-		u8 EntryIOS;
+		u8 EntryIOS = 0;
 		short NandEmuMode;
 		short NandEmuChanMode;
 		short UseSystemFont;
@@ -256,8 +256,8 @@ class CSettings
 
 		// These variables are not saved to the settings file
 		bool FirstTimeRun;
-		bool skipSaving;
-		short SDMode;
+		bool skipSaving = false;
+		short SDMode = OFF;
 	protected:
 		bool ValidVersion(FILE * file);
 		bool ValidateURL(char *value, int type = 0);

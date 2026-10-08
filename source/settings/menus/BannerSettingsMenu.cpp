@@ -108,8 +108,8 @@ int BannerSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%i", Settings.BannerZoomDuration);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.BannerZoomDuration = atoi(entry);
 	}
 
@@ -118,8 +118,8 @@ int BannerSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%g", Settings.BannerGridSpeed);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.BannerGridSpeed = atof(entry);
 	}
 
@@ -128,8 +128,8 @@ int BannerSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%g", Settings.BannerProjectionOffsetX);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.BannerProjectionOffsetX = atof(entry);
 	}
 
@@ -138,8 +138,8 @@ int BannerSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%g", Settings.BannerProjectionOffsetY);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.BannerProjectionOffsetY = atof(entry);
 	}
 
@@ -148,8 +148,8 @@ int BannerSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%g", Settings.BannerProjectionWidth);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.BannerProjectionWidth = atof(entry);
 	}
 
@@ -158,8 +158,8 @@ int BannerSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%g", Settings.BannerProjectionHeight);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.BannerProjectionHeight = atof(entry);
 	}
 
@@ -168,8 +168,8 @@ int BannerSettingsMenu::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%g", Settings.GCBannerScale);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if(ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if(numpadRet)
 			Settings.GCBannerScale = atof(entry);
 	}
 

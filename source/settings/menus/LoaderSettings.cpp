@@ -1051,8 +1051,8 @@ int LoaderSettings::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%i", Settings.NINVideoScale);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if (ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if (numpadRet)
 			Settings.NINVideoScale = LIMIT(atoi(entry), 40, 120);
 	}
 
@@ -1061,8 +1061,8 @@ int LoaderSettings::GetMenuInternal()
 	{
 		char entry[20];
 		snprintf(entry, sizeof(entry), "%i", Settings.NINVideoOffset);
-		int ret = OnScreenNumpad(entry, sizeof(entry));
-		if (ret)
+		int numpadRet = OnScreenNumpad(entry, sizeof(entry));
+		if (numpadRet)
 			Settings.NINVideoOffset = LIMIT(atoi(entry), -20, 20);
 	}
 

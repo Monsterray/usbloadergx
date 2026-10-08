@@ -183,7 +183,7 @@ void StartUpProcess::SetTextf(const char *format, ...)
 	if ((vasprintf(&tmp, format, va) >= 0) && tmp)
 	{
 		TextFade(-40);
-		gprintf(tmp);
+		gprintf("%s", tmp);
 		messageTxt->SetText(tmp);
 		TextFade(40);
 	}

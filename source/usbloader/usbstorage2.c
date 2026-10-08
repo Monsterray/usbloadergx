@@ -98,8 +98,13 @@ s32 USBStorage2_Init(u32 port)
 	IOS_IoctlvFormat(hid, fd, USB_IOCTL_UMS_INIT, ":");
 
 	/* Get device capacity */
-	if (USBStorage2_GetCapacity(port, &hdd_sector_size[port]) == 0)
+	u32 sector_size = 0;
+	if (USBStorage2_GetCapacity(port, &sector_size) == 0)
 		return IPC_ENOENT;
+
+	/* Keep the 512 byte default if the device reports no sector size. */
+	if (sector_size != 0)
+		hdd_sector_size[port] = sector_size;
 
 	hddInUse[port] = true;
 

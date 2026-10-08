@@ -357,13 +357,14 @@ u64 Wbfs_Fat::EstimateGameSize()
 
 bool Wbfs_Fat::CheckLayoutB(char *fname, int len, u8 *id, char *fname_title)
 {
-	if (len <= 8)
+	if (len <= 8 || len - 8 >= TITLE_LEN)
 		return false;
 	if (fname[len - 8] != '[' || fname[len - 1] != ']')
 		return false;
 	if (!isGameID(&fname[len - 7]))
 		return false;
-	strncpy(fname_title, fname, TITLE_LEN);
+	strncpy(fname_title, fname, TITLE_LEN - 1);
+	fname_title[TITLE_LEN - 1] = 0;
 	// Cut at '['
 	fname_title[len - 8] = 0;
 	int n = strlen(fname_title);
@@ -389,7 +390,7 @@ void Wbfs_Fat::AddHeader(struct discHdr *discHeader)
 	for (int j = 0; j < 6; ++j)
 		discHeader->id[j] = toupper((int)discHeader->id[j]);
 
-	std::string title(discHeader->title);
+	std::string title(discHeader->title, strnlen(discHeader->title, sizeof(discHeader->title)));
 	title.erase(0, title.find_first_not_of(' '));
 	snprintf(discHeader->title, sizeof(discHeader->title), "%s", title.c_str());
 

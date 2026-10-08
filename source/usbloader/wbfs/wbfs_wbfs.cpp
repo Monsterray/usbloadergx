@@ -25,6 +25,8 @@ s32 Wbfs_Wbfs::Open()
 		PartInfo.handle = (usbport == 0) ? DeviceHandler::GetUSB0Interface() : DeviceHandler::GetUSB1Interface();
 
 	u8 * buffer = (u8 *) malloc(MAX_WBFS_SECTORSIZE);
+	if (!buffer)
+		return -1;
 	memset(buffer, 0, MAX_WBFS_SECTORSIZE);
 
 	if(readCallback(&PartInfo, lba, 1, buffer) < 0)

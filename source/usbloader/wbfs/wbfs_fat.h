@@ -41,7 +41,7 @@ class Wbfs_Fat: public Wbfs
 		static void CleanTitleCharacters(char *title);
 	protected:
 
-		split_info_t split;
+		split_info_t split{};
 
 		std::vector<struct discHdr> fat_hdr_vector;
 		char wbfs_fs_drive[16];

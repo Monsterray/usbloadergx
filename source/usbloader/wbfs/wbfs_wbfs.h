@@ -34,7 +34,7 @@ class Wbfs_Wbfs: public Wbfs
 		u64 EstimateGameSize();
 		s32 GetFragList(u8 *id);
 	private:
-		WBFS_PartInfo PartInfo;
+		WBFS_PartInfo PartInfo = {};
 };
 
 #endif //_WBFS_WBFS_H

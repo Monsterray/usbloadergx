@@ -4,7 +4,7 @@
 #include "usbloader/disc.h"
 #include "settings/CSettings.h"
 
-#define GAME_HEADER_CACHE_VERSION 1282
+#define GAME_HEADER_CACHE_VERSION 1283
 
 #define WII_HEADER_CACHE_FILE "WII.cache"
 #define GAMECUBE_HEADER_CACHE_FILE "GAMECUBE.cache"
@@ -19,14 +19,15 @@ struct wiiCache
 struct gcCache
 {
 	struct discHdr header;
-	u8 path[200];
+	// Same size as discHdr::path, which is what the path list holds.
+	u8 path[260];
 };
 
 void ResetGameHeaderCache();
 void GetDirectoryList(const char *path, std::string &list);
 void GetListWBFS(std::string &list);
 bool isCacheCurrent();
-bool isCacheFile(std::string filename);
+bool isCacheFile(const std::string &filename);
 
 // EmuNAND
 void SaveGameHeaderCache(std::vector<struct discHdr> &list);
@@ -40,4 +41,3 @@ void LoadGameHeaderCache(std::vector<struct discHdr> &list, std::vector<int> &pl
 void SaveGameHeaderCache(std::vector<struct discHdr> &list, std::vector<std::string> &plist);
 void LoadGameHeaderCache(std::vector<struct discHdr> &list, std::vector<std::string> &plist);
 
-bool isCacheFile(std::string filename);

@@ -71,10 +71,11 @@ bool Wiinnertag::Send(const char *gameID)
 
 	for (u32 i = 0; i < tagList.size(); ++i)
 	{
-		strcpy(sendURL, tagList[i].first.c_str());
+		//! The URL and the key both come out of the user's Wiinnertag.xml
+		strlcpy(sendURL, tagList[i].first.c_str(), sizeof(sendURL));
 
-		replaceString(sendURL, "{ID6}", gameID);
-		replaceString(sendURL, "{KEY}", tagList[i].second.c_str());
+		replaceString(sendURL, sizeof(sendURL), "{ID6}", gameID);
+		replaceString(sendURL, sizeof(sendURL), "{KEY}", tagList[i].second.c_str());
 
 		struct download file = {};
 		file.skip_response = true;

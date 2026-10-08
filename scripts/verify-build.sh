@@ -85,7 +85,7 @@ done
 echo
 echo "=== first-party sources compile without warnings"
 make release -j"$J" > /tmp/build.log 2>&1
-warnings=$(grep 'warning:' /tmp/build.log | grep -v -E 'portlibs/|source/xml/pugi|source/libs/|source/utils/minizip/' || true)
+warnings=$(grep 'warning:' /tmp/build.log | grep -v -E 'portlibs/|source/xml/pugi|source/libs/' || true)
 if [ -n "$warnings" ]; then bad "first-party warnings"; echo "$warnings" | head -10; else ok "no first-party warnings"; fi
 
 echo

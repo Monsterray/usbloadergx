@@ -78,6 +78,9 @@ CFGARGS=(
 	-C Dolphin.Core.WiiSDCardAllowWrites=True
 	-C Dolphin.Core.WiiSDCardEnableFolderSync=True
 	-C Dolphin.Core.AccurateCPUCache=True
+	# A USB Gecko in slot B (EXIDeviceType::Gecko = 7): GX's gprintf, stdout and stderr
+	# go to it, and scripts/gecko_log.py saves them as gecko.log.
+	-C Dolphin.Core.SlotB=7
 	-C Dolphin.Movie.DumpFrames=True
 	-C Graphics.Settings.DumpFramesAsImages=True
 	-C Graphics.Settings.PNGCompressionLevel=1
@@ -94,6 +97,11 @@ CFGARGS=(
 	-C Logger.Logs.OSREPORT=True
 )
 
+# The loader's own log. Dolphin holds what GX prints until a client connects, so the
+# reader can start first and keep retrying until the listener exists.
+"${PYTHON:-python}" "$ROOT/scripts/gecko_log.py" "$OUT/gecko.log" "$((SECS + 30))" &
+GECKO_PID=$!
+
 "$D/Dolphin.exe" -b -u "$U_WIN" -e "$DOL_WIN" "${CFGARGS[@]}" ${DOLPHIN_ARGS:-} >/dev/null 2>&1 &
 sleep 3
 echo "Dolphin PID $(gx_pids | tr '\n' ' '), running $SECS s..."
@@ -106,5 +114,19 @@ sleep 2
 ls "$U"/Dump/Frames/*.png 2>/dev/null | tail -n "$KEEP" | while read -r f; do cp "$f" "$OUT/frames/"; done
 N=$(ls "$OUT/frames" | wc -l | tr -d ' ')
 cp "$U"/Logs/dolphin.log "$OUT/" 2>/dev/null || true
-echo "kept $N frames in $OUT/frames; log: $OUT/dolphin.log"
+# Dolphin closing the socket ends the reader; give it a moment, then stop it regardless.
+sleep 1; kill "$GECKO_PID" 2>/dev/null; wait "$GECKO_PID" 2>/dev/null
+G=$(wc -l < "$OUT/gecko.log" 2>/dev/null | tr -d ' ')
+echo "kept $N frames in $OUT/frames; logs: $OUT/dolphin.log, $OUT/gecko.log (${G:-0} lines)"
 [ "$N" -gt 0 ] || { echo "no frames dumped: check $OUT/dolphin.log; a modal dialog or a boot failure before the first present looks the same from here"; exit 1; }
+
+# Read the log before the pictures. With no USB device, a good start-up ends on GX's
+# "USB Device not initialized" prompt, and every step before it prints a line.
+if grep -q "USB Device not initialized" "$OUT/gecko.log" 2>/dev/null; then
+	echo "RESULT: start-up reached the USB prompt; last steps:"
+	grep -v '^[[:space:]]*$' "$OUT/gecko.log" | tail -n 6 | sed 's/^/  /'
+else
+	echo "RESULT: start-up did not reach the USB prompt; the last lines GX printed:"
+	tail -n 15 "$OUT/gecko.log" 2>/dev/null | sed 's/^/  /'
+	exit 1
+fi

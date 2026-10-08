@@ -21,7 +21,8 @@ fail() {
 
 # 1. There are two zip extractors and a wiiload receiver, and all three join a
 #    name they were given to a destination directory. One shared check.
-grep -q 'bool IsSafeRelativePath(const char \*name)' "$SRC/FileOperations/fileops.cpp" \
+#    tests/host/safe_path_test.c runs it against the names that matter.
+grep -q 'bool IsSafeRelativePath(const char \*name)' "$SRC/FileOperations/SafePath.c" \
 	|| fail "the shared path check is missing"
 grep -q 'IsSafeRelativePath' "$SRC/ZipFile.cpp" \
 	|| fail "ZipFile::ExtractAll() does not check the entry name"

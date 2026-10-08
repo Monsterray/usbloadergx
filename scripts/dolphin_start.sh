@@ -58,18 +58,26 @@ grep -q "PermissionAsked" "$U/Config/Dolphin.ini" 2>/dev/null ||
 U_WIN="$(cd "$U" && pwd -W | tr '/' '\\')"
 DOL_WIN="$(cd "$(dirname "$DOL")" && pwd -W | tr '/' '\\')\\$(basename "$DOL")"
 
-# UsePanicHandlers=False matters: booting a .dol with no argv makes the loader
-# read argv[0], Dolphin raises a modal "Invalid read from 0x00000000" Warning,
-# emulation blocks on it and the render window stays black.
+# UsePanicHandlers=False matters: any panic alert is a modal that blocks
+# emulation and leaves the render window black. Dolphin boots a .dol with no
+# argv at all; the loader read argv[0] regardless until 2026-09-22 and raised
+# exactly such an alert ("Invalid read from 0x00000000") on every boot.
 # ImmediateXFBEnable=True matters: the menu redraws an identical frame every
 # vblank, which deferred presentation shows as black.
 ARGS="'-e','$DOL_WIN','-u','$U_WIN'"
 for c in Dolphin.Interface.UsePanicHandlers=False Dolphin.Interface.ConfirmStop=False \
 	Dolphin.Core.WiiSDCard=True Dolphin.Core.WiiSDCardAllowWrites=True \
 	Dolphin.Core.WiiSDCardEnableFolderSync=True Graphics.Hacks.ImmediateXFBEnable=True \
-	Dolphin.Analytics.PermissionAsked=True Dolphin.Analytics.Enabled=False; do
+	Dolphin.Analytics.PermissionAsked=True Dolphin.Analytics.Enabled=False \
+	Dolphin.Core.SlotB=7; do
 	ARGS="$ARGS,'-C','$c'"
 done
+
+# The loader's own log while you drive it: USB Gecko in slot B (Core.SlotB=7),
+# read by scripts/gecko_log.py until Dolphin closes the connection.
+LIVELOG="$ROOT/.dev/gecko-live.log"
+nohup "${PYTHON:-python}" "$ROOT/scripts/gecko_log.py" "$LIVELOG" 86400 >/dev/null 2>&1 &
+disown
 
 powershell.exe -NoProfile -Command "Start-Process -FilePath '$(cd "$D" && pwd -W | tr '/' '\\')\\Dolphin.exe' -ArgumentList $ARGS" 2>&1 | tr -d '\r'
 sleep 5
@@ -77,4 +85,5 @@ pids="$(gx_pids)"
 [ -z "$pids" ] && { echo "Dolphin did not start"; exit 1; }
 echo "USB Loader GX running in Dolphin, PID $pids"
 echo "  games:  $SD/wbfs  and  $SD/games"
+echo "  log:    $LIVELOG  (what GX prints, as it prints it)"
 echo "  stop:   scripts/dolphin_start.sh --stop"

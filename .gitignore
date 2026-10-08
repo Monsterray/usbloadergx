@@ -20,3 +20,6 @@ AGENTS.md
 # Machine-local tooling output: the throwaway Dolphin profile that
 # scripts/dolphin_run.sh boots into.
 .dev/
+
+# What scripts/wii_install.py stages before it uploads to a Wii.
+.runs/

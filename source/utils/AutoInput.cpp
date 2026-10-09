@@ -10,6 +10,9 @@
  *   32000 point 535 417      Wii Remote pointer on at x y (screen coordinates)
  *   33000 unpoint            pointer off again
  *   34000 stick 70 0 400     GameCube main stick, held 400 ms
+ *   40000 download https://example.com/   downloadfile() it now and log the
+ *                            size, the time and the start of the body (HTTPS
+ *                            and wolfSSL in Dolphin, whose sockets reach the host)
  *
  * Buttons: A B X Y Z START UP DOWN LEFT RIGHT L R. Everything goes to channel
  * 0, merged with whatever a real controller sends. Each event is logged with
@@ -20,15 +23,17 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <string>
 #include <vector>
 #include <ogc/lwp_watchdog.h>
 #include "AutoInput.h"
 #include "GUI/gui.h"
+#include "network/https.h"
 #include "gecko.h"
 
 namespace
 {
-enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK };
+enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD };
 
 struct Event
 {
@@ -37,6 +42,7 @@ struct Event
 	u32 bits;
 	u32 duration;
 	int x, y;
+	std::string url;
 };
 
 std::vector<Event> events;
@@ -72,7 +78,7 @@ void Load()
 	if (!f)
 		return;
 
-	char line[160], cmd[16], arg[16];
+	char line[320], cmd[16], arg[16], url[256];
 	while (fgets(line, sizeof(line), f))
 	{
 		Event e = {};
@@ -99,6 +105,10 @@ void Load()
 		else if (strcasecmp(cmd, "stick") == 0 && sscanf(line, "%*u %*s %d %d %d", &a, &b, &c) == 3)
 		{
 			e.kind = EV_STICK; e.x = a; e.y = b; e.duration = c;
+		}
+		else if (strcasecmp(cmd, "download") == 0 && sscanf(line, "%*u %*s %255s", url) == 1)
+		{
+			e.kind = EV_DOWNLOAD; e.url = url;
 		}
 		else
 		{
@@ -152,6 +162,19 @@ void AutoInput_Apply(void)
 				stickUntil = ms + e.duration;
 				gprintf("autoinput %u: stick %d %d for %u ms\n", ms, e.x, e.y, e.duration);
 				break;
+			case EV_DOWNLOAD:
+			{
+				// Blocks this thread until the download ends; fine for a test run.
+				struct download file = {};
+				u64 begin = gettime();
+				downloadfile(e.url.c_str(), &file);
+				gprintf("autoinput %u: download %s: %u bytes in %u ms: %.60s\n", ms, e.url.c_str(),
+						(u32) file.size, (u32) ticks_to_millisecs(diff_ticks(begin, gettime())),
+						file.data ? file.data : "");
+				if (file.data)
+					MEM2_free(file.data);
+				break;
+			}
 		}
 	}
 

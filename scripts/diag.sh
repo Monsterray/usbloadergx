@@ -6,6 +6,7 @@
 #   scripts/diag.sh warnings     # build with extra GCC diagnostics, print warning lines (sorted, unique)
 #   scripts/diag.sh gc-sections  # build with --gc-sections and list the functions/data the linker dropped
 #   scripts/diag.sh autoinput    # test build with -DAUTOINPUT -> .dev/autoinput/boot.dol and boot.elf
+#                                # (EXTRA_CFLAGS="-DDEBUG_NETWORK" adds defines to it)
 #                                # (reads sd:/autoinput.txt; see source/utils/AutoInput.cpp)
 #
 # Output goes to stdout; redirect it to a file to keep it.
@@ -52,7 +53,7 @@ case "$MODE" in
 	autoinput)
 		# Built from a copy inside the container, so these objects never mix with a
 		# normal build; only the .dol and .elf come out.
-		CF="$BASE_CFLAGS -DAUTOINPUT"
+		CF="$BASE_CFLAGS -DAUTOINPUT ${EXTRA_CFLAGS:-}"
 		mkdir -p "$ROOT/.dev/autoinput"
 		OUT_MOUNT=(-v "$MOUNT_ROOT/.dev/autoinput:/out")
 		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make -j"$(nproc)" CFLAGS="$CF" > /out/build.log 2>&1; rc=$?; cp boot.dol boot.elf /out/ 2>/dev/null; grep -E "warning:|error:" /out/build.log | sort -u; exit $rc'

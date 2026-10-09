@@ -46,5 +46,22 @@ grep -qE '\bstrcpy\(' "$SRC/cache/cache.cpp" \
 awk '/^static bool __usbstorage_ogc_Shutdown/,/^}/' "$SRC/usbloader/usbstorage_libogc.c" | grep -q 'MEM2_free' 	&& fail "the IOS58 USB Shutdown() frees the arena Initialize() keeps using"
 awk '/^s32 USBStorage_OGC_Initialize/,/^}/' "$SRC/usbloader/usbstorage_libogc.c" | grep -B2 'return IPC_ENOMEM' | grep -q '_CPU_ISR_Restore' 	|| fail "USBStorage_OGC_Initialize() returns with interrupts disabled"
 
+# 6. A drive with no partition table (an SD card formatted as a "superfloppy", as
+#    Dolphin's SD image is) used to get the made-up size 0xdeadbeaf, 1.7 TiB, which
+#    the partition menus showed and WBFS formatting would have sized its free block
+#    table by. The size comes from the boot sector now (BootSector.c, tested by
+#    tests/host/boot_sector_test.c), 0 means unknown, and a format refuses 0.
+#    libwbfs shifts and allocates by its header and checks none of it.
+grep -qi '0xdeadbeaf' "$SRC/Controls/PartitionHandle.cpp" \
+	&& fail "PartitionHandle.cpp gives a partition a made-up sector count"
+grep -q 'BootSectorSecCount(' "$SRC/Controls/PartitionHandle.cpp" \
+	|| fail "AddPartition() does not take an unknown size from the boot sector"
+grep -q '1 << head->hd_sec_sz_s' "$SRC/Controls/PartitionHandle.cpp" \
+	&& fail "AddPartition() shifts by a WBFS header field it has not checked"
+grep -q 'WbfsHeadSecCount(' "$SRC/usbloader/wbfs/wbfs_wbfs.cpp" \
+	|| fail "Wbfs_Wbfs::Open() hands libwbfs a WBFS header it has not checked"
+awk '/^s32 Wbfs_Wbfs::Format/,/^}/' "$SRC/usbloader/wbfs/wbfs_wbfs.cpp" | grep -q 'if (size == 0)' \
+	|| fail "Wbfs_Wbfs::Format() formats a partition whose size is unknown"
+
 [ "$status" -eq 0 ] && echo "OK: storage bounds guards are in place"
 exit "$status"

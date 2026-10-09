@@ -34,6 +34,7 @@
 #include "libs/libext2fs/ext2.h"
 #include "libs/libwbfs/libwbfs.h"
 #include "utils/uncompress.h"
+#include "BootSector.h"
 #include "PartitionHandle.h"
 
 //! libfat stuff
@@ -153,7 +154,7 @@ bool PartitionHandle::Mount(int pos, const char *name, bool forceFAT)
 		if (fatMount(MountNameList[pos].c_str(), interface, 0, CACHE, SECTORS))
 		{
 			sec_t FAT_startSector = FindFirstValidPartition(interface);
-			AddPartition("FAT", FAT_startSector, 0xdeadbeaf, true, 0x0c, 0, TABLE_TYPE_UNKNOWN);
+			AddPartition("FAT", FAT_startSector, 0, true, 0x0c, 0, TABLE_TYPE_UNKNOWN);
 			return true;
 		}
 	}
@@ -277,7 +278,7 @@ int PartitionHandle::FindPartitions()
 		wbfs_head_t *head = (wbfs_head_t *)mbr;
 		if (head->magic == wbfs_htonl(WBFS_MAGIC))
 		{
-			AddPartition("WBFS", 0, 0xdeadbeaf, true, 0xBF, 0, TABLE_TYPE_UNKNOWN);
+			AddPartition("WBFS", 0, 0, true, 0xBF, 0, TABLE_TYPE_UNKNOWN);
 			free(mbr);
 			return 0;
 		}
@@ -327,7 +328,7 @@ int PartitionHandle::FindPartitions()
 			wbfs_head_t *head = (wbfs_head_t *)buffer;
 			if (head->magic == wbfs_htonl(WBFS_MAGIC))
 			{
-				AddPartition("WBFS", 0, 0xdeadbeaf, true, 0xBF, 0, TABLE_TYPE_UNKNOWN);
+				AddPartition("WBFS", 0, 0, true, 0xBF, 0, TABLE_TYPE_UNKNOWN);
 			}
 			// Check for FAT
 			else if (*((u16 *)(buffer + 0x1FE)) == 0x55AA || *((u16 *)(buffer + 0x1FE)) == 0x55AB)
@@ -335,11 +336,11 @@ int PartitionHandle::FindPartitions()
 				if (memcmp(buffer + 0x36, "FAT", 3) == 0 || memcmp(buffer + 0x52, "FAT", 3) == 0)
 				{
 					sec_t FAT_startSector = FindFirstValidPartition(interface);
-					AddPartition("FAT32", FAT_startSector, 0xdeadbeaf, true, 0x0c, 0, MBR);
+					AddPartition("FAT32", FAT_startSector, 0, true, 0x0c, 0, MBR);
 				}
 				else if (memcmp(buffer + 0x03, "NTFS", 4) == 0)
 				{
-					AddPartition("NTFS", 0, 0xdeadbeaf, true, 0x07, 0, MBR);
+					AddPartition("NTFS", 0, 0, true, 0x07, 0, MBR);
 				}
 			}
 		}
@@ -488,8 +489,12 @@ void PartitionHandle::AddPartition(const char *name, u64 lba_start, u64 sec_coun
 	{
 		name = "WBFS";
 		part_type = 0xBF; // Override partition type on WBFS
-		//! correct sector size in physical sectors (512 bytes per sector)
-		sec_count = (u64)head->n_hd_sec * (u64)(1 << head->hd_sec_sz_s) / (u64)BYTES_PER_SECTOR;
+		//! correct sector size in physical sectors (512 bytes per sector).
+		//! A header libwbfs could not open keeps the table's size, so the
+		//! partition can still be formatted.
+		u32 wbfs_count = WbfsHeadSecCount((const u8 *)buffer);
+		if (wbfs_count)
+			sec_count = wbfs_count;
 	}
 	else if (*((u16 *)(buffer + 0x1FE)) == 0x55AA)
 	{
@@ -506,6 +511,12 @@ void PartitionHandle::AddPartition(const char *name, u64 lba_start, u64 sec_coun
 			part_type = 0x07;
 		}
 	}
+
+	//! A drive without a partition table gives no size (sec_count 0), so take
+	//! the one its boot sector states. 0 stays "unknown", and nothing that
+	//! writes may size itself by it.
+	if (sec_count == 0)
+		sec_count = BootSectorSecCount((const u8 *)buffer);
 
 	PartitionFS PartitionEntry;
 	PartitionEntry.FSName = name;

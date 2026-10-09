@@ -6,6 +6,7 @@
 #include "usbloader/usbstorage2.h"
 #include "utils/tools.h"
 #include "wbfs_rw.h"
+#include "Controls/BootSector.h"
 
 #define MAX_WBFS_SECTORSIZE	 4096
 
@@ -35,11 +36,15 @@ s32 Wbfs_Wbfs::Open()
 		return -1;
 	}
 
+	//! libwbfs shifts by the header's sector sizes and sizes its free block
+	//! table by its sector count, and checks none of them.
+	bool usable = WbfsHeadSecCount(buffer) != 0;
+
 	wbfs_head_t head;
 	memcpy(&head, buffer, sizeof(wbfs_head_t));
 	free(buffer);
 
-	if (head.magic != wbfs_htonl(WBFS_MAGIC))
+	if (head.magic != wbfs_htonl(WBFS_MAGIC) || !usable)
 		return -1;
 
 	/* Set correct sector values for wbfs read/write */
@@ -88,6 +93,12 @@ void Wbfs_Wbfs::CloseDisc(wbfs_disc_t *disc)
 
 s32 Wbfs_Wbfs::Format()
 {
+	//! 0 is a partition whose size nothing on the drive states (no partition
+	//! table and no usable boot sector). A format sized by a guess writes the
+	//! free block table for a disk that is not there.
+	if (size == 0)
+		return -1;
+
 	WBFS_PartInfo HDD_Inf;
 	HDD_Inf.wbfs_sector_size = hdd_sector_size[usbport];
 	HDD_Inf.hdd_sector_size = hdd_sector_size[usbport];

@@ -176,7 +176,13 @@ int MountGamePartition(bool ShowGUI)
 				if (ShowGUI && !Settings.SDMode)
 					PartitionChoice();
 				else
+				{
+					//! SD mode has no partition to choose or format, so say why
+					//! the games are missing before falling back to channels.
+					if (ShowGUI)
+						ShowError("%s", tr( "No WBFS or FAT/NTFS/EXT partition found" ));
 					Settings.LoaderMode = MODE_NANDCHANNELS;
+				}
 			}
 		}
 	}

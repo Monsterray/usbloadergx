@@ -64,5 +64,14 @@ grep -q 'month >= 1 && month <= 12' "$SRC/prompts/gameinfo.cpp" \
 grep -q "\*rp = ch;" "$SRC/language/gettext.c" \
 	&& fail "expand_escape() drops an octal escape"
 
+# 9. FreeType 2.10 and later (devkitPro's ppc-freetype) rasterize a glyph with a
+#    FT_RENDER_POOL_SIZE (16 KiB) buffer on the stack; 2.4, which GX bundled before,
+#    kept that pool on the heap. Any thread that sets GuiText renders glyphs, and a
+#    16 KiB stack overflowed into the heap: SD mode froze at the free space line.
+grep -q 'ThreadCallback, this, NULL, 16384' "$SRC/utils/ThreadedTask.cpp" \
+	&& fail "ThreadedTask's thread is too small for FreeType's glyph rasterizer"
+grep -q 'ProgressThread, NULL, NULL, 16384' "$SRC/prompts/ProgressWindow.cpp" \
+	&& fail "the progress window's thread is too small for FreeType's glyph rasterizer"
+
 [ "$status" -eq 0 ] && echo "OK: GUI bounds guards are in place"
 exit "$status"

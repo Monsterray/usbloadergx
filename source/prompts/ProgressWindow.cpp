@@ -482,7 +482,9 @@ static void * ProgressThread(void *arg)
  ***************************************************************************/
 void InitProgressThread()
 {
-	LWP_CreateThread(&progressthread, ProgressThread, NULL, NULL, 16384, 60);
+	//! This thread builds the window's GuiText, and FreeType 2.10 and later
+	//! rasterize a glyph with a 16 KiB buffer on the caller's stack.
+	LWP_CreateThread(&progressthread, ProgressThread, NULL, NULL, 65536, 60);
 
 	memset(progressTitle, 0, sizeof(progressTitle));
 	memset(progressMsg1, 0, sizeof(progressMsg1));

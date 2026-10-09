@@ -28,7 +28,10 @@ ThreadedTask * ThreadedTask::instance = NULL;
 ThreadedTask::ThreadedTask()
 	: ExitRequested(false)
 {
-	LWP_CreateThread (&Thread, ThreadCallback, this, NULL, 16384, 70);
+	//! A callback here sets GUI text (the free space line), and FreeType 2.10 and
+	//! later rasterize a glyph with a FT_RENDER_POOL_SIZE (16 KiB) buffer on the
+	//! caller's stack. 16 KiB of stack overflowed into the heap.
+	LWP_CreateThread (&Thread, ThreadCallback, this, NULL, 65536, 70);
 }
 
 ThreadedTask::~ThreadedTask()

@@ -191,6 +191,11 @@ void StopGX()
 		VIDEO_WaitVSync();
 }
 
+void *Video_SpareFramebuffer(void)
+{
+	return xfb[whichfb ^ 1];
+}
+
 /****************************************************************************
  * Menu_Render
  *

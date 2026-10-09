@@ -83,7 +83,7 @@ endif
 # gd and freetype are devkitPro's ppc-libgd and ppc-freetype, which need the
 # image libraries they were built with (bzip2, brotli, webp). Their gdlib.pc
 # cannot be used for this: it has an unsubstituted @LIBICONV@.
-LIBS := -lwolfssl -lpugixml -lminizip \
+LIBS := -lhbcagent -lwolfssl -lpugixml -lminizip \
 		-lcustomfat -lcustomntfs -lcustomext2fs -lvorbisidec -logg -lmad \
 		-lgd -lfreetype -lpng16 -ljpeg -lwebp -lsharpyuv -lbz2 -lbrotlidec -lbrotlicommon \
 		-lm -lz -lwiiuse -lbte -lasnd -logc

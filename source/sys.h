@@ -14,6 +14,7 @@ void Sys_ShutdownToStandby(void);
 void Sys_LoadMenu(void);
 void Sys_BackToLoader(void);
 void Sys_LoadHBC(void);
+void Sys_LoadPriiloader(void);
 bool RebootApp(void);
 void ScreenShot(void);
 bool isWiiU(void);

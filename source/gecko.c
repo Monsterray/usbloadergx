@@ -17,15 +17,12 @@
 /* init-globals */
 static bool geckoinit = false;
 
+//! Everything goes through stdout: the USB Gecko is the device under it
+//! (USBGeckoOutput), and the hbc agent puts its own in front, which keeps the
+//! end of it for `hbc.py lastlog` and sends it to the PC with "Log to PC".
+//! Before USBGeckoOutput() stdout goes nowhere.
 void gprintf(const char *format, ...)
 {
-	#ifndef DEBUG_TO_FILE
-		#ifndef WIFI_GECKO
-		if (!geckoinit)
-			return;
-		#endif
-	#endif
-
 	static char stringBuf[4096];
 	int len;
 	va_list va;
@@ -42,7 +39,7 @@ void gprintf(const char *format, ...)
 			fclose(debugF);
 		}
 		#else
-		usb_sendbuffer(1, stringBuf, len);
+		fwrite(stringBuf, 1, len < (int)sizeof(stringBuf) ? len : (int)sizeof(stringBuf) - 1, stdout);
 		#endif
 		
 		#ifdef WIFI_GECKO
@@ -100,7 +97,7 @@ void hexdump(void *d, int len)
 
 static ssize_t __out_write(struct _reent *r, void *fd, const char *ptr, size_t len)
 {
-	if(len > 0)
+	if(len > 0 && geckoinit)
 		usb_sendbuffer(1, ptr, len);
 
 	return len;
@@ -149,4 +146,6 @@ void USBGeckoOutput()
 {
 	devoptab_list[STD_OUT] = &gecko_out;
 	devoptab_list[STD_ERR] = &gecko_out;
+	// Each line as it is written, as gprintf() did straight to the Gecko
+	setvbuf(stdout, NULL, _IONBF, 0);
 }

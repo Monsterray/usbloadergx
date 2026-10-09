@@ -14,6 +14,8 @@
 void InitVideo();
 void StopGX();
 void Menu_Render();
+//! The framebuffer that is not on screen, while the GUI thread is halted
+void *Video_SpareFramebuffer(void);
 void Menu_DrawImg(f32 xpos, f32 ypos, f32 zpos, f32 width, f32 height, u8 data[], f32 degrees, f32 scaleX, f32 scaleY,
 		u8 alphaF, int XX1, int YY1, int XX2, int YY2, int XX3, int YY3, int XX4, int YY4);
 void Menu_DrawTPLImg(f32 xpos, f32 ypos, f32 zpos, f32 width, f32 height, GXTexObj *texObj, f32 degrees, f32 scaleX,

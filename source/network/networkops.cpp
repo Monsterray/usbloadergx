@@ -6,6 +6,7 @@
  * Based on dhewg/bushing, modified by dimok, made thread-safe by blackb0x
  ****************************************************************************/
 
+#include <hbc_agent.h>
 #include <ogcsys.h>
 #include <string.h>
 #include <stdio.h>
@@ -55,6 +56,11 @@ void Initialize_Network(int retries)
 		return;
 	}
 	NET_UNLOCK();
+
+	// The hbc agent starts the network in its own thread, and libogc's
+	// net_init() hangs if it runs while another thread's start-up is in
+	// progress. This returns at once when none is.
+	hbc_agent_net_wait(30000);
 
 	s32 result = if_config(IP, NULL, NULL, true, retries);
 
@@ -285,6 +291,9 @@ void HaltNetworkThread()
 	while (!LWP_ThreadIsSuspended(networkthread))
 		usleep(100);
 
+	// GX's wiiload server is done with TCP 4299; the agent listens again.
+	hbc_agent_listen(true);
+
 //	LWP_SuspendThread(networkthread);
 }
 
@@ -305,6 +314,10 @@ void ResumeNetworkThread()
  ***************************************************************************/
 void ResumeNetworkWait()
 {
+	// The hbc agent listens on the same port (TCP 4299) as GX's wiiload server
+	// in NetworkWait(); it lets go until HaltNetworkThread().
+	hbc_agent_listen(false);
+
 	NET_LOCK();
 	networkHalt = true;
 	checkincomming = true;

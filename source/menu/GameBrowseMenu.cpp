@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <hbc_agent.h>
 #include "GameBrowseMenu.hpp"
 #include "banner/BannerAsync.h"
 #include "Controls/DeviceHandler.hpp"
@@ -1174,6 +1175,11 @@ int GameBrowseMenu::MainLoop()
 		gprintf("\thomeScreenBtn clicked\n");
 		WindowExitPrompt();
 		homeScreenBtn->ResetState();
+	}
+	else if (hbc_agent_home_pending())
+	{
+		// `hbc.py key h`: the HOME overlay, as if HOME had been pressed
+		WindowExitPrompt();
 	}
 	else if (homeBtn->GetState() == STATE_CLICKED)
 	{

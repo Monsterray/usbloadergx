@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include "system/HbcAgent.h"
 #include "StartUpProcess.h"
 #include "GUI/gui.h"
 #include "video.h"
@@ -525,6 +526,9 @@ int StartUpProcess::FinalizeExecute()
 	setlocale(LC_CTYPE, "en_US.UTF-8");
 	setlocale(LC_MESSAGES, "en_US.UTF-8");
 	AdjustOverscan(Settings.AdjustOverscanX, Settings.AdjustOverscanY);
+
+	// After the last IOS reload and Sys_Init()'s Reset and Power handlers
+	HbcAgent_Init();
 
 	return 0;
 }

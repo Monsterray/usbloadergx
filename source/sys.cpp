@@ -1,5 +1,7 @@
 #include <gctypes.h>
+#include <string.h>
 #include <ogc/system.h>
+#include <hbc_agent.h>
 
 #include "mload/mload.h"
 #include "memory/memory.h"
@@ -29,11 +31,13 @@
 #include "gecko.h"
 #include "wpad.h"
 #include "wad/nandtitle.h"
+#include "usbloader/GameBooter.hpp"
 
 extern "C"
 {
 	extern s32 MagicPatches(s32);
 }
+extern u64 HBCTID; // in channels.cpp
 
 //Wiilight stuff
 void wiilight(int enable) // Toggle wiilight (thanks Bool for wiilight source)
@@ -90,6 +94,11 @@ void AppCleanUp(void)
 		return;
 
 	app_clean = true;
+
+	//! Every exit and every boot of a game, a channel or a homebrew app comes
+	//! through here before IOS is reloaded or memory overwritten, so nothing of
+	//! the agent may run or point at GX's code afterwards.
+	hbc_agent_stop();
 
 	BannerAsync::ThreadExit();
 
@@ -226,6 +235,17 @@ void Sys_BackToLoader(void)
 
 void Sys_LoadHBC(void)
 {
+	// A Wii VC inject cannot launch a title from here; boot the HBC it found
+	// installed (channels.cpp) the way a channel is booted.
+	if (isWiiVC && HBCTID)
+	{
+		struct discHdr header = {};
+		memcpy(header.id, "JODI", 4);
+		memcpy(header.title, "Homebrew Channel", 16);
+		header.tid = HBCTID;
+		GameBooter::BootGame(&header);
+	}
+
 	ExitApp();
 
 	WII_Initialize();
@@ -238,6 +258,19 @@ void Sys_LoadHBC(void)
 	WII_LaunchTitle(HBC_HAXX);
 	
 	//Back to system menu if all fails
+	SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
+}
+
+void Sys_LoadPriiloader(void)
+{
+	editMetaArguments();
+	ExitApp();
+	// Priiloader opens its own menu instead of the System Menu when it finds
+	// this word ("Daco") at either address.
+	*(vu32 *)0x8132FFFB = 0x4461636F;
+	*(vu32 *)0x817FEFF0 = 0x4461636F;
+	DCFlushRange((void *)0x8132FFFB, 4);
+	DCFlushRange((void *)0x817FEFF0, 4);
 	SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
 }
 

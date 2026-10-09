@@ -7,6 +7,7 @@
  * menu.cpp
  * Menu flow routines - handles all menu logic
  ***************************************************************************/
+#include <hbc_agent.h>
 #include <unistd.h>
 
 #include "GUI/gui.h"
@@ -102,6 +103,12 @@ static void * UpdateGUI(void *arg)
 			LWP_SuspendThread(guithread);
 			continue;
 		}
+
+		// The hang watchdog (HbcAgent.cpp): when no GUI frame ends within its
+		// limit, it is reported as a hang (hbc.py crash) and GX returns to HBC.
+		// HaltGui() stops the frames too, so the main thread hanging while it
+		// holds the GUI halted is caught as well.
+		hbc_agent_alive();
 
 		UpdatePads();
 

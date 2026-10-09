@@ -11,7 +11,7 @@
 #include "usbloader/wbfs.h"
 #include "usbloader/wdvd.h"
 #include "usbloader/usbstorage2.h"
-#include "usbloader/GameBooter.hpp"
+#include "system/HbcAgent.h"
 #include "usbloader/GameList.h"
 #include "GameCube/GCGames.h"
 #include "language/gettext.h"
@@ -47,8 +47,6 @@
 #include "lstub.h"
 #include "SoundOperations/MusicPlayer.h"
 
-extern bool isWiiVC; // in sys.cpp
-extern u64 HBCTID; // in channels.cpp
 
 static const char * DMLVersions[] =
 {
@@ -702,6 +700,11 @@ int WindowExitPrompt()
 {
 	gprintf("WindowExitPrompt()\n");
 
+	// The Homebrew Channel's HOME overlay; GX's own menu below is the fallback
+	// when the overlay cannot open (no memory for it, or the agent is stopped).
+	if (HbcAgent_Home())
+		return 0;
+
 	if (Settings.SilentHomeMenu)
 		MusicPlayer::Instance()->SetVolume(0);
 
@@ -986,56 +989,19 @@ int WindowExitPrompt()
 			if (Settings.HomeMenu == HOME_MENU_SYSTEM)
 				Sys_LoadMenu();
 			else if (Settings.HomeMenu == HOME_MENU_DEFAULT)
-			{
-				if (isWiiVC && HBCTID)
-				{
-					struct discHdr header = {};
-					memcpy(header.id, "JODI", 4);
-					memcpy(header.title, "Homebrew Channel", 16);
-					header.tid = HBCTID;
-					GameBooter::BootGame(&header);
-				}
 				Sys_LoadHBC();
-			}
 			else if (Settings.HomeMenu == HOME_MENU_FULL)
 			{
 				ret = WindowPrompt(tr( "Exit to where?" ), 0, tr( "Homebrew Channel" ), tr( "Wii Menu" ), tr( "Priiloader" ), tr( "Cancel" ));
 				if (ret == 1)
-				{
-					if (isWiiVC && HBCTID)
-					{
-						struct discHdr header = {};
-						memcpy(header.id, "JODI", 4);
-						memcpy(header.title, "Homebrew Channel", 16);
-						header.tid = HBCTID;
-						GameBooter::BootGame(&header);
-					}
-					else
-						Sys_LoadHBC();
-				}
+					Sys_LoadHBC();
 				else if(ret == 2)
 					Sys_LoadMenu();
 				else if(ret == 3)
-				{
-					editMetaArguments();
-					ExitApp();
-					*(vu32 *)0x8132FFFB = 0x4461636F;
-					*(vu32 *)0x817FEFF0 = 0x4461636F;
-					DCFlushRange((void *)0x8132FFFB, 4);
-					DCFlushRange((void *)0x817FEFF0, 4);
-					SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
-				}
+					Sys_LoadPriiloader();
 			}
 			else if (Settings.HomeMenu == HOME_MENU_PRIILOADER)
-			{
-				editMetaArguments();
-				ExitApp();
-				*(vu32 *)0x8132FFFB = 0x4461636F;
-				*(vu32 *)0x817FEFF0 = 0x4461636F;
-				DCFlushRange((void *)0x8132FFFB, 4);
-				DCFlushRange((void *)0x817FEFF0, 4);
-				SYS_ResetSystem(SYS_RETURNTOMENU, 0, 0);
-			}
+				Sys_LoadPriiloader();
 			HaltGui();
 			mainWindow->SetState(STATE_DISABLED);
 			promptWindow.SetState(STATE_DEFAULT);

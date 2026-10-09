@@ -11,7 +11,8 @@ set -eu
 dol="${1:?usage: $0 file.dol}"
 filesize=$(wc -c < "$dol")
 
-# 7 text + 11 data sections: file offsets at 0x00, sizes at 0x90.
+# 7 text + 11 data sections: file offsets at 0, sizes at 0x90 (144). Decimal
+# only: mawk, the awk in the devkitPro image, reads 0x90 as 0.
 od -An -v -tu1 -N216 "$dol" | awk -v filesize="$filesize" -v dol="$dol" '
 	{ for (i = 1; i <= NF; i++) b[n++] = $i }
 	function be32(o) { return ((b[o] * 256 + b[o + 1]) * 256 + b[o + 2]) * 256 + b[o + 3] }
@@ -19,7 +20,7 @@ od -An -v -tu1 -N216 "$dol" | awk -v filesize="$filesize" -v dol="$dol" '
 		if (n < 216) { print dol ": too short for a DOL header"; exit 1 }
 		bad = 0
 		for (s = 0; s < 18; s++) {
-			off = be32(s * 4); size = be32(0x90 + s * 4)
+			off = be32(s * 4); size = be32(144 + s * 4)
 			if (size == 0) continue
 			name = s < 7 ? sprintf("text%d", s) : sprintf("data%d", s - 7)
 			end = off + int((size + 31) / 32) * 32

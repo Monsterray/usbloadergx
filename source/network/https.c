@@ -217,6 +217,8 @@ bool read_chunked(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos
             return false;
         }
         start_pos += rsize;
+        if (buffer->max_size && start_pos > buffer->max_size)
+            return false;
     } while (pret == -2);
     return finish_download(buffer, start_pos);
 }
@@ -259,6 +261,8 @@ bool read_all(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos)
         if (ret < 0)
             return false;
         start_pos += ret;
+        if (buffer->max_size && start_pos > buffer->max_size)
+            return false;
     };
     if (!finish_download(buffer, start_pos))
         return false;
@@ -609,6 +613,13 @@ void downloadfile(const char *url, struct download *buffer)
             return;
         }
         memcpy(buffer->data, &response.data[response.pret], response.buflen - response.pret);
+        if (buffer->max_size && response.buflen - response.pret > buffer->max_size)
+        {
+            MEM2_free(buffer->data);
+            buffer->data = NULL;
+            https_close(&httpinfo);
+            return;
+        }
         // Determine how to read the data
         bool dl_valid;
         if (is_chunked(response.headers, response.num_headers))
@@ -616,7 +627,11 @@ void downloadfile(const char *url, struct download *buffer)
         else
         {
             buffer->content_length = get_header_value_int(response.headers, response.num_headers, "content-length");
-            dl_valid = read_all(&httpinfo, buffer, response.buflen - response.pret);
+            // The server says up front that it will send too much
+            if (buffer->max_size && buffer->content_length > buffer->max_size)
+                dl_valid = false;
+            else
+                dl_valid = read_all(&httpinfo, buffer, response.buflen - response.pret);
         }
         // Check if the download is incomplete
         if (!dl_valid || buffer->size < 1)

@@ -28,6 +28,7 @@ extern "C"
         bool show_progress; // Used when downloading wiitdb.zip
         u64 gametdbcheck;   // Used when checking the GameTDB version
         u64 content_length;
+        u64 max_size;       // Fail a body longer than this; 0 means no limit
         u64 size;
         char *data;
     };

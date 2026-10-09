@@ -58,4 +58,11 @@ git tag -a v5.3.0 -m "USB Loader GX 5.3.0"
 git push origin v5.3.0
 ````
 
-Raise MAJOR when settings files, saves or caches of the previous release stop working, MINOR for a new feature, and PATCH for fixes only. The old revision number in `version.txt` (r1283) stays: the settings files and the updater still compare it.
+Raise MAJOR when settings files, saves or caches of the previous release stop working, MINOR for a new feature, and PATCH for fixes only. The old revision number in `version.txt` (r1283) stays: the settings files still record it.
+
+## Updates
+Settings > Update Menu > Update USB Loader GX installs the latest [release of this fork](https://github.com/Monsterray/usbloadergx/releases), not upstream's. Pushing a `vMAJOR.MINOR.PATCH` tag runs `.github/workflows/release.yml`, which builds the release, checks that the build shows exactly that version, and publishes a GitHub release with `boot.dol`, `meta.xml`, `icon.png`, a zip for the SD card and `update.txt`.
+
+`update.txt` names the version and the size and SHA-256 of every file, and ends with an Ed25519 signature (format: `source/network/UpdateManifest.h`). The loader downloads with no certificate check, so it installs a file only when the signature verifies with the public key compiled into it (`source/network/UpdateKey.h`) and the file matches its SHA-256, and only when the release is newer than the running version (semver; `5.2.0+4.g1a2b3c4` counts as `5.2.0`). The private key is the repository secret `UPDATE_SIGNING_KEY`; `scripts/update-keygen.sh` makes a key pair, and `scripts/update-manifest.sh` writes and signs `update.txt`, refusing a key that does not match the loader's. Replacing the key pair locks out every loader built with the old public key: those have to be updated by hand once.
+
+The channel build (`make channel`) installs `usbloadergx.wad` from the release to NAND with ES (`source/wad/WadInstall.cpp`), only for title `00010001-ULNR`. The release workflow makes no WAD: to add one, put it next to the release's other files, run `scripts/update-manifest.sh` again, and upload the WAD and the new `update.txt` to the release. A fakesigned WAD installs only on an IOS that accepts fakesigned titles (a cIOS). The language files, cheats, GameTDB and Nintendont still come from their own upstreams.

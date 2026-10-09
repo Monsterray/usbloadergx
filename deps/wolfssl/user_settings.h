@@ -39,6 +39,8 @@ extern int GXGenerateSeed(unsigned char *output, unsigned int sz);
 #define HAVE_ECC
 #define ECC_TIMING_RESISTANT
 #define HAVE_CURVE25519
+#define HAVE_ED25519               /* the updater's signed update.txt (network/update.cpp);
+                                      needs WOLFSSL_SHA512 */
 #define HAVE_FFDHE_2048
 #define SP_INT_BITS 4096           /* RSA keys up to 4096 bits: art.gametdb.com uses one.
                                       A 32-bit target defaults to 2048, and the

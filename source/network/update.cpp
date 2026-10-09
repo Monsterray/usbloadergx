@@ -49,6 +49,13 @@
 #include "xml/GameTDB.hpp"
 #include "usbloader/GameList.h"
 #include "version.h"
+#include "UpdateKey.h"
+#include "UpdateManifest.h"
+#include "wad/nandtitle.h"
+#include "wad/WadInstall.h"
+
+#include <wolfssl/wolfcrypt/ed25519.h>
+#include <wolfssl/wolfcrypt/hash.h>
 
 /****************************************************************************
  * Checking if an Update is available
@@ -195,117 +202,200 @@ int UpdateCheats()
 	return (result ? filesize : -1);
 }
 
-int ApplicationDownload()
-{
-	std::string DownloadURL;
-	int newrev = 0;
-#if defined(GITRELEASE)
-	int currentrev = atoi(LOADER_REV);
-#else
-	// It might be a pre-release version, so always update
-	int currentrev = 0;
-#endif
-
-	struct download file = {};
 #ifdef FULLCHANNEL
-	downloadfile("https://raw.githubusercontent.com/wiidev/usbloadergx/updates/update_wad.txt", &file);
+#define UPDATE_FILE "usbloadergx.wad"
 #else
-	downloadfile("https://raw.githubusercontent.com/wiidev/usbloadergx/updates/update_dol.txt", &file);
+#define UPDATE_FILE "boot.dol"
 #endif
 
-	if (file.size > 0)
-	{
-		// First line of the text file is the revisionc
-		newrev = atoi((char *)file.data);
-		// 2nd line of the text file is the url
-		char *ptr = strchr((char *)file.data, '\n');
-		while (ptr && (*ptr == '\r' || *ptr == '\n' || *ptr == ' '))
-			ptr++;
-		while (ptr && *ptr != '\0' && *ptr != '\r' && *ptr != '\n')
-		{
-			DownloadURL.push_back(*ptr);
-			ptr++;
-		}
+// The signature covers every byte of update.txt before its signature line, and
+// the manifest holds the size and SHA-256 of every file, so nothing GX installs
+// depends on the connection, which has no certificate check.
+static bool VerifyManifestSignature(const UpdateManifest &manifest, const char *data)
+{
+	byte publicKey[ED25519_PUB_KEY_SIZE];
+	if (strlen(UPDATE_PUBLIC_KEY_HEX) != 2 * sizeof(publicKey) ||
+		!UpdateHex_Decode(UPDATE_PUBLIC_KEY_HEX, 2 * sizeof(publicKey), publicKey))
+		return false;
 
-		MEM2_free(file.data);
+	ed25519_key key;
+	if (wc_ed25519_init(&key) != 0)
+		return false;
+
+	int verified = 0;
+	bool ok = wc_ed25519_import_public(publicKey, sizeof(publicKey), &key) == 0 &&
+			  wc_ed25519_verify_msg(manifest.signature, sizeof(manifest.signature), (const byte *)data,
+									manifest.signedLength, &verified, &key) == 0 &&
+			  verified == 1;
+	wc_ed25519_free(&key);
+	return ok;
+}
+
+// Downloads a file the manifest lists into file. False unless it has exactly
+// the size and SHA-256 the manifest gives; file then holds nothing.
+static bool DownloadReleaseFile(const UpdateManifest &manifest, const UpdateFile &entry, bool showprogress,
+								struct download *file)
+{
+	char url[300];
+	snprintf(url, sizeof(url), "%s/download/v%u.%u.%u/%s", UPDATE_RELEASES_URL, (unsigned)manifest.version.major,
+			 (unsigned)manifest.version.minor, (unsigned)manifest.version.patch, entry.name);
+
+	if (showprogress)
+	{
+		ProgressCancelEnable(true);
+		StartProgress(tr("Downloading file..."), 0, entry.name, true, true);
+	}
+	*file = {};
+	file->show_progress = showprogress;
+	file->max_size = entry.size;
+	downloadfile(url, file);
+	if (showprogress)
+	{
+		ProgressStop();
+		ProgressCancelEnable(false);
 	}
 
-	if (newrev <= currentrev)
+	byte digest[WC_SHA256_DIGEST_SIZE];
+	if (file->size == entry.size && wc_Sha256Hash((const byte *)file->data, entry.size, digest) == 0 &&
+		memcmp(digest, entry.sha256, sizeof(digest)) == 0)
+		return true;
+
+	gprintf("Update: %s failed (%llu of %u bytes, or a wrong SHA-256)\n", entry.name, file->size, (unsigned)entry.size);
+	if (file->size > 0)
+		MEM2_free(file->data);
+	*file = {};
+	return false;
+}
+
+// A short write (a full card) removes the file instead of leaving part of it
+static bool WriteWholeFile(const char *path, const char *data, u32 size)
+{
+	FILE *f = fopen(path, "wb");
+	if (!f)
+		return false;
+	bool ok = fwrite(data, 1, size, f) == size;
+	ok = (fclose(f) == 0) && ok;
+	if (!ok)
+		remove(path);
+	return ok;
+}
+
+int ApplicationDownload()
+{
+	// Releases of this fork, not upstream's: upstream's build would replace the fork
+	struct download file = {};
+	file.max_size = UPDATE_MANIFEST_MAX_SIZE;
+	downloadfile(UPDATE_RELEASES_URL "/latest/download/update.txt", &file);
+	if (file.size == 0)
+	{
+		WindowPrompt(tr("Failed updating"), tr("Could not download the update information."), tr("OK"));
+		return -1;
+	}
+
+	UpdateManifest manifest;
+	bool valid = UpdateManifest_Parse(file.data, file.size, &manifest) && VerifyManifestSignature(manifest, file.data);
+	MEM2_free(file.data);
+	if (!valid)
+	{
+		WindowPrompt(tr("Failed updating"), tr("The update information is damaged or not signed by the publisher."), tr("OK"));
+		return -1;
+	}
+
+	// A version without a release tag (0.0.0+g1a2b3c4) is older than any release
+	UpdateVersion current = {0, 0, 0};
+	UpdateVersion_Parse(LOADER_VERSION, &current);
+	char available[24];
+	snprintf(available, sizeof(available), "%u.%u.%u", (unsigned)manifest.version.major,
+			 (unsigned)manifest.version.minor, (unsigned)manifest.version.patch);
+	gprintf("Update: installed %s, latest release %s\n", LOADER_VERSION, available);
+
+	if (UpdateVersion_Compare(&manifest.version, &current) <= 0)
 	{
 		WindowPrompt(tr("No new updates."), 0, tr("OK"));
 		return 0;
 	}
 
-	bool update_error = false;
-	char tmppath[250];
-
-#ifdef FULLCHANNEL
-	snprintf(tmppath, sizeof(tmppath), "%s/ULNR.wad", Settings.BootDevice);
-#else
-	char realpath[250];
-	snprintf(realpath, sizeof(realpath), "%sboot.dol", Settings.ConfigPath);
-	snprintf(tmppath, sizeof(tmppath), "%sboot.tmp", Settings.ConfigPath);
-#endif
-
-	int ret = DownloadFileToPath(DownloadURL.c_str(), tmppath);
-	if (ret < 1024 * 1024)
+	// tr() can return a long translation, so these are not sized for the English
+	char title[600], msg[600];
+	const UpdateFile *loader = UpdateManifest_Find(&manifest, UPDATE_FILE);
+	if (!loader)
 	{
-		remove(tmppath);
-		WindowPrompt(tr("Failed updating"), tr("Error while downloading file"), tr("OK"));
-		update_error = true;
-	}
-	else
-	{
-#ifdef FULLCHANNEL
-		FILE *wadFile = fopen(tmppath, "rb");
-		if (!wadFile)
-		{
-			update_error = true;
-			WindowPrompt(tr("Failed updating"), tr("Error opening downloaded file"), tr("OK"));
-			return -1;
-		}
-
-		int error = Wad_Install(wadFile);
-		if (error)
-		{
-			update_error = true;
-			ShowError(tr("The WAD installation failed with error %i"), error);
-		}
-		else
-			WindowPrompt(tr("Success"), tr("The WAD file was installed"), tr("OK"));
-
-		RemoveFile(tmppath);
-#else
-		gprintf("%s\n%s\n", realpath, tmppath);
-		char bakpath[250];
-		snprintf(bakpath, sizeof(bakpath), "%sboot.bak", Settings.ConfigPath);
-		RemoveFile(bakpath);
-		bool haveBackup = CheckFile(realpath) && RenameFile(realpath, bakpath);
-		if (!haveBackup)
-			RemoveFile(realpath);
-		if (!RenameFile(tmppath, realpath))
-		{
-			update_error = true;
-			// Put the loader that works back
-			if (haveBackup)
-				RenameFile(bakpath, realpath);
-		}
-		else
-			RemoveFile(bakpath);
-#endif
-	}
-
-	if (update_error)
-	{
-		ShowError(tr("Error while updating USB Loader GX."));
+		snprintf(msg, sizeof(msg), tr("Release %s has no %s."), available, UPDATE_FILE);
+		WindowPrompt(tr("Failed updating"), msg, tr("OK"));
 		return -1;
 	}
 
-	snprintf(tmppath, sizeof(tmppath), "%s/icon.png", Settings.ConfigPath);
-	DownloadFileToPath("https://raw.githubusercontent.com/wiidev/usbloadergx/updates/icon.png", tmppath, false);
+	snprintf(title, sizeof(title), tr("USB Loader GX %s is available"), available);
+	snprintf(msg, sizeof(msg), tr("You have %s. Update now?"), LOADER_VERSION);
+	if (!WindowPrompt(title, msg, tr("Yes"), tr("No")))
+		return 0;
 
-	snprintf(tmppath, sizeof(tmppath), "%s/meta.xml", Settings.ConfigPath);
-	DownloadFileToPath("https://raw.githubusercontent.com/wiidev/usbloadergx/updates/meta.xml", tmppath, false);
+	struct download update;
+	if (!DownloadReleaseFile(manifest, *loader, true, &update))
+	{
+		WindowPrompt(tr("Failed updating"), tr("The download failed or does not match the update information."), tr("OK"));
+		return -1;
+	}
+
+#ifdef FULLCHANNEL
+	StartProgress(tr("Installing the channel..."), 0, UPDATE_FILE, true, false);
+	int error = WadInstall((const u8 *)update.data, update.size, TITLE_ID(0x00010001, 0x554c4e52));
+	ProgressStop();
+	MEM2_free(update.data);
+	// IOS refuses the release's fakesigned ticket with -2011 unless its ES is patched (a cIOS)
+	if (error == -2011)
+	{
+		ShowError(tr("The WAD installation failed with error %i. It needs an IOS that accepts fakesigned titles, such as cIOS 249."), error);
+		return -1;
+	}
+	if (error)
+	{
+		ShowError(tr("The WAD installation failed with error %i"), error);
+		return -1;
+	}
+#else
+	char realpath[250], tmppath[250], bakpath[250];
+	snprintf(realpath, sizeof(realpath), "%sboot.dol", Settings.ConfigPath);
+	snprintf(tmppath, sizeof(tmppath), "%sboot.tmp", Settings.ConfigPath);
+	snprintf(bakpath, sizeof(bakpath), "%sboot.bak", Settings.ConfigPath);
+
+	bool written = WriteWholeFile(tmppath, update.data, update.size);
+	MEM2_free(update.data);
+	if (!written)
+	{
+		ShowError(tr("Can't write to destination."));
+		return -1;
+	}
+
+	RemoveFile(bakpath);
+	bool haveBackup = CheckFile(realpath) && RenameFile(realpath, bakpath);
+	if (!haveBackup)
+		RemoveFile(realpath);
+	if (!RenameFile(tmppath, realpath))
+	{
+		// Put the loader that works back
+		if (haveBackup)
+			RenameFile(bakpath, realpath);
+		RemoveFile(tmppath);
+		ShowError(tr("Error while updating USB Loader GX."));
+		return -1;
+	}
+	RemoveFile(bakpath);
+#endif
+
+	// The Homebrew Channel entry; the release may leave either out
+	static const char *const extras[] = {"meta.xml", "icon.png"};
+	for (const char *name : extras)
+	{
+		const UpdateFile *entry = UpdateManifest_Find(&manifest, name);
+		struct download extra;
+		if (!entry || !DownloadReleaseFile(manifest, *entry, false, &extra))
+			continue;
+		char path[250];
+		snprintf(path, sizeof(path), "%s%s", Settings.ConfigPath, name);
+		WriteWholeFile(path, extra.data, extra.size);
+		MEM2_free(extra.data);
+	}
 
 	return 1;
 }

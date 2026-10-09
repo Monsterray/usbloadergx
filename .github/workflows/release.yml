@@ -1,0 +1,86 @@
+name: Release
+
+# Pushing a vMAJOR.MINOR.PATCH tag publishes a GitHub release, which is what the
+# loader's "Update USB Loader GX" installs: it reads update.txt from the latest
+# release, compares versions and checks the Ed25519 signature and the SHA-256 of
+# every file before installing anything (source/network/update.cpp).
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # The whole history and the tags: makexml.sh takes the version from them.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run static checks
+        run: |
+          for check in tests/*.sh; do
+            echo "== $check"
+            sh "$check" || exit 1
+          done
+
+      - name: Run host tests
+        run: sh tests/host/run.sh
+
+      - name: Build the toolchain image
+        run: docker build --target toolchain -t usbloadergx-toolchain .
+
+      - name: Compile USB Loader GX
+        run: |
+          set -o pipefail
+          docker run --rm -v "$GITHUB_WORKSPACE:/w" -w /w usbloadergx-toolchain bash -c \
+            'git config --global --add safe.directory /w && make release -j$(nproc)' 2>&1 | tee build.log
+          sh scripts/check-dol.sh boot.dol
+
+      # The loader compares this version with the release's; a build that shows
+      # anything else (+dirty, or the wrong tag) would be offered again forever.
+      - name: Check the version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! grep -qx "#define LOADER_VERSION \"$version\"" source/version.h; then
+            cat source/version.h
+            echo "::error::the build's LOADER_VERSION is not $version"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Sign the update
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: |
+          if [ -z "$UPDATE_SIGNING_KEY" ]; then
+            echo "::error::the UPDATE_SIGNING_KEY secret is not set (scripts/update-keygen.sh)"
+            exit 1
+          fi
+          mkdir -p release
+          cp boot.dol HBC/meta.xml HBC/icon.png release/
+          key="$RUNNER_TEMP/update-signing-key.pem"
+          (umask 077; printf '%s\n' "$UPDATE_SIGNING_KEY" > "$key")
+          bash scripts/update-manifest.sh "$VERSION" release "$key"
+          rm -f "$key"
+
+      - name: Package
+        run: |
+          mkdir -p zip/apps/usbloader_gx
+          cp release/boot.dol release/meta.xml release/icon.png zip/apps/usbloader_gx/
+          (cd zip && zip -r "../release/usbloadergx_v$VERSION.zip" apps)
+          cp boot.elf "release/usbloadergx_v${VERSION}_debug.elf"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/* --verify-tag \
+            --title "USB Loader GX $VERSION" --notes-from-tag

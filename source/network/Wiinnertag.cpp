@@ -27,7 +27,7 @@
 #include "network/networkops.h"
 #include "network/https.h"
 #include "utils/StringTools.h"
-#include "xml/pugixml.hpp"
+#include <pugixml.hpp>
 
 Wiinnertag::Wiinnertag(const std::string &filepath)
 {

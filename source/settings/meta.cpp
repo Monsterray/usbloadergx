@@ -21,7 +21,7 @@ misrepresented as being the original software.
 distribution.
 */
 #include "settings/CSettings.h"
-#include "xml/pugixml.hpp"
+#include <pugixml.hpp>
 #include "gecko.h"
 
 int editMetaArguments()

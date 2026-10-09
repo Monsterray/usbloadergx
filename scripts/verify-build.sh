@@ -15,7 +15,7 @@ export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # The toolchain stage of the Dockerfile: the devkitPPC image plus the packages it
-# adds. Built from the Dockerfile alone, with no context, and cached after the first time.
+# adds (deps/build.sh). Docker caches it until the Dockerfile or deps/ change.
 IMAGE="usbloadergx-toolchain"
 WSL_DISTRO="${WSL_DISTRO:-Ubuntu-24.04}"
 
@@ -30,7 +30,7 @@ if [ "${GX_IN_CONTAINER:-}" != "1" ]; then
 		echo "docker not found, natively or through WSL." >&2
 		exit 1
 	fi
-	"${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" - < "$ROOT/Dockerfile" >/dev/null
+	"${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" "$MOUNT_ROOT" >/dev/null
 	exec "${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" -e GX_IN_CONTAINER=1 \
 		"$IMAGE" bash /src/scripts/verify-build.sh
 fi
@@ -88,7 +88,7 @@ done
 echo
 echo "=== first-party sources compile without warnings"
 make release -j"$J" > /tmp/build.log 2>&1
-warnings=$(grep 'warning:' /tmp/build.log | grep -v -E 'portlibs/|source/xml/pugi|source/libs/' || true)
+warnings=$(grep 'warning:' /tmp/build.log | grep -v 'source/libs/' || true)
 if [ -n "$warnings" ]; then bad "first-party warnings"; echo "$warnings" | head -10; else ok "no first-party warnings"; fi
 
 echo

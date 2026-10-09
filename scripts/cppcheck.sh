@@ -5,11 +5,11 @@
 #   scripts/cppcheck.sh            # warning, performance, portability checks (parallel)
 #   scripts/cppcheck.sh unused     # whole-program unusedFunction pass (single-threaded, slower)
 #
-# Third-party code is skipped: pugixml itself, source/libs and source/mload/modules. The
-# rest of source/xml is GameTDB, which is this project's own reader for a downloaded
-# wiitdb.xml, and source/utils/minizip is minizip with this project's extractZip() on top.
-# Excluding whole directories hid both of them. verify-build.sh and CI already gate on
-# source/xml/pugi rather than on source/xml, so keep the two lists the same.
+# Third-party code is skipped: source/libs and source/mload/modules. pugixml, minizip and
+# wolfSSL are no longer in the tree (deps/build.sh builds them). source/xml is GameTDB,
+# this project's own reader for a downloaded wiitdb.xml, and source/utils/minizip is this
+# project's extractZip() on top of minizip; excluding whole directories hid both once.
+# verify-build.sh and CI gate on source/libs as well, so keep the lists the same.
 # Some checks are suppressed because they describe the style this codebase and libogc are
 # written in rather than a defect, and cppcheck 2.19 onwards reports them in the hundreds:
 # dangerousTypeCast (every old-style C cast), uninitMemberVarNoCtor (plain structs with no
@@ -31,12 +31,12 @@ LIBOGC_INC="${LIBOGC_INC:-/c/devkitPro/libogc/include}"
 SUPPRESS=(--suppress=dangerousTypeCast --suppress=uninitMemberVarNoCtor
 	--suppress=noCopyConstructor --suppress=noOperatorEq --suppress=duplInheritedMember
 	--suppress=postfixOperator --suppress=useInitializationList
-	"--suppress=*:$LIBOGC_INC/*" "--suppress=*:$ROOT/portlibs/include/*")
+	"--suppress=*:$LIBOGC_INC/*")
 
 COMMON=(-q --suppress=missingInclude --suppress=missingIncludeSystem "${SUPPRESS[@]}"
 	--template='{file}:{line}:{severity}:{id}:{message}'
-	-DGEKKO -DHW_RVL -I "$ROOT/source" -I "$ROOT/portlibs/include" -I "$LIBOGC_INC"
-	-i "$ROOT/source/xml/pugixml.cpp" -i "$ROOT/source/xml/pugixml.hpp" -i "$ROOT/source/libs" -i "$ROOT/source/mload/modules")
+	-DGEKKO -DHW_RVL -I "$ROOT/source" -I "$LIBOGC_INC"
+	-i "$ROOT/source/libs" -i "$ROOT/source/mload/modules")
 
 case "${1:-check}" in
 	check)  "$CPPCHECK" -j8 --enable=warning,performance,portability --inline-suppr "${COMMON[@]}" "$ROOT/source" ;;

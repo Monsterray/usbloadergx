@@ -82,13 +82,14 @@ cachedinit=$(grep -c "GameIDCache\[0\] = " "$SRC/xml/GameTDB.cpp")
 [ "$cachedinit" -ge 3 ] \
 	|| fail "GameIDCache is not initialised in both constructors"
 
-# 11. unzOpen2() wrote through the allocation without checking it.
-grep -q 'if (s == NULL)' "$SRC/utils/unzip.c" \
-	|| fail "unzOpen2() writes through an unchecked allocation"
+# 11. unzOpen2() wrote through the allocation without checking it. minizip is
+#     built from zlib's contrib/minizip now (deps/build.sh); 1.3 and later check it.
+grep -qE '^MINIZIP_VERSION=1\.([3-9]|[1-9][0-9])' "$(dirname "$0")/../deps/build.sh" \
+	|| fail "deps/build.sh builds a minizip older than 1.3"
 
 # 12. Excluding whole directories from cppcheck hid GameTDB and miniunz.
-grep -q 'source/xml/pugixml.cpp' "$(dirname "$0")/../scripts/cppcheck.sh" \
-	|| fail "cppcheck still excludes the whole of source/xml"
+grep -q 'i "$ROOT/source/xml"' "$(dirname "$0")/../scripts/cppcheck.sh" \
+	&& fail "cppcheck still excludes the whole of source/xml"
 grep -q 'i "$ROOT/source/utils/minizip"' "$(dirname "$0")/../scripts/cppcheck.sh" \
 	&& fail "cppcheck still excludes the whole of source/utils/minizip"
 

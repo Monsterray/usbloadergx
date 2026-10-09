@@ -30,7 +30,7 @@
 
 #include <string>
 
-#include "utils/unzip.h"
+#include <minizip/unzip.h>
 
 typedef struct
 {

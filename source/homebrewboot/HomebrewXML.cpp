@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "FileOperations/fileops.h"
-#include "xml/pugixml.hpp"
+#include <pugixml.hpp>
 #include "gecko.h"
 
 #include "HomebrewXML.h"

@@ -79,14 +79,20 @@ endif
 #---------------------------------------------------------------------------------
 # Any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS := -lwolfssl -lcustomfat -lcustomntfs -lcustomext2fs -lvorbisidec -logg \
-		-lmad -lfreetype -lgd -ljpeg -lpng -lm -lz -lwiiuse \
-		-lbte -lasnd -logc
+# gd and freetype are devkitPro's ppc-libgd and ppc-freetype, which need the
+# image libraries they were built with (bzip2, brotli, webp). Their gdlib.pc
+# cannot be used for this: it has an unsubstituted @LIBICONV@.
+LIBS := -lwolfssl -lpugixml -lminizip \
+		-lcustomfat -lcustomntfs -lcustomext2fs -lvorbisidec -logg -lmad \
+		-lgd -lfreetype -lpng16 -ljpeg -lwebp -lsharpyuv -lbz2 -lbrotlidec -lbrotlicommon \
+		-lm -lz -lwiiuse -lbte -lasnd -logc
 #---------------------------------------------------------------------------------
 # List of directories containing libraries, this must be the top level containing
-# include and lib
+# include and lib. usbloadergx holds what deps/build.sh builds from source; ppc
+# holds devkitPro's portlibs. The Dockerfile's toolchain stage has both.
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(CURDIR)/portlibs
+PORTLIBS_PATH	?= $(DEVKITPRO)/portlibs
+LIBDIRS	:= $(PORTLIBS_PATH)/usbloadergx $(PORTLIBS_PATH)/ppc
 #---------------------------------------------------------------------------------
 ifneq ($(BUILD),$(notdir $(CURDIR)))
 #---------------------------------------------------------------------------------
@@ -126,6 +132,7 @@ export OFILES	:=	$(addsuffix .o,$(DATAFILES)) \
 #---------------------------------------------------------------------------------
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 					$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
+					-I$(PORTLIBS_PATH)/ppc/include/freetype2 \
 					-I$(CURDIR)/$(BUILD) -I$(LIBOGC_INC)
 
 #---------------------------------------------------------------------------------

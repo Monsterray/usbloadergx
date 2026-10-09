@@ -17,7 +17,7 @@ export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # The toolchain stage of the Dockerfile: the devkitPPC image plus the packages it
-# adds. Built from the Dockerfile alone, with no context, and cached after the first time.
+# adds (deps/build.sh). Docker caches it until the Dockerfile or deps/ change.
 IMAGE="usbloadergx-toolchain"
 WSL_DISTRO="${WSL_DISTRO:-Ubuntu-24.04}"
 MODE="${1:-warnings}"
@@ -42,12 +42,12 @@ BASE_LDFLAGS='-ggdb $(MACHDEP) -Wl,-Map,$(notdir $@).map,--section-start,.init=0
 case "$MODE" in
 	warnings)
 		CF="$BASE_CFLAGS -Wformat=2 -Wno-format-nonliteral -Wnull-dereference -Wduplicated-cond -Wlogical-op -Wshadow=local -Wcast-align -Wimplicit-fallthrough=3"
-		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make release -j"$(nproc)" CFLAGS="$CF" 2>&1 | grep -E "warning:" | grep -v "^/opt/|portlibs/" | sed -E "s|^/w/||" | sort -u'
+		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make release -j"$(nproc)" CFLAGS="$CF" 2>&1 | grep -E "warning:" | grep -v "^/opt/" | sed -E "s|^/w/||" | sort -u'
 		;;
 	gc-sections)
 		CF="$BASE_CFLAGS -ffunction-sections -fdata-sections"
 		LF="$BASE_LDFLAGS,--gc-sections,--print-gc-sections"
-		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make release -j"$(nproc)" CFLAGS="$CF" LDFLAGS="$LF" 2>&1 | grep -i "removing unused" | grep -v "portlibs/\|/opt/" | sed -E "s/.*section .(\.[a-z]+)\.([^ ]*). in file .([^ ]*)\.o.*/\3 \1 \2/" | while read -r f s n; do echo "$f $s $(echo "$n" | powerpc-eabi-c++filt)"; done'
+		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make release -j"$(nproc)" CFLAGS="$CF" LDFLAGS="$LF" 2>&1 | grep -i "removing unused" | grep -v "/opt/" | sed -E "s/.*section .(\.[a-z]+)\.([^ ]*). in file .([^ ]*)\.o.*/\3 \1 \2/" | while read -r f s n; do echo "$f $s $(echo "$n" | powerpc-eabi-c++filt)"; done'
 		;;
 	autoinput)
 		# Built from a copy inside the container, so these objects never mix with a
@@ -55,7 +55,7 @@ case "$MODE" in
 		CF="$BASE_CFLAGS -DAUTOINPUT"
 		mkdir -p "$ROOT/.dev/autoinput"
 		OUT_MOUNT=(-v "$MOUNT_ROOT/.dev/autoinput:/out")
-		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make -j"$(nproc)" CFLAGS="$CF" > /out/build.log 2>&1; rc=$?; cp boot.dol boot.elf /out/ 2>/dev/null; grep -E "warning:|error:" /out/build.log | grep -v "portlibs/" | sort -u; exit $rc'
+		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make -j"$(nproc)" CFLAGS="$CF" > /out/build.log 2>&1; rc=$?; cp boot.dol boot.elf /out/ 2>/dev/null; grep -E "warning:|error:" /out/build.log | sort -u; exit $rc'
 		;;
 	*)
 		echo "Usage: $0 [warnings|gc-sections|autoinput]" >&2
@@ -63,5 +63,5 @@ case "$MODE" in
 		;;
 esac
 
-"${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" - < "$ROOT/Dockerfile" >/dev/null
+"${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" "$MOUNT_ROOT" >/dev/null
 "${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" "${OUT_MOUNT[@]}" -e CF="$CF" -e LF="${LF:-}" "$IMAGE" bash -c "$SCRIPT"

@@ -42,24 +42,16 @@ jobs:
       - name: Run host tests
         run: sh tests/host/run.sh
 
+  # The toolchain is the Dockerfile's toolchain stage: the devkitPPC image, the
+  # packages it adds and the libraries deps/build.sh builds from source. CI builds
+  # that stage and compiles in it, so it uses exactly what everyone else does.
   build:
     runs-on: ubuntu-latest
-    container: devkitpro/devkitppc:20260503
-    # Steps in a container run with sh, which is dash in this image, and dash has no
-    # pipefail: the compile step stopped at "set -o pipefail" with exit code 2.
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-
-      # The image ships devkitppc-crtls 2.0.0, which leaves DOL segment sizes
-      # unaligned. Same package as the toolchain stage of the Dockerfile.
-      - name: Install devkitppc-crtls 2.1.0
-        run: dkp-pacman -U --noconfirm https://pkg.devkitpro.org/packages/devkitppc-crtls-2.1.0-1-any.pkg.tar.zst
-
-      - name: Configure Git
-        run: git config --system --add safe.directory "$GITHUB_WORKSPACE"
 
       - name: Run static checks
         run: |
@@ -68,10 +60,14 @@ jobs:
             sh "$check" || exit 1
           done
 
+      - name: Build the toolchain image
+        run: docker build --target toolchain -t usbloadergx-toolchain .
+
       - name: Compile USB Loader GX
         run: |
           set -o pipefail
-          make release -j$(nproc) 2>&1 | tee build.log
+          docker run --rm -v "$GITHUB_WORKSPACE:/w" -w /w usbloadergx-toolchain bash -c \
+            'git config --global --add safe.directory /w && make release -j$(nproc)' 2>&1 | tee build.log
 
       - name: Check build output
         run: |
@@ -81,10 +77,10 @@ jobs:
 
       - name: Check for compiler warnings
         run: |
-          # The sources this project maintains compile clean. Third-party trees
-          # are vendored as-is and are not held to that.
-          warnings=$(grep 'warning:' build.log \
-            | grep -v -E 'portlibs/|source/xml/pugi|source/libs/' || true)
+          # The sources this project maintains compile clean. The third-party
+          # code still kept in the tree (source/libs) is not held to that; the
+          # libraries deps/build.sh builds are compiled with the toolchain image.
+          warnings=$(grep 'warning:' build.log | grep -v 'source/libs/' || true)
           if [ -n "$warnings" ]; then
             echo "$warnings"
             echo "::error::the build emitted warnings in first-party sources"

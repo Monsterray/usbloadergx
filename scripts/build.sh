@@ -9,8 +9,8 @@
 #
 # Docker is used natively when present. On Windows (Git Bash) with no native docker, the
 # WSL distro named in WSL_DISTRO (default Ubuntu-24.04) must have Docker Engine installed.
-# Do not build GX with the toolchains under C:\devkitPro: none of them match this repo's
-# libogc/portlibs pairing (see AGENTS.md).
+# Do not build GX with the toolchains under C:\devkitPro: they are not kept in step with
+# the Dockerfile's toolchain stage (see AGENTS.md).
 set -euo pipefail
 
 # Git Bash (MSYS) rewrites arguments that look like absolute POSIX paths, which
@@ -19,7 +19,7 @@ export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # The toolchain stage of the Dockerfile: the devkitPPC image plus the packages it
-# adds. Built from the Dockerfile alone, with no context, and cached after the first time.
+# adds (deps/build.sh). Docker caches it until the Dockerfile or deps/ change.
 IMAGE="usbloadergx-toolchain"
 WSL_DISTRO="${WSL_DISTRO:-Ubuntu-24.04}"
 
@@ -37,7 +37,7 @@ fi
 
 cd "$ROOT"
 toolchain() {
-	"${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" - < "$ROOT/Dockerfile" >/dev/null
+	"${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" "$MOUNT_ROOT" >/dev/null
 }
 
 case "${1:-zip}" in

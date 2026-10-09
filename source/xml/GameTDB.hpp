@@ -26,7 +26,7 @@
 
 #include <vector>
 #include <string>
-#include "pugixml.hpp"
+#include <pugixml.hpp>
 
 typedef struct _Accessory
 {

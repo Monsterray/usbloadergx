@@ -28,7 +28,7 @@
 #include <map>
 #include <string>
 #include <vector>
-#include "xml/pugixml.hpp"
+#include <pugixml.hpp>
 #include "CCategoryList.hpp"
 
 class CGameCategories

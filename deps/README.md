@@ -35,7 +35,7 @@ libraries.
 | wolfSSL | 5.9.4 | HTTPS (`source/network/https.c`) |
 | pugixml | 1.16 | `wiitdb.xml`, categories, homebrew `meta.xml`, Wiinnertag |
 | minizip | from zlib 1.3.2 | zip extraction (`ZipFile`, `utils/minizip/miniunz.c`) |
-| hbc agent | hbc-reborn f0fe12d (HBC 1.10.1) | HBC's in-app agent |
+| hbc agent | hbc-reborn ecb4de2 (HBC 1.10.2) | HBC's in-app agent |
 
 The wolfSSL configuration is `deps/wolfssl/user_settings.h`. Three of its settings are
 not optional:

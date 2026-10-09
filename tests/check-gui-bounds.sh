@@ -73,5 +73,20 @@ grep -q 'ThreadCallback, this, NULL, 16384' "$SRC/utils/ThreadedTask.cpp" \
 grep -q 'ProgressThread, NULL, NULL, 16384' "$SRC/prompts/ProgressWindow.cpp" \
 	&& fail "the progress window's thread is too small for FreeType's glyph rasterizer"
 
+# 10. One FreeTypeGX serves every GuiText, and the main thread, ThreadedTask and
+#     the progress window's thread measure text while the GUI thread draws. A
+#     lookup inserts into std::maps and changes the face's size and glyph slot,
+#     so every public call takes the font's lock. drawText() calls getWidth() and
+#     getOffset(), so the lock has to be recursive.
+grep -q 'LWP_MutexInit(&fontMutex, true)' "$SRC/FreeTypeGX.cpp" \
+	|| fail "FreeTypeGX does not create a recursive font lock"
+for f in drawText getWidth getCharWidth getHeight getOffset; do
+	awk -v f="$f" '
+		/^[a-z].*FreeTypeGX::[A-Za-z]+\(/ { infn = ($0 ~ ("FreeTypeGX::" f "\\(")) }
+		infn && /FontLock lock\(fontMutex\);/ { found = 1 }
+		END { exit !found }' "$SRC/FreeTypeGX.cpp" \
+		|| fail "FreeTypeGX::$f() reads the glyph cache without the font lock"
+done
+
 [ "$status" -eq 0 ] && echo "OK: GUI bounds guards are in place"
 exit "$status"

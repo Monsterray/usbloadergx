@@ -113,6 +113,7 @@ class FreeTypeGX
 		uint8_t vertexIndex; /**< Vertex format descriptor index. */
 		std::map<int16_t, std::map<wchar_t, ftgxCharData> > fontData; /**< Map which holds the glyph data structures for the corresponding characters in one size. */
 		std::map<int16_t, ftgxDataOffset> ftgxAlign; /**< Map which holds the ascender and decender for different sizes. */
+		mutex_t fontMutex; /**< Held by every public call; see FontLock in FreeTypeGX.cpp. */
 
 		int16_t getStyleOffsetWidth(uint16_t width, uint16_t format);
 		int16_t getStyleOffsetHeight(int16_t format, uint16_t pixelSize);

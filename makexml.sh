@@ -16,13 +16,16 @@ commit_message=$(git show -s --format="%<(52,trunc)%s" HEAD 2>/dev/null | xargs 
 [ -z "$commit_message" ] && commit_message="unable to get the commit message"
 git_old=$(sed -n 3p ./source/version.h 2>/dev/null | cut -d '"' -f 2)
 
-# git describe --long: vX.Y.Z-<commits since>-g<commit>[-dirty]
-desc=$(git describe --tags --long --match 'v[0-9]*.[0-9]*.[0-9]*' --abbrev=7 --dirty 2>/dev/null)
-if [[ "$desc" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-g([0-9a-f]+)(-dirty)?$ ]]; then
+# git describe --long: vX.Y.Z-<commits since>-g<commit>
+desc=$(git describe --tags --long --match 'v[0-9]*.[0-9]*.[0-9]*' --abbrev=7 2>/dev/null)
+if [[ "$desc" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-([0-9]+)-g([0-9a-f]+)$ ]]; then
 	ver_new="${BASH_REMATCH[1]}"
 	meta=""
 	[ "${BASH_REMATCH[2]}" != "0" ] && meta="${BASH_REMATCH[2]}.g${BASH_REMATCH[3]}"
-	[ -n "${BASH_REMATCH[4]}" ] && meta="${meta:+$meta.}dirty"
+	# Changed content, not line endings: the files are stored with LF, a Windows
+	# checkout has some with CRLF, and the build regenerates filelist.h with LF.
+	# git describe --dirty counts both as changes, even with core.autocrlf.
+	git diff --quiet --ignore-cr-at-eol HEAD -- 2>/dev/null || meta="${meta:+$meta.}dirty"
 	[ -n "$meta" ] && ver_new="$ver_new+$meta"
 else
 	ver_new="0.0.0+g$git_new"

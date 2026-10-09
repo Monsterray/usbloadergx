@@ -90,6 +90,12 @@ CFGARGS=(
 	# A USB Gecko in slot B (EXIDeviceType::Gecko = 7): GX's gprintf, stdout and stderr
 	# go to it, and scripts/gecko_log.py saves them as gecko.log.
 	-C Dolphin.Core.SlotB=7
+	# No emulated controllers: this profile maps them to the keyboard (X is A,
+	# Enter is START), and each run's window takes focus, so typing elsewhere
+	# pressed buttons. An X on the start-up screen switched GX to SD mode.
+	# Scripted input (AUTOINPUT) goes to GX directly and does not need them.
+	-C Dolphin.Core.SIDevice0=0
+	-C WiiPad.Wiimote1.Source=0
 	-C Dolphin.Movie.DumpFrames=True
 	-C Graphics.Settings.DumpFramesAsImages=True
 	-C Graphics.Settings.PNGCompressionLevel=1

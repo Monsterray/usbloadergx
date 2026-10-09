@@ -27,6 +27,21 @@ using namespace std;
 
 #define ALIGN8(x) (((x) + 7) & ~7)
 
+//! One FreeTypeGX serves every GuiText, and the GUI thread draws while other
+//! threads measure: the main thread building a menu, ThreadedTask setting the
+//! free space line, the progress window's thread. A lookup can insert into
+//! fontData and ftgxAlign and changes ftPointSize and the face's glyph slot, so
+//! each public call holds the lock. Recursive, because drawText() calls
+//! getWidth() and getOffset().
+class FontLock
+{
+	public:
+		FontLock(mutex_t m) : mutex(m) { LWP_MutexLock(mutex); }
+		~FontLock() { LWP_MutexUnlock(mutex); }
+	private:
+		mutex_t mutex;
+};
+
 /**
  * Convert a short char string to a wide char string.
  *
@@ -66,6 +81,7 @@ FreeTypeGX::FreeTypeGX(const uint8_t* fontBuffer, FT_Long bufferSize, bool lastF
 	int faceIndex = 0;
 	ftPointSize = 0;
 	ftFace = NULL;
+	LWP_MutexInit(&fontMutex, true);
 
 	FT_Init_FreeType(&ftLibrary);
 	if(lastFace)
@@ -94,6 +110,7 @@ FreeTypeGX::~FreeTypeGX()
 	if (ftFace)
 		FT_Done_Face(ftFace);
 	FT_Done_FreeType(ftLibrary);
+	LWP_MutexDestroy(fontMutex);
 }
 
 /**
@@ -365,6 +382,7 @@ uint16_t FreeTypeGX::drawText(int16_t x, int16_t y, int16_t z, const wchar_t *te
 {
 	if (!text) return 0;
 
+	FontLock lock(fontMutex);
 	uint16_t fullTextWidth = textWidth > 0 ? textWidth : getWidth(text, pixelSize);
 	uint16_t x_pos = x, printed = 0;
 	uint16_t x_offset = 0, y_offset = 0;
@@ -439,6 +457,7 @@ uint16_t FreeTypeGX::getWidth(const wchar_t *text, int16_t pixelSize)
 {
 	if (!text) return 0;
 
+	FontLock lock(fontMutex);
 	uint16_t strWidth = 0;
 	FT_Vector pairDelta;
 
@@ -468,6 +487,7 @@ uint16_t FreeTypeGX::getWidth(const wchar_t *text, int16_t pixelSize)
  */
 uint16_t FreeTypeGX::getCharWidth(const wchar_t wChar, int16_t pixelSize, const wchar_t prevChar)
 {
+	FontLock lock(fontMutex);
 	uint16_t strWidth = 0;
 	ftgxCharData * glyphData = cacheGlyphData(wChar, pixelSize);
 
@@ -497,6 +517,7 @@ uint16_t FreeTypeGX::getCharWidth(const wchar_t wChar, int16_t pixelSize, const 
  */
 uint16_t FreeTypeGX::getHeight(const wchar_t *text, int16_t pixelSize)
 {
+	FontLock lock(fontMutex);
 	getOffset(text, pixelSize);
 
 	return ftgxAlign[pixelSize].max - ftgxAlign[pixelSize].min;
@@ -514,6 +535,7 @@ uint16_t FreeTypeGX::getHeight(const wchar_t *text, int16_t pixelSize)
  */
 void FreeTypeGX::getOffset(const wchar_t *text, int16_t pixelSize, uint16_t widthLimit)
 {
+	FontLock lock(fontMutex);
 	if (ftgxAlign.find(pixelSize) != ftgxAlign.end()) return;
 
 	int16_t strMax = 0, strMin = 9999;

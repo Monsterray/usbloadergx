@@ -40,7 +40,10 @@ extern "C"
         size_t num_headers;
         size_t buflen;
         struct phr_header headers[100];
-        char data[4096];
+        // The status line and headers. GitHub's release downloads send about
+        // 6 KB of headers (Content-Security-Policy alone is several KB), more
+        // than the 4 KB this used to hold. Allocate it; never on a stack.
+        char data[16384];
     } HTTP_RESPONSE;
 
     typedef struct

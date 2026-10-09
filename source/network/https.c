@@ -314,7 +314,6 @@ bool check_ip(char *str)
 
 bool connect_proxy(HTTP_INFO *httpinfo, char *host, char *username, char *password)
 {
-    HTTP_RESPONSE response = {0};
     char request[500];
     char credentials[66];
     char *auth;
@@ -336,12 +335,14 @@ bool connect_proxy(HTTP_INFO *httpinfo, char *host, char *username, char *passwo
                        host, httpinfo->use_https ? 443 : 80);
     if (len > 0 && https_write(httpinfo, request, len, true) != len)
         return false;
-    if (get_response(httpinfo, &response, true))
-    {
-        if (response.status == 200)
-            return true;
-    }
-    return false;
+    // On the heap: HTTP_RESPONSE holds 16 KB of headers
+    HTTP_RESPONSE *response = (HTTP_RESPONSE *)MEM2_alloc(sizeof(HTTP_RESPONSE));
+    if (!response)
+        return false;
+    memset(response, 0, sizeof(*response));
+    bool ok = get_response(httpinfo, response, true) && response->status == 200;
+    MEM2_free(response);
+    return ok;
 }
 
 static int tcp_connect(char *host, u16 port)
@@ -383,6 +384,103 @@ static int tcp_connect(char *host, u16 port)
     }
     net_close(sock);
     return -ETIMEDOUT;
+}
+
+// What downloadfile() does with the response once its headers are in.
+static void handle_response(HTTP_INFO *httpinfo, HTTP_RESPONSE *response, struct download *buffer, const char *url)
+{
+    // The website wants to redirect us
+    if (response->status == 301 || response->status == 302 || response->status == 303 ||
+        response->status == 307 || response->status == 308)
+    {
+        https_close(httpinfo);
+        if (loop == REDIRECT_LIMIT)
+        {
+#ifdef DEBUG_NETWORK
+            gprintf("Reached redirect limit\n");
+#endif
+            return;
+        }
+        loop++;
+        char location[2049];
+        if (!get_header_value(response->headers, response->num_headers, location, sizeof(location), "location"))
+            return;
+#ifdef DEBUG_NETWORK
+        gprintf("Redirect #%i - %s\n", loop, location);
+#endif
+        downloadfile(location, buffer);
+        return;
+    }
+    // It's not a redirect, so reset the loop
+    loop = 0;
+    // Exit if it's a GameTDB HEAD request
+    if (buffer->gametdbcheck)
+    {
+        buffer->gametdbcheck = get_header_value_int(response->headers, response->num_headers, "x-gametdb-timestamp");
+        https_close(httpinfo);
+        return;
+    }
+    // We got what we wanted
+    if (response->status == 200)
+    {
+        // Body bytes that came with the headers; get_response() reads the
+        // headers a byte at a time, so normally none
+        size_t first = response->buflen - response->pret;
+        buffer->data = MEM2_alloc((first > 4096 ? first : 4096) + 1);
+        if (!buffer->data)
+        {
+            https_close(httpinfo);
+            return;
+        }
+        memcpy(buffer->data, &response->data[response->pret], response->buflen - response->pret);
+        if (buffer->max_size && response->buflen - response->pret > buffer->max_size)
+        {
+            MEM2_free(buffer->data);
+            buffer->data = NULL;
+            https_close(httpinfo);
+            return;
+        }
+        // Determine how to read the data
+        bool dl_valid;
+        if (is_chunked(response->headers, response->num_headers))
+            dl_valid = read_chunked(httpinfo, buffer, response->buflen - response->pret);
+        else
+        {
+            buffer->content_length = get_header_value_int(response->headers, response->num_headers, "content-length");
+            // The server says up front that it will send too much
+            if (buffer->max_size && buffer->content_length > buffer->max_size)
+                dl_valid = false;
+            else
+                dl_valid = read_all(httpinfo, buffer, response->buflen - response->pret);
+        }
+        // Check if the download is incomplete
+        if (!dl_valid || buffer->size < 1)
+        {
+            buffer->size = 0;
+            MEM2_free(buffer->data);
+#ifdef DEBUG_NETWORK
+            gprintf("Removed incomplete download\n");
+#endif
+            https_close(httpinfo);
+            return;
+        }
+        // Finished
+        https_close(httpinfo);
+#ifdef DEBUG_NETWORK
+        gprintf("Download size: %llu\n", (long long)buffer->size);
+        gprintf("------------- HEADERS -------------\n");
+        for (size_t i = 0; i != response->num_headers; ++i)
+            gprintf("%.*s: %.*s\n", (int)response->headers[i].name_len, response->headers[i].name,
+                    (int)response->headers[i].value_len, response->headers[i].value);
+        gprintf("------------ COMPLETED ------------\n");
+#endif
+        return;
+    }
+    // Close on all other status codes
+#ifdef DEBUG_NETWORK
+    gprintf("Status code: %i - %s\n", response->status, url);
+#endif
+    https_close(httpinfo);
 }
 
 void downloadfile(const char *url, struct download *buffer)
@@ -566,99 +664,18 @@ void downloadfile(const char *url, struct download *buffer)
         https_close(&httpinfo);
         return;
     }
-    // Get the response
-    HTTP_RESPONSE response = {0};
-    if (!get_response(&httpinfo, &response, false))
+    // Get the response, on the heap: HTTP_RESPONSE holds 16 KB of headers,
+    // and a redirect calls downloadfile() again from handle_response().
+    HTTP_RESPONSE *response = (HTTP_RESPONSE *)MEM2_alloc(sizeof(HTTP_RESPONSE));
+    if (!response)
     {
         https_close(&httpinfo);
         return;
     }
-    // The website wants to redirect us
-    if (response.status == 301 || response.status == 302)
-    {
+    memset(response, 0, sizeof(*response));
+    if (get_response(&httpinfo, response, false))
+        handle_response(&httpinfo, response, buffer, url);
+    else
         https_close(&httpinfo);
-        if (loop == REDIRECT_LIMIT)
-        {
-#ifdef DEBUG_NETWORK
-            gprintf("Reached redirect limit\n");
-#endif
-            return;
-        }
-        loop++;
-        char location[2049];
-        if (!get_header_value(response.headers, response.num_headers, location, sizeof(location), "location"))
-            return;
-#ifdef DEBUG_NETWORK
-        gprintf("Redirect #%i - %s\n", loop, location);
-#endif
-        downloadfile(location, buffer);
-        return;
-    }
-    // It's not 301 or 302, so reset the loop
-    loop = 0;
-    // Exit if it's a GameTDB HEAD request
-    if (buffer->gametdbcheck)
-    {
-        buffer->gametdbcheck = get_header_value_int(response.headers, response.num_headers, "x-gametdb-timestamp");
-        https_close(&httpinfo);
-        return;
-    }
-    // We got what we wanted
-    if (response.status == 200)
-    {
-        buffer->data = MEM2_alloc(4096 + 1);
-        if (!buffer->data)
-        {
-            https_close(&httpinfo);
-            return;
-        }
-        memcpy(buffer->data, &response.data[response.pret], response.buflen - response.pret);
-        if (buffer->max_size && response.buflen - response.pret > buffer->max_size)
-        {
-            MEM2_free(buffer->data);
-            buffer->data = NULL;
-            https_close(&httpinfo);
-            return;
-        }
-        // Determine how to read the data
-        bool dl_valid;
-        if (is_chunked(response.headers, response.num_headers))
-            dl_valid = read_chunked(&httpinfo, buffer, response.buflen - response.pret);
-        else
-        {
-            buffer->content_length = get_header_value_int(response.headers, response.num_headers, "content-length");
-            // The server says up front that it will send too much
-            if (buffer->max_size && buffer->content_length > buffer->max_size)
-                dl_valid = false;
-            else
-                dl_valid = read_all(&httpinfo, buffer, response.buflen - response.pret);
-        }
-        // Check if the download is incomplete
-        if (!dl_valid || buffer->size < 1)
-        {
-            buffer->size = 0;
-            MEM2_free(buffer->data);
-#ifdef DEBUG_NETWORK
-            gprintf("Removed incomplete download\n");
-#endif
-            https_close(&httpinfo);
-            return;
-        }
-        // Finished
-        https_close(&httpinfo);
-#ifdef DEBUG_NETWORK
-        gprintf("Download size: %llu\n", (long long)buffer->size);
-        gprintf("------------- HEADERS -------------\n");
-        for (size_t i = 0; i != response.num_headers; ++i)
-            gprintf("%.*s: %.*s\n", (int)response.headers[i].name_len, response.headers[i].name,
-                    (int)response.headers[i].value_len, response.headers[i].value);
-        gprintf("------------ COMPLETED ------------\n");
-#endif
-        return;
-    }
-    // Close on all other status codes
-#ifdef DEBUG_NETWORK
-    gprintf("Status code: %i - %s\n", response.status, url);
-#endif
-    https_close(&httpinfo);
+    MEM2_free(response);
 }

@@ -1,7 +1,7 @@
 <p align="center"><a href="https://github.com/wiidev/usbloadergx/" title="USB Loader GX"><img src="data/web/logo.png"></a></p>
 <p align="center">
-<a href="https://github.com/wiidev/usbloadergx/releases" title="Releases"><img src="https://img.shields.io/github/v/release/wiidev/usbloadergx?logo=github"></a>
-<a href="https://github.com/wiidev/usbloadergx/actions" title="Actions"><img src="https://img.shields.io/github/actions/workflow/status/wiidev/usbloadergx/main.yml?branch=enhanced&logo=github"></a>
+<a href="https://github.com/Monsterray/usbloadergx/releases" title="Releases"><img src="https://img.shields.io/github/v/release/Monsterray/usbloadergx?logo=github"></a>
+<a href="https://github.com/Monsterray/usbloadergx/actions" title="Actions"><img src="https://img.shields.io/github/actions/workflow/status/Monsterray/usbloadergx/main.yml?branch=master&logo=github"></a>
 </p>
 
 ## Description

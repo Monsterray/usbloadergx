@@ -76,15 +76,18 @@ change. Rebuilding any of them is a project of its own, and it needs tests on a 
 
 | File | What it is | Origin | To rebuild |
 |---|---|---|---|
-| `source/libs/libfat/libcustomfat.a` | libfat 1.1.5 with `_FAT_get_fragments()` (`fatfile_frag.h`) | Last replaced by upstream GX in 2025 (a24d7d92). No published source. | devkitPro's libfat 1.1.5 plus the fragment patch, which has to be written again from the header and from how `source/usbloader/frag.c` uses it. |
-| `source/libs/libntfs/libcustomntfs.a` | libntfs-wii (NTFS-3G) with `_NTFS_get_fragments()`, MEM2 allocation and sectors over 512 bytes | Same commit as libcustomfat. No published source. | libntfs-wii (code.google export, for example rhyskoedijk/libntfs-wii) plus the GX changes listed in the GX history (2011-06, 2013-04). |
-| `source/libs/libext2fs/libcustomext2fs.a` | libext2fs-wii with `_EXT2_get_fragments()` | GX, 2012-02 (R1153). No published source. | libext2fs-wii (code.google export) plus the fragment function. |
-| `source/mload/modules/ehcmodule_5.c` | Hermes/rodries EHCI module for cIOS 222/223, as a C array | GX 2010-10, from WiiFlow | Hermes' cIOS sources, devkitARM. |
+| `source/libs/libfat/libcustomfat.a` | libfat 1.1.5 with `_FAT_get_fragments()` (`fatfile_frag.h`) | Last replaced by upstream GX in 2025 (a24d7d92). Its source up to libfat 1.1.1 (2017) is on this repository's `libs` branch, `libcustomfat/`; the 2025 build's source is not published. | The `libs` branch's `libcustomfat` (it has the fragment code) moved up to devkitPro's libfat 1.1.5. |
+| `source/libs/libntfs/libcustomntfs.a` | libntfs-wii (NTFS-3G) with `_NTFS_get_fragments()`, MEM2 allocation and sectors over 512 bytes | Same commit as libcustomfat. Its 2017 source is on the `libs` branch, `libcustomntfs/`. | The `libs` branch's `libcustomntfs`, compared with what the 2025 binary does. |
+| `source/libs/libext2fs/libcustomext2fs.a` | libext2fs-wii with `_EXT2_get_fragments()` | GX, 2012-02 (R1153). Source on the `libs` branch, `libcustomext2fs/`. | The `libs` branch's `libcustomext2fs`. |
+| `source/mload/modules/ehcmodule_5.c` | Hermes/rodries EHCI module for cIOS 222/223, as a C array | GX 2010-10, from WiiFlow | Source (ehcmodule, tinyehci, mload) on this repository's `ehcmodule_rodries` branch (2011); devkitARM. |
 | `source/mload/modules/odip_frag.c`, `dip_plugin_249.c` | DIP plugins for cIOS 249 and Hermes cIOS, as C arrays | GX 2010-10, from WiiFlow | Their cIOS sources, devkitARM. |
 | `source/patches/codehandler*.c`, `codehandleronly.h`, `kenobiwii.h` | Gecko/Ocarina cheat code handlers, as C arrays | GX 2009-2011 | Gecko OS code handler assembly. |
 | `data/binary/app_booter.bin` | Homebrew app booter | dimok, WiiXplorer, 2011-07 | WiiXplorer's app booter source. |
 | `data/binary/stub.bin` | Return-to-loader stub | upstream GX, 2021-08 (bcfac02d) | Source not published with it. |
 | `data/magic_patcher.o` | AHBPROT patcher for DVD access on IOS58 | GX, 2011-01 | Source not in the repository. |
+
+The `libs` and `ehcmodule_rodries` branches are kept for these sources; they are separate trees, not
+branches of the loader, and never merge into `master`.
 
 The filesystem libraries matter most: they write to users' drives, so a rebuild needs
 testing on FAT32, NTFS and ext2/3/4 drives on a Wii before it replaces these files.

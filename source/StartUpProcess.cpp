@@ -54,13 +54,14 @@ StartUpProcess::StartUpProcess()
 	versionTxt->SetAlignment(ALIGN_LEFT, ALIGN_BOTTOM);
 	versionTxt->SetPosition(23, screenheight - 20);
 
-// Please don't release unofficial builds w/o tagging them as such
+// The version from the release tag (makexml.sh). Please don't release
+// unofficial builds w/o tagging them as such
 #if defined(FULLCHANNEL)
-	versionTxt->SetTextf("v4.0c Rev. %s (%s)", LOADER_REV, GIT_VER);
+	versionTxt->SetTextf("v%s (channel)", LOADER_VERSION);
 #elif defined(GITRELEASE)
-	versionTxt->SetTextf("v4.0 Rev. %s (%s)", LOADER_REV, GIT_VER);
+	versionTxt->SetTextf("v%s", LOADER_VERSION);
 #else
-	versionTxt->SetTextf("v4.0 Rev. %s (%s) / Unofficial", LOADER_REV, GIT_VER);
+	versionTxt->SetTextf("v%s / Unofficial", LOADER_VERSION);
 #endif
 
 	if (strncmp(Settings.ConfigPath, "sd", 2) == 0)

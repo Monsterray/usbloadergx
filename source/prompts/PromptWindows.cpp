@@ -299,9 +299,9 @@ void WindowCredits()
 
 	char revision[80];
 #ifdef FULLCHANNEL
-	snprintf(revision, sizeof(revision), "Rev%sc   IOS%d (Rev %d)%s", LOADER_REV, (int)IOS_GetVersion(), (int)IOS_GetRevision(), (*(vu32*)0xcd800064 == 0xFFFFFFFF)? " + AHB" : "" );
+	snprintf(revision, sizeof(revision), "v%s (channel)   IOS%d (Rev %d)%s", LOADER_VERSION, (int)IOS_GetVersion(), (int)IOS_GetRevision(), (*(vu32*)0xcd800064 == 0xFFFFFFFF)? " + AHB" : "" );
 #else
-	snprintf(revision, sizeof(revision), "Rev%s   IOS%d (Rev %d)%s", LOADER_REV, (int)IOS_GetVersion(), (int)IOS_GetRevision(), (*(vu32*)0xcd800064 == 0xFFFFFFFF)? " + AHB" : "" );
+	snprintf(revision, sizeof(revision), "v%s   IOS%d (Rev %d)%s", LOADER_VERSION, (int)IOS_GetVersion(), (int)IOS_GetRevision(), (*(vu32*)0xcd800064 == 0xFFFFFFFF)? " + AHB" : "" );
 #endif
 
 	char IosInfo[80] = "";

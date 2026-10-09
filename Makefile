@@ -68,9 +68,10 @@ ifeq ($(BUILDMODE),channel)
 	CFLAGS += -DFULLCHANNEL
 	CXXFLAGS += -DFULLCHANNEL
 else ifeq ($(BUILDMODE),release)
-# Unofficial builds should be tagged as such
+# Unofficial builds should be tagged as such. A release build of upstream's
+# repository or of the Monsterray fork, as their CI makes, is official.
 	GIT_ORIGIN_URL := $(shell git remote get-url origin 2>/dev/null)
-	ifneq (,$(findstring wiidev/usbloadergx,$(GIT_ORIGIN_URL)))
+	ifneq (,$(findstring wiidev/usbloadergx,$(GIT_ORIGIN_URL))$(findstring Monsterray/usbloadergx,$(GIT_ORIGIN_URL)))
 		CFLAGS += -DGITRELEASE
 		CXXFLAGS += -DGITRELEASE
 	endif

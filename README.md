@@ -43,3 +43,19 @@ Before opening a pull request, run the static checks in `tests/` (for example `s
 - **Host tests** (`tests/host/`): each test compiles the exact source file the Wii build uses, with the host C compiler under AddressSanitizer and UndefinedBehaviorSanitizer. Add one for any pure function that handles data from a file, a drive or the network. On Windows, `run.sh` uses WSL when Git Bash has no working compiler.
 - **Dolphin**: `scripts/dolphin_run.sh <outdir> [seconds]` boots the build unattended in a throwaway profile, keeps the last frames, and saves what the loader prints to its USB Gecko as `gecko.log`. It ends with a verdict read from that log. `scripts/dolphin_start.sh` starts it for you to drive and writes the same log live to `.dev/gecko-live.log`. Dolphin has no USB mass storage and no cIOS, so the emulated SD card is the only storage the loader sees there.
 - **A real Wii**: `scripts/wii_install.py` puts a build on a Wii's SD card through a Homebrew Channel that speaks the [hbc-reborn](https://github.com/Monsterray/hbc-reborn) developer protocol, into `apps/usbloader_gx_review` so an installed release and its settings stay as they are.
+
+## Versions
+The loader shows a `MAJOR.MINOR.PATCH` version on its start-up screen, in its info window and in the Homebrew Channel. It comes from the last release tag, `vMAJOR.MINOR.PATCH` (for example `v5.2.0`), through `git describe` in `makexml.sh`:
+
+- `5.2.0`: a build of the tagged commit.
+- `5.2.0+4.g1a2b3c4`: 4 commits after `v5.2.0`, at commit `1a2b3c4`; `.dirty` is added when the tree has uncommitted changes.
+- `0.0.0+g1a2b3c4`: no release tag is reachable (a shallow clone, for example).
+
+Builds made outside the project's CI add "/ Unofficial". To release, tag the commit and push the tag:
+
+````
+git tag -a v5.3.0 -m "USB Loader GX 5.3.0"
+git push origin v5.3.0
+````
+
+Raise MAJOR when settings files, saves or caches of the previous release stop working, MINOR for a new feature, and PATCH for fixes only. The old revision number in `version.txt` (r1283) stays: the settings files and the updater still compare it.

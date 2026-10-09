@@ -51,7 +51,11 @@ jobs:
       run:
         shell: bash
     steps:
+      # The whole history and the tags: makexml.sh takes the version shown in
+      # the loader from the last vMAJOR.MINOR.PATCH tag (git describe).
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Run static checks
         run: |

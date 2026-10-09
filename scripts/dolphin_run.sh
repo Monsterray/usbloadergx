@@ -61,10 +61,19 @@ U_WIN="$(cd "$U" && pwd -W | tr '/' '\\')"
 DOL_WIN="$(cd "$(dirname "$DOL")" && pwd -W | tr '/' '\\')\\$(basename "$DOL")"
 
 # Only Dolphin instances launched against THIS profile, matched on their command line.
+# Every worktree has its own profile and other sessions run GX in Dolphin too: the
+# old pattern *usbloadergx*dolphin_profile* matched theirs, refused to start, and
+# force-killed their Dolphin at the end of the run.
 gx_pids() {
 	powershell.exe -NoProfile -Command \
-		"Get-CimInstance Win32_Process -Filter \"Name='Dolphin.exe'\" | Where-Object { \$_.CommandLine -like '*usbloadergx*dolphin_profile*' } | Select-Object -ExpandProperty ProcessId" \
+		"Get-CimInstance Win32_Process -Filter \"Name='Dolphin.exe'\" | Where-Object { \$_.CommandLine -like '*-u $U_WIN *' } | Select-Object -ExpandProperty ProcessId" \
 		2>/dev/null | tr -d '\r' | grep -E '^[0-9]+$' || true
+}
+# The USB Gecko port the Dolphin with process ID $1 listens on, once it has one.
+gecko_port() {
+	powershell.exe -NoProfile -Command \
+		"Get-NetTCPConnection -State Listen -OwningProcess $1 -ErrorAction SilentlyContinue | Where-Object { \$_.LocalPort -ge 55020 -and \$_.LocalPort -le 55030 } | Select-Object -First 1 -ExpandProperty LocalPort" \
+		2>/dev/null | tr -d '\r' | grep -E '^[0-9]+$' | head -n 1 || true
 }
 if [ -n "$(gx_pids)" ]; then
 	echo "a Dolphin already runs against $U (PID $(gx_pids | tr '\n' ' ')); stop it first: taskkill //F //PID <pid>" >&2
@@ -112,14 +121,22 @@ CFGARGS=(
 	-C Logger.Logs.OSREPORT=True
 )
 
-# The loader's own log. Dolphin holds what GX prints until a client connects, so the
-# reader can start first and keep retrying until the listener exists.
-"${PYTHON:-python}" "$ROOT/scripts/gecko_log.py" "$OUT/gecko.log" "$((SECS + 30))" &
-GECKO_PID=$!
-
 "$D/Dolphin.exe" -b -u "$U_WIN" -e "$DOL_WIN" "${CFGARGS[@]}" ${DOLPHIN_ARGS:-} >/dev/null 2>&1 &
 sleep 3
-echo "Dolphin PID $(gx_pids | tr '\n' ' '), running $SECS s..."
+PID="$(gx_pids | head -n 1)"
+echo "Dolphin PID ${PID:-?}, running $SECS s..."
+
+# The loader's own log, from this Dolphin's USB Gecko. Each Dolphin listens on the
+# first free port from 55020, so with another one running that port is not ours.
+# Dolphin holds what GX prints until a client connects.
+GECKO_PORT=""
+for _ in $(seq 1 15); do
+	[ -n "$PID" ] && GECKO_PORT="$(gecko_port "$PID")"
+	[ -n "$GECKO_PORT" ] && break
+	sleep 1
+done
+"${PYTHON:-python}" "$ROOT/scripts/gecko_log.py" "$OUT/gecko.log" "$((SECS + 30))" ${GECKO_PORT:-} &
+GECKO_PID=$!
 sleep "$SECS"
 for p in $(gx_pids); do taskkill //F //PID "$p" >/dev/null 2>&1 || true; done
 sleep 2

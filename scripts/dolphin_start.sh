@@ -21,10 +21,13 @@ DOL="${DOL:-$ROOT/usbloader_gx/boot.dol}"
 D="${DOLPHIN:-/c/tools/Dolphin-x64}"
 U="$ROOT/.dev/dolphin_profile"
 SD="$U/Load/WiiSDSync"
+mkdir -p "$U"
+U_WIN="$(cd "$U" && pwd -W | tr '/' '\\')"
 
+# Only the Dolphin running this worktree's profile: other sessions run GX too.
 gx_pids() {
 	powershell.exe -NoProfile -Command \
-		"Get-CimInstance Win32_Process -Filter \"Name='Dolphin.exe'\" | Where-Object { \$_.CommandLine -like '*usbloadergx*dolphin_profile*' } | Select-Object -ExpandProperty ProcessId" \
+		"Get-CimInstance Win32_Process -Filter \"Name='Dolphin.exe'\" | Where-Object { \$_.CommandLine -like '*-u $U_WIN *' } | Select-Object -ExpandProperty ProcessId" \
 		2>/dev/null | tr -d '\r' | grep -E '^[0-9]+$' || true
 }
 
@@ -55,7 +58,6 @@ cp "$DOL" "$SD/apps/usbloader_gx/boot.dol"
 grep -q "PermissionAsked" "$U/Config/Dolphin.ini" 2>/dev/null ||
 	printf '[Analytics]\nPermissionAsked = True\nEnabled = False\n' >> "$U/Config/Dolphin.ini"
 
-U_WIN="$(cd "$U" && pwd -W | tr '/' '\\')"
 DOL_WIN="$(cd "$(dirname "$DOL")" && pwd -W | tr '/' '\\')\\$(basename "$DOL")"
 
 # UsePanicHandlers=False matters: any panic alert is a modal that blocks

@@ -22,15 +22,16 @@ u32 getipbyname(char *domain)
 	if (!domain)
 		return 0;
 
+	//! net_gethostbyname() returns a static hostent: read it before the next caller can
 	init_dns_mutex();
 	LWP_MutexLock(dns_mutex);
+	u32 ip = 0;
 	struct hostent *host = net_gethostbyname(domain);
+	if (host != NULL && host->h_addr_list != NULL && host->h_addr_list[0] != NULL)
+		ip = *(u32*)host->h_addr_list[0];
 	LWP_MutexUnlock(dns_mutex);
 
-	if (host == NULL || host->h_addr_list == NULL || host->h_addr_list[0] == NULL)
-		return 0;
-
-	return *(u32*)host->h_addr_list[0];
+	return ip;
 }
 
 //Defines how many DNS entries should be cached by getipbynamecached()
@@ -78,8 +79,9 @@ u32 getipbynamecached(char *domain)
 				node->nextnode = firstdnsentry;
 				firstdnsentry = node;
 			}
+			u32 ip = node->ip;
 			LWP_MutexUnlock(dns_mutex);
-			return node->ip;
+			return ip;
 		}
 		//Go to the next element in the list
 		previousnode = node;
@@ -138,5 +140,5 @@ u32 getipbynamecached(char *domain)
 	}
 
 	LWP_MutexUnlock(dns_mutex);
-	return newnode->ip;
+	return ip;
 }

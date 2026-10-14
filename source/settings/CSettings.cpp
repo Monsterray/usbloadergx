@@ -115,6 +115,7 @@ void CSettings::SetDefault()
 	sinfo = GAMEINFO_REGION;
 	rumble = ON;
 	GameSort = SORT_ABC;
+	PlayersFilter = 0;
 	volume = 80;
 	sfxvolume = 80;
 	gamesoundvolume = 80;
@@ -361,6 +362,7 @@ bool CSettings::Save()
 	EncryptString(unlockCode, EncryptedTxt);
 	fprintf(file, "password = %s\n", EncryptedTxt);
 	fprintf(file, "GameSort = %d\n", GameSort);
+	fprintf(file, "PlayersFilter = %d\n", PlayersFilter);
 	fprintf(file, "LoaderIOS = %d\n", LoaderIOS);
 	fprintf(file, "cios = %d\n", cios);
 	fprintf(file, "autoios = %d\n", AutoIOS);
@@ -685,6 +687,13 @@ bool CSettings::SetSetting(char *name, char *value)
 	else if (strcmp(name, "GameSort") == 0)
 	{
 		GameSort = atoi(value);
+		return true;
+	}
+	else if (strcmp(name, "PlayersFilter") == 0)
+	{
+		PlayersFilter = atoi(value);
+		if (PlayersFilter < 0 || PlayersFilter > 4)
+			PlayersFilter = 0;
 		return true;
 	}
 	else if (strcmp(name, "LoaderIOS") == 0)

@@ -94,6 +94,8 @@ GameBrowseMenu::GameBrowseMenu()
 	imgrankIcon = Resources::GetImageData("rankIcon.png");
 	imgplayCountIcon = Resources::GetImageData("playCountIcon.png");
 	imgplayersSortIcon = Resources::GetImageData("playersSort.png");
+	imgplayersFilter = Resources::GetImageData("playersFilter.png");
+	imgplayersFilter_gray = Resources::GetImageData("playersFilter_gray.png");
 	imgarrangeGrid = Resources::GetImageData("arrangeGrid.png");
 	imgarrangeGrid_gray = Resources::GetImageData("arrangeGrid_gray.png");
 	imgarrangeList = Resources::GetImageData("arrangeList.png");
@@ -236,6 +238,23 @@ GameBrowseMenu::GameBrowseMenu()
 	favoriteBtn = new GuiButton(favoriteBtnImg_g, favoriteBtnImg_g, ALIGN_LEFT, ALIGN_TOP, 0, 0,
 								trigA, btnSoundOver, btnSoundClick2, 1, favoriteBtnTT, -15, 52, 0, 3);
 	favoriteBtn->SetSelectable(false);
+
+	playersBtnTT = new GuiTooltip(" ");
+	if (Settings.wsprompt)
+		playersBtnTT->SetWidescreen(Settings.widescreen);
+	playersBtnTT->SetAlpha(thInt("255 - tooltip alpha"));
+	playersBtnImg = new GuiImage(imgplayersFilter);
+	playersBtnImg->SetWidescreen(Settings.widescreen);
+	playersBtnImg_g = new GuiImage(imgplayersFilter_gray);
+	playersBtnImg_g->SetWidescreen(Settings.widescreen);
+	//! The minimum player count, in the icon's lower right corner
+	playersBtnTxt = new GuiText(" ", 14, thColor("r=0 g=0 b=0 a=255 - players filter btn text color"));
+	playersBtnTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
+	playersBtnTxt->SetPosition(18, 14);
+	playersBtn = new GuiButton(playersBtnImg_g, playersBtnImg_g, ALIGN_LEFT, ALIGN_TOP, 0, 0,
+							   trigA, btnSoundOver, btnSoundClick2, 1, playersBtnTT, -15, 52, 0, 3);
+	playersBtn->SetLabel(playersBtnTxt);
+	playersBtn->SetSelectable(false);
 
 	searchBtnTT = new GuiTooltip(tr("Set search filter"));
 	if (Settings.wsprompt)
@@ -427,6 +446,7 @@ GameBrowseMenu::GameBrowseMenu()
 	ToolBar.push_back(viewTypeBtn);
 	ToolBar.push_back(lockBtn);
 	ToolBar.push_back(dvdBtn);
+	ToolBar.push_back(playersBtn);
 	SetUpdateCallback(UpdateCallback);
 
 	ReloadBrowser(true);
@@ -479,6 +499,8 @@ GameBrowseMenu::~GameBrowseMenu()
 	delete imgrankIcon;
 	delete imgplayCountIcon;
 	delete imgplayersSortIcon;
+	delete imgplayersFilter;
+	delete imgplayersFilter_gray;
 	delete imgarrangeGrid;
 	delete imgarrangeGrid_gray;
 	delete imgarrangeCarousel;
@@ -525,6 +547,8 @@ GameBrowseMenu::~GameBrowseMenu()
 	delete sdcardImgOver;
 	delete favoriteBtnImg;
 	delete favoriteBtnImg_g;
+	delete playersBtnImg;
+	delete playersBtnImg_g;
 	delete searchBtnImg;
 	delete searchBtnImg_g;
 	delete sortBtnImg;
@@ -566,6 +590,8 @@ GameBrowseMenu::~GameBrowseMenu()
 	delete sdcardBtn;
 	delete gameInfo;
 	delete favoriteBtn;
+	delete playersBtn;
+	delete playersBtnTxt;
 	delete searchBtn;
 	delete sortBtn;
 	delete listBtn;
@@ -587,6 +613,7 @@ GameBrowseMenu::~GameBrowseMenu()
 	delete poweroffBtnTT;
 	delete sdcardBtnTT;
 	delete favoriteBtnTT;
+	delete playersBtnTT;
 	delete searchBtnTT;
 	delete sortBtnTT;
 	delete listBtnTT;
@@ -695,6 +722,26 @@ void GameBrowseMenu::ReloadBrowser(bool firstRun)
 	{
 		favoriteBtn->SetImage(favoriteBtnImg_g);
 		favoriteBtn->SetImageOver(favoriteBtnImg_g);
+	}
+
+	if (Settings.PlayersFilter > 0)
+	{
+		playersBtn->SetImage(playersBtnImg);
+		playersBtn->SetImageOver(playersBtnImg);
+		playersBtnTxt->SetText(fmt("%d+", Settings.PlayersFilter));
+		if (Settings.PlayersFilter == 2)
+			playersBtnTT->SetText(tr("Games for 2 or more players"));
+		else if (Settings.PlayersFilter == 3)
+			playersBtnTT->SetText(tr("Games for 3 or more players"));
+		else
+			playersBtnTT->SetText(tr("Games for 4 or more players"));
+	}
+	else
+	{
+		playersBtn->SetImage(playersBtnImg_g);
+		playersBtn->SetImageOver(playersBtnImg_g);
+		playersBtnTxt->SetText("");
+		playersBtnTT->SetText(tr("Filter by number of players"));
 	}
 
 	if (*gameList.GetCurrentFilter())
@@ -844,6 +891,8 @@ void GameBrowseMenu::ReloadBrowser(bool firstRun)
 							 thInt("13 - list layout lock btn pos y"));
 		dvdBtn->SetPosition(Settings.widescreen ? thInt("534 - list layout dvd btn pos x widescreen") : thInt("568 - list layout dvd btn pos x"),
 							thInt("13 - list layout dvd btn pos y"));
+		playersBtn->SetPosition(Settings.widescreen ? thInt("566 - list layout players btn pos x widescreen") : thInt("608 - list layout players btn pos x"),
+							 thInt("13 - list layout players btn pos y"));
 
 		gameBrowser = new GuiGameList(thInt("396 - game list layout width"), thInt("280 - game list layout height"), Settings.GameListOffset);
 		gameBrowser->SetPosition(thInt("200 - game list layout pos x"), thInt("49 - game list layout pos y"));
@@ -920,6 +969,8 @@ void GameBrowseMenu::ReloadBrowser(bool firstRun)
 							 thInt("13 - grid layout lock btn pos y"));
 		dvdBtn->SetPosition(Settings.widescreen ? thInt("464 - grid layout dvd btn pos x widescreen") : thInt("500 - grid layout dvd btn pos x"),
 							thInt("13 - grid layout dvd btn pos y"));
+		playersBtn->SetPosition(Settings.widescreen ? thInt("496 - grid layout players btn pos x widescreen") : thInt("540 - grid layout players btn pos x"),
+							 thInt("13 - grid layout players btn pos y"));
 		if (Settings.LayoutVersion >= 2)
 		{
 			homebrewBtn->SetPosition(Settings.widescreen ? thInt("349 - grid layout hbc btn pos x widescreen") : thInt("359 - grid layout hbc btn pos x"),
@@ -981,6 +1032,8 @@ void GameBrowseMenu::ReloadBrowser(bool firstRun)
 							 thInt("13 - carousel layout lock btn pos y"));
 		dvdBtn->SetPosition(Settings.widescreen ? thInt("464 - carousel layout dvd btn pos x widescreen") : thInt("500 - carousel layout dvd btn pos x"),
 							thInt("13 - carousel layout dvd btn pos y"));
+		playersBtn->SetPosition(Settings.widescreen ? thInt("496 - carousel layout players btn pos x widescreen") : thInt("540 - carousel layout players btn pos x"),
+							 thInt("13 - carousel layout players btn pos y"));
 		if (Settings.LayoutVersion >= 2)
 		{
 			homebrewBtn->SetPosition(Settings.widescreen ? thInt("349 - carousel layout hbc btn pos x widescreen") : thInt("359 - carousel layout hbc btn pos x"),
@@ -1042,6 +1095,8 @@ void GameBrowseMenu::ReloadBrowser(bool firstRun)
 							 thInt("13 - bannergrid layout lock btn pos y"));
 		dvdBtn->SetPosition(Settings.widescreen ? thInt("464 - bannergrid layout dvd btn pos x widescreen") : thInt("500 - bannergrid layout dvd btn pos x"),
 							thInt("13 - bannergrid layout dvd btn pos y"));
+		playersBtn->SetPosition(Settings.widescreen ? thInt("496 - bannergrid layout players btn pos x widescreen") : thInt("540 - bannergrid layout players btn pos x"),
+							 thInt("13 - bannergrid layout players btn pos y"));
 		if (Settings.LayoutVersion >= 2)
 		{
 			homebrewBtn->SetPosition(Settings.widescreen ? thInt("349 - bannergrid layout hbc btn pos x widescreen") : thInt("359 - bannergrid layout hbc btn pos x"),
@@ -1089,6 +1144,7 @@ void GameBrowseMenu::ReloadBrowser(bool firstRun)
 	Append(viewTypeBtn);
 	Append(lockBtn);
 	Append(dvdBtn);
+	Append(playersBtn);
 
 	if ((Settings.hddinfo == CLOCK_HR12) || (Settings.hddinfo == CLOCK_HR24))
 	{
@@ -1361,6 +1417,24 @@ int GameBrowseMenu::MainLoop()
 		}
 		else
 			ReloadBrowser();
+	}
+
+	else if (playersBtn->GetState() == STATE_CLICKED)
+	{
+		playersBtn->ResetState();
+		gprintf("\tplayersBtn clicked\n");
+
+		//! All -> 2+ -> 3+ -> 4+ -> All
+		Settings.PlayersFilter = Settings.PlayersFilter == 0 ? 2 : Settings.PlayersFilter < 4 ? Settings.PlayersFilter + 1 : 0;
+		gameList.FilterList();
+
+		if (Settings.PlayersFilter > 0 && gameList.size() == 0)
+		{
+			Settings.PlayersFilter = 0;
+			gameList.FilterList();
+			ShowError("%s", tr("No games for that many players."));
+		}
+		ReloadBrowser();
 	}
 
 	else if (searchBtn->GetState() == STATE_CLICKED)

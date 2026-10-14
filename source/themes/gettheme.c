@@ -221,6 +221,9 @@ void LoadNewTheme()
 	setMSG("534 - list layout dvd btn pos x widescreen", "402");
 	setMSG("568 - list layout dvd btn pos x", "427");
 	setMSG("13 - list layout dvd btn pos y", "367");
+	setMSG("608 - list layout players btn pos x", "461");
+	setMSG("566 - list layout players btn pos x widescreen", "429");
+	setMSG("13 - list layout players btn pos y", "367");
 
 	setMSG("200 - game list layout pos x", "218");
 	setMSG("49 - game list layout pos y", "29");
@@ -246,6 +249,9 @@ void LoadNewTheme()
 	setMSG("464 - grid layout dvd btn pos x widescreen", "402");
 	setMSG("500 - grid layout dvd btn pos x", "427");
 	setMSG("13 - grid layout dvd btn pos y", "367");
+	setMSG("540 - grid layout players btn pos x", "461");
+	setMSG("496 - grid layout players btn pos x widescreen", "429");
+	setMSG("13 - grid layout players btn pos y", "367");
 
 	setMSG("100 - carousel layout favorite btn pos x", "258");
 	setMSG("144 - carousel layout favorite btn pos x widescreen", "268");
@@ -268,6 +274,9 @@ void LoadNewTheme()
 	setMSG("464 - carousel layout dvd btn pos x widescreen", "402");
 	setMSG("500 - carousel layout dvd btn pos x", "427");
 	setMSG("13 - carousel layout dvd btn pos y", "367");
+	setMSG("540 - carousel layout players btn pos x", "461");
+	setMSG("496 - carousel layout players btn pos x widescreen", "429");
+	setMSG("13 - carousel layout players btn pos y", "367");
 	setMSG("-20 - game carousel layout pos y", "-44");
 
 	setMSG("100 - bannergrid layout favorite btn pos x", "258");
@@ -291,6 +300,9 @@ void LoadNewTheme()
 	setMSG("464 - bannergrid layout dvd btn pos x widescreen", "402");
 	setMSG("500 - bannergrid layout dvd btn pos x", "427");
 	setMSG("13 - bannergrid layout dvd btn pos y", "367");
+	setMSG("540 - bannergrid layout players btn pos x", "461");
+	setMSG("496 - bannergrid layout players btn pos x widescreen", "429");
+	setMSG("13 - bannergrid layout players btn pos y", "367");
 
 	setMSG("68 - region info text pos x", "38");
 	setMSG("30 - region info text pos y", "28");

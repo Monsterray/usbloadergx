@@ -218,6 +218,9 @@ msgstr ""
 msgid "432 - viewtype btn pos x"
 msgstr ""
 
+msgid "r=0 g=0 b=0 a=255 - players filter btn text color"
+msgstr ""
+
 msgid "432 - viewtype btn pos x widescreen"
 msgstr ""
 
@@ -348,6 +351,15 @@ msgid "568 - list layout dvd btn pos x"
 msgstr "427"
 
 msgid "13 - list layout dvd btn pos y"
+msgstr "367"
+
+msgid "608 - list layout players btn pos x"
+msgstr "461"
+
+msgid "566 - list layout players btn pos x widescreen"
+msgstr "429"
+
+msgid "13 - list layout players btn pos y"
 msgstr "367"
 
 msgid "280 - game list layout height"
@@ -482,6 +494,15 @@ msgstr "427"
 msgid "13 - grid layout dvd btn pos y"
 msgstr "367"
 
+msgid "540 - grid layout players btn pos x"
+msgstr "461"
+
+msgid "496 - grid layout players btn pos x widescreen"
+msgstr "429"
+
+msgid "13 - grid layout players btn pos y"
+msgstr "367"
+
 msgid "349 - grid layout hbc btn pos x widescreen"
 msgstr ""
 
@@ -603,6 +624,15 @@ msgid "500 - carousel layout dvd btn pos x"
 msgstr "427"
 
 msgid "13 - carousel layout dvd btn pos y"
+msgstr "367"
+
+msgid "540 - carousel layout players btn pos x"
+msgstr "461"
+
+msgid "496 - carousel layout players btn pos x widescreen"
+msgstr "429"
+
+msgid "13 - carousel layout players btn pos y"
 msgstr "367"
 
 msgid "349 - carousel layout hbc btn pos x widescreen"
@@ -732,6 +762,15 @@ msgid "500 - bannergrid layout dvd btn pos x"
 msgstr "427"
 
 msgid "13 - bannergrid layout dvd btn pos y"
+msgstr "367"
+
+msgid "540 - bannergrid layout players btn pos x"
+msgstr "461"
+
+msgid "496 - bannergrid layout players btn pos x widescreen"
+msgstr "429"
+
+msgid "13 - bannergrid layout players btn pos y"
 msgstr "367"
 
 msgid "349 - bannergrid layout hbc btn pos x widescreen"

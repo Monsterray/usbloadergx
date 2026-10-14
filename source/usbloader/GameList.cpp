@@ -235,6 +235,10 @@ void GameList::InternalFilterList(std::vector<struct discHdr *> &FullList)
 			}
 		}
 
+		//! Player count filter. The count is the most players the game takes, from wiitdb.xml.
+		if (Settings.PlayersFilter > 0 && GameTitles.GetPlayersCount((const char *)header->id) < Settings.PlayersFilter)
+			continue;
+
 		// Ignore uLoader cfg "iso".  i was told it is "__CFG_"  but not confirmed
 		if (strncasecmp((char *)header->id, "__CFG_", 6) == 0)
 			continue;

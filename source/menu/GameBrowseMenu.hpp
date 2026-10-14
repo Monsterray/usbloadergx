@@ -70,6 +70,8 @@ class GameBrowseMenu : public GuiWindow
 		GuiImageData * imgrankIcon;
 		GuiImageData * imgplayCountIcon;
 		GuiImageData * imgplayersSortIcon;
+		GuiImageData * imgplayersFilter;
+		GuiImageData * imgplayersFilter_gray;
 		GuiImageData * imgarrangeGrid;
 		GuiImageData * imgarrangeGrid_gray;
 		GuiImageData * imgarrangeCarousel;
@@ -116,6 +118,8 @@ class GameBrowseMenu : public GuiWindow
 		GuiImage * sdcardImgOver;
 		GuiImage * favoriteBtnImg;
 		GuiImage * favoriteBtnImg_g;
+		GuiImage * playersBtnImg;
+		GuiImage * playersBtnImg_g;
 		GuiImage * searchBtnImg;
 		GuiImage * searchBtnImg_g;
 		GuiImage * sortBtnImg;
@@ -143,6 +147,7 @@ class GameBrowseMenu : public GuiWindow
 
 		GuiText * usedSpaceTxt;
 		GuiText * gamecntTxt;
+		GuiText * playersBtnTxt;
 		GuiText * clockTimeBack;
 		GuiText * clockTime;
 		GuiText * GameRegionTxt;
@@ -157,6 +162,7 @@ class GameBrowseMenu : public GuiWindow
 		GuiButton * sdcardBtn;
 		GuiButton * gameInfo;
 		GuiButton * favoriteBtn;
+		GuiButton * playersBtn;
 		GuiButton * searchBtn;
 		GuiButton * sortBtn;
 		GuiButton * listBtn;
@@ -178,6 +184,7 @@ class GameBrowseMenu : public GuiWindow
 		GuiTooltip * poweroffBtnTT;
 		GuiTooltip * sdcardBtnTT;
 		GuiTooltip * favoriteBtnTT;
+		GuiTooltip * playersBtnTT;
 		GuiTooltip * searchBtnTT;
 		GuiTooltip * sortBtnTT;
 		GuiTooltip * listBtnTT;

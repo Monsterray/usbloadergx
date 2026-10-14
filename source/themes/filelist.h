@@ -1,7 +1,7 @@
 /****************************************************************************
  * USB Loader GX resource files.
  * This file is generated automatically.
- * Includes 208 files.
+ * Includes 210 files.
  *
  * NOTE:
  * Any manual modification of this file will be overwriten by the generation.
@@ -146,6 +146,8 @@
 #include "player3_point_png.h"
 #include "player4_grab_png.h"
 #include "player4_point_png.h"
+#include "playersFilter_png.h"
+#include "playersFilter_gray_png.h"
 #include "playersSort_png.h"
 #include "progressbar_png.h"
 #include "progressbar_empty_png.h"
@@ -358,6 +360,8 @@ RecourceFile Resources::RecourceFiles[] =
 	{"player3_point.png", player3_point_png, player3_point_png_size, NULL, 0},
 	{"player4_grab.png", player4_grab_png, player4_grab_png_size, NULL, 0},
 	{"player4_point.png", player4_point_png, player4_point_png_size, NULL, 0},
+	{"playersFilter.png", playersFilter_png, playersFilter_png_size, NULL, 0},
+	{"playersFilter_gray.png", playersFilter_gray_png, playersFilter_gray_png_size, NULL, 0},
 	{"playersSort.png", playersSort_png, playersSort_png_size, NULL, 0},
 	{"progressbar.png", progressbar_png, progressbar_png_size, NULL, 0},
 	{"progressbar_empty.png", progressbar_empty_png, progressbar_empty_png_size, NULL, 0},

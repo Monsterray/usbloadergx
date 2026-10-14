@@ -132,6 +132,7 @@ class CSettings
 		short wsprompt;
 		short keyset;
 		short GameSort;
+		short PlayersFilter; //! Show only games for at least this many players; 0 shows all
 		short wiilight;
 		short gameDisplay;
 		short patchcountrystrings;

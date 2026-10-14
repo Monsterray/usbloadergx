@@ -258,7 +258,12 @@ LoaderSettings::~LoaderSettings()
 		bool usingWiiGames = (Settings.LoaderMode & MODE_WIIGAMES) || (Settings.LayoutVersion >= 2 && Settings.GameDisplayType == DISP_WII);
 		if (usingWiiGames && (gameList.GameCount() == 0))
 		{
-			WBFS_ReInit(Settings.SDMode ? WBFS_DEVICE_SDHC : WBFS_DEVICE_USB);
+			//! As GameBrowseMenu::ReloadWiiGames(): only remount when a partition is
+			//! mounted but none is open. A remount waits for every USB port to spin
+			//! up, 20 s for a port with nothing in it, with no window on screen.
+			u32 device = Settings.SDMode ? WBFS_DEVICE_SDHC : WBFS_DEVICE_USB;
+			if (!WBFS_Selected() && WBFS_Init(device) >= 0)
+				WBFS_ReInit(device);
 			gameList.ReadGameList();
 		}
 

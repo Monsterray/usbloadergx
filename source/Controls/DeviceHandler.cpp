@@ -165,6 +165,7 @@ static inline bool USBSpinUp()
 	bool started0 = false;
 	bool started1 = false;
 	Timer countDown;
+	float firstUp = -1.f;
 
 	const DISC_INTERFACE *handle0 = NULL;
 	const DISC_INTERFACE *handle1 = NULL;
@@ -185,6 +186,16 @@ static inline bool USBSpinUp()
 		if ((!handle0 || started0) && (!handle1 || started1))
 		{
 			break;
+		}
+
+		//! With both ports selected and a drive in only one, the other port never starts.
+		//! A drive that was mounted before answers at once; give the other port 5 s, not 20.
+		if (started0 || started1)
+		{
+			if (firstUp < 0.f)
+				firstUp = countDown.elapsed();
+			else if (countDown.elapsed() - firstUp > 5.f)
+				break;
 		}
 		usleep(50000);
 	//! By the clock, as StartUpProcess::USBSpinUp() does: startup() on a port with no

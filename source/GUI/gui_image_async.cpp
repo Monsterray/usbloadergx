@@ -60,18 +60,20 @@ void GuiImageAsync::ThreadAddImage(GuiImageAsync *Image)
 	LWP_ResumeThread(Thread);
 }
 
+//! Search under ListLock too: the loader thread erases the front entry, and an index
+//! found without the lock can name another image by the time it is erased.
 void GuiImageAsync::ThreadRemoveImage(GuiImageAsync *Image)
 {
+	LWP_MutexLock(ListLock);
 	for(u32 i = 0; i < List.size(); ++i)
 	{
 		if(List[i] == Image)
 		{
-			LWP_MutexLock(ListLock);
 			List.erase(List.begin()+i);
-			LWP_MutexUnlock(ListLock);
 			break;
 		}
 	}
+	LWP_MutexUnlock(ListLock);
 }
 
 void GuiImageAsync::ClearQueue()
@@ -91,6 +93,12 @@ void * GuiImageAsync::GuiImageAsyncThread(void *arg)
 		while(!List.empty() && !CloseThread)
 		{
 			LWP_MutexLock(ListLock);
+			//! ClearQueue() can empty the list after the check above
+			if(List.empty())
+			{
+				LWP_MutexUnlock(ListLock);
+				continue;
+			}
 			InUse = List.front();
 			List.erase(List.begin());
 			LWP_MutexUnlock(ListLock);
@@ -137,10 +145,8 @@ u32 GuiImageAsync::ThreadExit()
 		CloseThread = true;
 		LWP_ResumeThread(Thread);
 		LWP_JoinThread(Thread, NULL);
-		LWP_MutexUnlock(ListLock);
 		LWP_MutexDestroy(ListLock);
 		Thread = LWP_THREAD_NULL;
-		ListLock = LWP_MUTEX_NULL;
 		ListLock = LWP_MUTEX_NULL;
 	}
 	*/

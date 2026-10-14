@@ -1392,6 +1392,7 @@ int GameBrowseMenu::MainLoop()
 
 	else if (settingsBtn->GetState() == STATE_CLICKED)
 	{
+		gprintf("\tsettingsBtn clicked\n");
 		if (!Settings.godmode && (Settings.ParentalBlocks & BLOCK_GLOBAL_SETTINGS))
 		{
 			WindowPrompt(tr("Permission denied."), tr("Console must be unlocked for this option."), tr("OK"));
@@ -1614,18 +1615,11 @@ int GameBrowseMenu::MainLoop()
 			Settings.gameDisplay = GRID_MODE;
 		else if (Settings.gameDisplay == GRID_MODE)
 			Settings.gameDisplay = CAROUSEL_MODE;
-		else if (Settings.gameDisplay == CAROUSEL_MODE)
+		//! The channel grid draws with the Wii Menu's banner resources; without them, skip it
+		else if (Settings.gameDisplay == CAROUSEL_MODE && SystemMenuResources::Instance()->IsLoaded())
 			Settings.gameDisplay = BANNERGRID_MODE;
-		else if (Settings.gameDisplay == BANNERGRID_MODE)
-		{
-			if (!SystemMenuResources::Instance()->IsLoaded())
-			{
-				WindowPrompt(tr("Error:"), tr("Banner grid layout is only available with AHBPROT! Please consider installing new HBC version."), tr("OK"));
-				viewTypeBtn->ResetState();
-				return MENU_NONE;
-			}
+		else
 			Settings.gameDisplay = LIST_MODE;
-		}
 		ReloadBrowser();
 		viewTypeBtn->ResetState();
 	}
@@ -1690,6 +1684,7 @@ int GameBrowseMenu::MainLoop()
 
 	else if (categBtn->GetState() == STATE_CLICKED)
 	{
+		gprintf("\tcategBtn clicked\n");
 		if (!Settings.godmode && (Settings.ParentalBlocks & BLOCK_CATEGORIES_MENU))
 		{
 			WindowPrompt(tr("Permission denied."), tr("Console must be unlocked for this option."), tr("OK"));
@@ -1721,6 +1716,7 @@ int GameBrowseMenu::MainLoop()
 
 	else if (loaderModeBtn->GetState() == STATE_CLICKED)
 	{
+		gprintf("\tloaderModeBtn clicked\n");
 		if (!Settings.godmode && (Settings.ParentalBlocks & BLOCK_GAME_SOURCES_BUTTON))
 		{
 			WindowPrompt(tr("Permission denied."), tr("Console must be unlocked for this option."), tr("OK"));
@@ -1784,9 +1780,10 @@ int GameBrowseMenu::MainLoop()
 
 void GameBrowseMenu::CheckDiscSlotUpdate()
 {
-	// No need to update every 1 ms
+	//! The cover is polled every 100 passes (about 5 s), but a click on the DVD button is
+	//! answered at once: it waited for the next poll, and its prompt then took the next click
 	static u32 delayCounter = 0;
-	if (++delayCounter < 100)
+	if (++delayCounter < 100 && dvdBtn->GetState() != STATE_CLICKED)
 		return;
 
 	delayCounter = 0;

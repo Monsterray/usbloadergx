@@ -61,9 +61,16 @@ grep -q 'cnt >= 5 && file.data\[cnt\]' "$SRC/network/URL_List.cpp" \
 grep -q 'ind >= urlcount || ind < 0' "$SRC/network/URL_List.cpp" \
 	|| fail "URL_List::GetURL() accepts one index past the end"
 
-# 8. Anything on the LAN can open the wiiload connection.
-grep -q 'gotHeader = (net_read(local_connection, &haxx, 8) == 8)' "$SRC/network/networkops.cpp" \
+# 8. Anything on the LAN can open the wiiload connection, and then say nothing.
+#    A blocking read held the network thread, and HaltNetworkThread() waits for
+#    that thread on the main thread.
+grep -q 'gotHeader = (read_with_stall_timeout(local_connection, haxx, 8) == 8)' "$SRC/network/networkops.cpp" \
 	|| fail "NetworkWait() uses the wiiload header without checking the read"
+grep -q 'WIILOAD_STALL_MS' "$SRC/network/networkops.cpp" \
+	|| fail "wiiload reads are not bounded by the clock"
+awk '/^s32 network_read\(/ { infn = 1 } infn && /net_read\(/ { found = 1 } infn && /^}/ { exit }
+	END { exit found }' "$SRC/network/networkops.cpp" \
+	|| fail "network_read() calls net_read() itself; a silent sender blocks it for ever"
 
 # 9. A failed DNS lookup used to be cached, so one bad moment stopped that host
 #    working until the next reboot.

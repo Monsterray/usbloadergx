@@ -12,6 +12,8 @@
 #include <stdio.h>
 #include <ogc/lwp.h>
 #include <ogc/mutex.h>
+#include <ogc/lwp_watchdog.h>
+#include <errno.h>
 
 #include "networkops.h"
 #include "https.h"
@@ -20,6 +22,8 @@
 #include "settings/ProxySettings.h"
 
 #define PORT 4299
+//! How long a wiiload sender may go quiet before the read gives up
+#define WIILOAD_STALL_MS 10000
 
 /*** Incoming filesize ***/
 u32 infilesize = 0;
@@ -129,26 +133,45 @@ char *GetIncommingIP(void)
 
 /****************************************************************************
  * Read network data
+ *
+ * The wiiload connection is non-blocking, and a read gives up when the sender
+ * sends nothing for WIILOAD_STALL_MS. Anything on the LAN can open it and then
+ * say nothing: a blocking read held the network thread, HaltNetworkThread()
+ * waits for that thread on the main thread, and leaving the homebrew browser
+ * froze the loader. Returns what arrived, or a negative error if nothing did.
  ***************************************************************************/
+static s32 read_with_stall_timeout(s32 sock, u8 *buf, u32 len)
+{
+	u32 read = 0;
+	u64 lastData = gettime();
+
+	while (read < len)
+	{
+		s32 ret = net_read(sock, buf + read, len - read);
+		if (ret > 0)
+		{
+			read += ret;
+			lastData = gettime();
+			continue;
+		}
+		if (ret == 0)
+			break;
+		if (ret != -EAGAIN)
+			return read > 0 ? (s32) read : ret;
+		if (ticks_to_millisecs(diff_ticks(lastData, gettime())) > WIILOAD_STALL_MS)
+			return read > 0 ? (s32) read : -ETIMEDOUT;
+		usleep(10000);
+	}
+	return read;
+}
+
 s32 network_read(s32 connect, u8 *buf, u32 len)
 {
 	NET_LOCK();
 	s32 conn = (connect == NET_DEFAULT_SOCK) ? connection : connect;
 	NET_UNLOCK();
 
-	u32 read = 0;
-	s32 ret = -1;
-
-	while (read < len)
-	{
-		ret = net_read(conn, buf + read, len - read);
-		if (ret < 0)
-			return ret;
-		if (!ret)
-			break;
-		read += ret;
-	}
-	return read;
+	return read_with_stall_timeout(conn, buf, len);
 }
 
 /****************************************************************************
@@ -172,6 +195,31 @@ void CloseConnection()
 }
 
 /****************************************************************************
+ * The wiiload server's non-blocking listening socket
+ ***************************************************************************/
+static s32 OpenListenSocket()
+{
+	s32 sock = net_socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
+	if (sock == INVALID_SOCKET)
+		return -1;
+
+	struct sockaddr_in sin;
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons(PORT);
+	sin.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	int flags = net_fcntl(sock, F_GETFL, 0);
+	net_fcntl(sock, F_SETFL, flags | 4);
+
+	if (net_bind(sock, (struct sockaddr *)&sin, sizeof(sin)) < 0 || net_listen(sock, 3) < 0)
+	{
+		net_close(sock);
+		return -1;
+	}
+	return sock;
+}
+
+/****************************************************************************
  * NetworkWait
  ***************************************************************************/
 int NetworkWait()
@@ -184,56 +232,58 @@ int NetworkWait()
 	}
 	NET_UNLOCK();
 
-	struct sockaddr_in sin;
 	struct sockaddr_in client_address;
 	socklen_t addrlen = sizeof(client_address);
 
-	s32 local_socket = net_socket(AF_INET, SOCK_STREAM, IPPROTO_IP);
-	if (local_socket == INVALID_SOCKET)
-		return local_socket;
-
-	sin.sin_family = AF_INET;
-	sin.sin_port = htons(PORT);
-	sin.sin_addr.s_addr = htonl(INADDR_ANY);
-
-	int flags = net_fcntl(local_socket, F_GETFL, 0);
-	net_fcntl(local_socket, F_SETFL, flags | 4);
-
-
-	if (net_bind(local_socket, (struct sockaddr *)&sin, sizeof(sin)) < 0)
+	//! The listening socket stays open while GX waits. It was opened and closed
+	//! again around each non-blocking accept, 100 ms apart, so a sender got in
+	//! only if its connect landed in the few milliseconds the socket existed.
+	NET_LOCK();
+	s32 local_socket = listenSocket;
+	NET_UNLOCK();
+	if (local_socket < 0)
 	{
-		net_close(local_socket);
-		return -1;
-	}
-
-	if (net_listen(local_socket, 3) < 0)
-	{
-		net_close(local_socket);
-		return -1;
+		local_socket = OpenListenSocket();
+		if (local_socket < 0)
+			return -1;
+		NET_LOCK();
+		listenSocket = local_socket;
+		NET_UNLOCK();
 	}
 
 	s32 local_connection = net_accept(local_socket, (struct sockaddr *)&client_address, &addrlen);
 
+	if (local_connection < 0)
+	{
+		//! Nobody there yet. Any other error (a network re-init closed the
+		//! socket) needs a new one.
+		if (local_connection != -EAGAIN)
+		{
+			NET_LOCK();
+			if (listenSocket == local_socket)
+			{
+				net_close(local_socket);
+				listenSocket = -1;
+			}
+			NET_UNLOCK();
+		}
+		return -4;
+	}
+
 	NET_LOCK();
-	listenSocket = local_socket;
 	connection = local_connection;
 	snprintf(incommingIP, sizeof(incommingIP), "%s", inet_ntoa(client_address.sin_addr));
 	NET_UNLOCK();
 
-	if (local_connection < 0)
 	{
-		net_close(local_socket);
-		NET_LOCK();
-		listenSocket = -1;
-		NET_UNLOCK();
-		return -4;
-	}
-	else
-	{
+		//! Not every IOS passes O_NONBLOCK on to an accepted socket
+		int connFlags = net_fcntl(local_connection, F_GETFL, 0);
+		net_fcntl(local_connection, F_SETFL, (connFlags < 0 ? 0 : connFlags) | 4);
+
 		//! Anything on the network can open this connection, so a short read
 		//! must not leave the version or either size as whatever was there.
 		unsigned char haxx[9] = {0};
-		bool gotHeader = (net_read(local_connection, &haxx, 8) == 8);
+		bool gotHeader = (read_with_stall_timeout(local_connection, haxx, 8) == 8);
 
 		if (gotHeader)
 		{
@@ -245,19 +295,18 @@ int NetworkWait()
 			infilesize = 0;
 			uncfilesize = 0;
 
-			gotHeader = (net_read(local_connection, &infilesize, 4) == 4);
+			gotHeader = (read_with_stall_timeout(local_connection, (u8 *) &infilesize, 4) == 4);
 
 			if (gotHeader && (haxx[4] > 0 || haxx[5] > 4))
-				gotHeader = (net_read(local_connection, &uncfilesize, 4) == 4);
+				gotHeader = (read_with_stall_timeout(local_connection, (u8 *) &uncfilesize, 4) == 4);
 		}
 
 		if (!gotHeader)
 		{
+			gprintf("wiiload: no header from %s\n", inet_ntoa(client_address.sin_addr));
 			net_close(local_connection);
-			net_close(local_socket);
 			NET_LOCK();
 			connection = -1;
-			listenSocket = -1;
 			NET_UNLOCK();
 			return -4;
 		}
@@ -283,13 +332,14 @@ void HaltNetworkThread()
 	bool need_close = waitforanswer;
 	NET_UNLOCK();
 
-	if (need_close)
-		CloseConnection();
-
-	// wait for thread to finish
+	// wait for thread to finish: a wiiload read in it gives up after WIILOAD_STALL_MS,
+	// and the sockets it uses are closed only once it has stopped
 	gprintf("HaltNetworkThread\n");
 	while (!LWP_ThreadIsSuspended(networkthread))
 		usleep(100);
+
+	if (need_close)
+		CloseConnection();
 
 	// GX's wiiload server is done with TCP 4299; the agent listens again.
 	hbc_agent_listen(true);

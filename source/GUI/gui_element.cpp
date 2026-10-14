@@ -15,6 +15,7 @@
  */
 //mutex_t GuiElement::mutex = LWP_MUTEX_NULL;
 mutex_t GuiElement::_lock_mutex = LWP_MUTEX_NULL;
+cond_t GuiElement::_lock_cond = LWP_COND_NULL;
 GuiElement::GuiElement()
 {
 	xoffset = 0;
@@ -66,10 +67,10 @@ GuiElement::GuiElement()
 	alignmentVert = ALIGN_TOP;
 	alignmentHor = ALIGN_LEFT;
 	//  if(mutex == LWP_MUTEX_NULL) LWP_MutexInit(&mutex, true);
-	if (_lock_mutex == LWP_MUTEX_NULL) LWP_MutexInit(&_lock_mutex, true);
+	if (_lock_mutex == LWP_MUTEX_NULL) LWP_MutexInit(&_lock_mutex, false);
+	if (_lock_cond == LWP_COND_NULL) LWP_CondInit(&_lock_cond);
 	_lock_thread = LWP_THREAD_NULL;
 	_lock_count = 0;
-	_lock_queue = LWP_TQUEUE_NULL;
 
 }
 
@@ -686,52 +687,37 @@ bool GuiElement::IsInside(int x, int y)
 	if (x > this->GetLeft() && x < (this->GetLeft() + width) && y > this->GetTop() && y < (this->GetTop() + height)) return true;
 	return false;
 }
+//! An element lock is recursive for the thread that holds it. A thread that finds
+//! it held by another waits on _lock_cond, which every element shares: a wait that
+//! wakes for another element just checks again. It used to sleep on a per-element
+//! thread queue that the unlock closed, which woke the sleepers in libogc 1 and 2.
+//! libogc 3's LWP_CloseQueue() only frees the queue, so the waiter slept for ever.
+//! _lock_mutex guards only these fields and is never taken twice, so it is a plain one.
 void GuiElement::LockElement()
 {
-	//  LWP_MutexLock(mutex);
-	for (;;) // loop while element is locked by self
-	{
-		LWP_MutexLock(_lock_mutex);
+	lwp_t self = LWP_GetSelf();
 
-		if (_lock_thread == LWP_THREAD_NULL) // element is not locked
-		{
-			_lock_thread = LWP_GetSelf(); // mark as locked
-			_lock_count = 1; // set count of lock to 1
-			LWP_MutexUnlock(_lock_mutex);
-			return;
-		}
-		else if (_lock_thread == LWP_GetSelf()) // thread is locked by my self
-		{
-			_lock_count++; // inc count of locks;
-			LWP_MutexUnlock(_lock_mutex);
-			return;
-		}
-		else // otherwise the element is locked by an other thread
-		{
-			if (_lock_queue == LWP_TQUEUE_NULL) // no queue - meens it is the first access to the locked element
-			LWP_InitQueue(&_lock_queue); // init queue
-			LWP_MutexUnlock(_lock_mutex);
-			LWP_ThreadSleep(_lock_queue); // and sleep
-			// try lock again;
-		}
+	LWP_MutexLock(_lock_mutex);
+	while (_lock_thread != LWP_THREAD_NULL && _lock_thread != self)
+		LWP_CondWait(_lock_cond, _lock_mutex);
+
+	if (_lock_thread == self)
+		_lock_count++;
+	else
+	{
+		_lock_thread = self;
+		_lock_count = 1;
 	}
+	LWP_MutexUnlock(_lock_mutex);
 }
 void GuiElement::UnlockElement()
 {
-	//  LWP_MutexUnlock(mutex);
 	LWP_MutexLock(_lock_mutex);
-	// only the thread was locked this element, can call unlock
-	if (_lock_thread == LWP_GetSelf()) // but we check it here safe is safe
+	// only the thread that locked this element can unlock it
+	if (_lock_thread == LWP_GetSelf() && --_lock_count == 0)
 	{
-		if (--_lock_count == 0) // dec count of locks and check if it last lock;
-		{
-			_lock_thread = LWP_THREAD_NULL; // mark as unlocked
-			if (_lock_queue != LWP_TQUEUE_NULL) // has a queue
-			{
-				LWP_CloseQueue(_lock_queue); // close the queue and wake all waited threads
-				_lock_queue = LWP_TQUEUE_NULL;
-			}
-		}
+		_lock_thread = LWP_THREAD_NULL;
+		LWP_CondBroadcast(_lock_cond);
 	}
 	LWP_MutexUnlock(_lock_mutex);
 }

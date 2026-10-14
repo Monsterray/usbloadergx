@@ -30,6 +30,7 @@
 #define LIBWIIGUI_H
 
 #include <gccore.h>
+#include <ogc/cond.h>
 #include <malloc.h>
 #include <stdlib.h>
 #include <string.h>
@@ -371,9 +372,9 @@ class GuiElement
 		void UnlockElement();
 		//	  static mutex_t mutex;
 		static mutex_t _lock_mutex;
+		static cond_t _lock_cond;
 		lwp_t _lock_thread;
 		u16 _lock_count;
-		lwpq_t _lock_queue;
 		friend class SimpleLock;
 
 		//int position2; //! B Scrollbariable

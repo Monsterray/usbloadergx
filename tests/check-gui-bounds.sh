@@ -88,5 +88,20 @@ for f in drawText getWidth getCharWidth getHeight getOffset; do
 		|| fail "FreeTypeGX::$f() reads the glyph cache without the font lock"
 done
 
+# 11. libogc 3's non-recursive LWP mutex blocks for ever when its owner locks it
+#     again, unlocking one the thread does not hold hangs with interrupts off, and
+#     LWP_CloseQueue() frees a thread queue without waking the threads asleep on it.
+grep -q 'LWP_CloseQueue(_lock' "$SRC/GUI/gui_element.cpp" \
+	&& fail "GuiElement::UnlockElement() relies on LWP_CloseQueue() to wake waiters"
+grep -q 'LWP_CondWait(_lock_cond, _lock_mutex)' "$SRC/GUI/gui_element.cpp" \
+	|| fail "GuiElement::LockElement() does not wait on the element lock's cond var"
+awk '/BannerAsync::BannerAsyncThread\(/ { inthr = 1 } /^}/ { inthr = 0 }
+	inthr && /delete DeleteList/ { found = 1 } END { exit found }' "$SRC/banner/BannerAsync.cpp" \
+	|| fail "the banner thread deletes banners under ListLock; ~BannerAsync() takes it again"
+awk '/GuiImageAsync::ThreadRemoveImage\(/ { infn = 1 }
+	infn && /LWP_MutexLock\(ListLock\)/ { locked = 1 }
+	infn && /for *\(/ { exit !locked }' "$SRC/GUI/gui_image_async.cpp" \
+	|| fail "GuiImageAsync::ThreadRemoveImage() searches the list without ListLock"
+
 [ "$status" -eq 0 ] && echo "OK: GUI bounds guards are in place"
 exit "$status"

@@ -27,10 +27,10 @@ MINIZIP_VERSION=1.3.2
 MINIZIP_URL=https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz
 MINIZIP_SHA256=bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16
 
-# The Homebrew Channel's in-app agent (sdk/hbc_agent.h), HBC 1.10.2.
-HBCAGENT_VERSION=ecb4de295094f79d06233ad01066d533f271332c
-HBCAGENT_URL=https://github.com/Monsterray/hbc-reborn/archive/ecb4de295094f79d06233ad01066d533f271332c.tar.gz
-HBCAGENT_SHA256=268b4ff79d4f9e664aa5cfef3e55b4709202c262f3950ef4672559ce9e0c7900
+# The Homebrew Channel's in-app agent (sdk/hbc_agent.h), HBC 1.10.6.
+HBCAGENT_VERSION=6ee1c070b1d9c36024d1fe2b625f42d4a79886d9
+HBCAGENT_URL=https://github.com/Monsterray/hbc-reborn/archive/6ee1c070b1d9c36024d1fe2b625f42d4a79886d9.tar.gz
+HBCAGENT_SHA256=cd37aff9d9b74f2ed244c2adc2e69ecdacc1bac775f94b349f477f0f89178087
 
 DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
 DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"

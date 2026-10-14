@@ -52,6 +52,7 @@ private:
 
 	static std::vector<BannerAsync *> List;
 	static std::queue<BannerAsync *> DeleteList;
+	static void DeleteQueued(void);
 	static lwp_t Thread;
 	static mutex_t ListLock;
 	static BannerAsync * InUse;

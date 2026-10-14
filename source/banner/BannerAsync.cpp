@@ -107,19 +107,32 @@ void BannerAsync::PushFront(BannerAsync *banner)
 	LWP_ResumeThread(Thread);
 }
 
+//! Delete the banners RemoveBanner() queued. Never with ListLock held: ~BannerAsync()
+//! takes it again in ThreadRemove(), and ListLock is not recursive. libogc 3 blocks
+//! forever on that second lock, and the GUI thread then blocks on ListLock too.
+void BannerAsync::DeleteQueued(void)
+{
+	std::queue<BannerAsync *> doomed;
+	LWP_MutexLock(ListLock);
+	std::swap(doomed, DeleteList);
+	LWP_MutexUnlock(ListLock);
+
+	while(!doomed.empty())
+	{
+		delete doomed.front();
+		doomed.pop();
+	}
+}
+
 void * BannerAsync::BannerAsyncThread(void *arg)
 {
 	while(!CloseThread)
 	{
 		while(!List.empty() && !CloseThread && !SleepThread)
 		{
+			DeleteQueued();
+
 			LWP_MutexLock(ListLock);
-			//! Delete the delete queue
-			while(!DeleteList.empty())
-			{
-				delete DeleteList.front();
-				DeleteList.pop();
-			}
 			//! Check if there is still something to do
 			if(List.empty())
 			{
@@ -133,7 +146,10 @@ void * BannerAsync::BannerAsyncThread(void *arg)
 			LWP_MutexUnlock(ListLock);
 
 			if (!InUse || !InUse->header)
+			{
+				InUse = NULL;
 				continue;
+			}
 
 			const u8 * banner = NULL;
 			u32 bannerSize = 0;
@@ -170,16 +186,7 @@ void * BannerAsync::BannerAsyncThread(void *arg)
 		}
 
 		//! Delete the delete queue here as well in case list was empty
-		if(!DeleteList.empty())
-		{
-			LWP_MutexLock(ListLock);
-			while(!DeleteList.empty())
-			{
-				delete DeleteList.front();
-				DeleteList.pop();
-			}
-			LWP_MutexUnlock(ListLock);
-		}
+		DeleteQueued();
 
 		if(!CloseThread)
 			LWP_SuspendThread(Thread);
@@ -225,7 +232,6 @@ void BannerAsync::ThreadExit(void)
 		CloseThread = true;
 		LWP_ResumeThread(Thread);
 		LWP_JoinThread(Thread, NULL);
-		LWP_MutexUnlock(ListLock);
 		LWP_MutexDestroy(ListLock);
 		Thread = LWP_THREAD_NULL;
 		ListLock = LWP_MUTEX_NULL;

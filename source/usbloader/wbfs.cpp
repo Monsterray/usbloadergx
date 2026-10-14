@@ -167,6 +167,17 @@ bool WBFS_Close(int part_num)
 	return true;
 }
 
+//! True when a game partition is open
+bool WBFS_Selected()
+{
+	for (u32 i = 0; i < WbfsList.size(); ++i)
+	{
+		if (WbfsList[i])
+			return true;
+	}
+	return false;
+}
+
 void WBFS_CloseAll()
 {
 	gameList.clear();

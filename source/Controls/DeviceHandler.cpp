@@ -33,6 +33,8 @@
 #include "DeviceHandler.hpp"
 #include "usbloader/wbfs.h"
 #include "system/IosLoader.h"
+#include "utils/timer.h"
+#include "gecko.h"
 
 DeviceHandler *DeviceHandler::instance = NULL;
 
@@ -162,7 +164,7 @@ static inline bool USBSpinUp()
 {
 	bool started0 = false;
 	bool started1 = false;
-	int retries = 400;
+	Timer countDown;
 
 	const DISC_INTERFACE *handle0 = NULL;
 	const DISC_INTERFACE *handle1 = NULL;
@@ -185,8 +187,11 @@ static inline bool USBSpinUp()
 			break;
 		}
 		usleep(50000);
-	} while (--retries > 0);
+	//! By the clock, as StartUpProcess::USBSpinUp() does: startup() on a port with no
+	//! drive can take most of a second, and 400 retries of it took about five minutes.
+	} while (countDown.elapsed() < 20.f);
 
+	gprintf("USBSpinUp: port 0 %d, port 1 %d after %.1f s\n", started0, started1, countDown.elapsed());
 	return (started0 || started1);
 }
 

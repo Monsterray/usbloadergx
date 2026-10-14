@@ -1172,10 +1172,15 @@ bool GameBrowseMenu::ReloadWiiGames(bool cached)
 {
 	if (gameList.GameCount() == 0)
 	{
-		if (WBFS_Init(Settings.SDMode ? WBFS_DEVICE_SDHC : WBFS_DEVICE_USB) < 0)
-			return false;
-		else
-			WBFS_ReInit(Settings.SDMode ? WBFS_DEVICE_SDHC : WBFS_DEVICE_USB);
+		//! A drive with no Wii games on it is mounted already: read the list again.
+		//! A remount waits for every USB port to spin up, which took minutes on a Wii.
+		if (!WBFS_Selected())
+		{
+			if (WBFS_Init(Settings.SDMode ? WBFS_DEVICE_SDHC : WBFS_DEVICE_USB) < 0)
+				return false;
+			else
+				WBFS_ReInit(Settings.SDMode ? WBFS_DEVICE_SDHC : WBFS_DEVICE_USB);
+		}
 		gameList.ReadGameList(cached);
 
 		allowUsedSpaceTxtUpdate = true;

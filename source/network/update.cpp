@@ -27,6 +27,7 @@
  * for Wii-Xplorer 2009
  ***************************************************************************/
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <ogcsys.h>
 #include <string>
@@ -87,39 +88,49 @@ static bool ReplaceFile(const char *part, const char *dest)
 	return true;
 }
 
-// Downloads url to dest through dest.part, writing each block as it arrives:
-// on the Wii GX can have less than 2 MB of MEM2 free, too little to hold
-// wiitdb.zip. dest is replaced only by a complete download, and dest.part is
-// removed whatever happens. With report set the download reports into the
-// progress window that is open and stops when it is cancelled.
-// Returns the size, 0 when the download failed, -7 when the card cannot take it.
-static int DownloadToFile(const char *url, const char *dest, bool report)
+// Downloads url to the file part, writing each block as it arrives: on the
+// Wii GX can have less than 2 MB of MEM2 free, too little to hold wiitdb.zip
+// or a boot.dol. With report set the download reports into the progress
+// window that is open and stops when it is cancelled.
+// Returns the size, 0 when the download failed, -7 when the card cannot take
+// it. part is left for the caller, complete or not.
+static int DownloadToPart(const char *url, const char *part, bool report, u64 maxSize)
 {
-	char part[300];
-	if (snprintf(part, sizeof(part), "%s.part", dest) >= (int)sizeof(part))
-		return -7;
 	FILE *f = fopen(part, "wb");
 	if (!f)
 		return -7;
 
 	struct download file = {};
 	file.show_progress = report;
-	file.max_size = DOWNLOAD_FILE_MAX_SIZE;
+	file.max_size = maxSize;
 	file.file = f;
 	downloadfile(url, &file);
 
 	bool writeFailed = ferror(f) != 0;
 	writeFailed = (fclose(f) != 0) || writeFailed;
-	if (!writeFailed && file.size > 0)
-	{
-		if (ReplaceFile(part, dest))
-			return file.size;
-		writeFailed = true;
-	}
+	if (writeFailed)
+		return -7;
+	return file.size;
+}
 
-	RemoveFile(part);
-	gprintf("Download of %s to %s failed%s\n", url, dest, writeFailed ? " (write error)" : "");
-	return writeFailed ? -7 : 0;
+// Downloads url to dest through dest.part. dest is replaced only by a
+// complete download, and dest.part is removed whatever happens.
+// Returns the size, 0 when the download failed, -7 when the card cannot take it.
+static int DownloadToFile(const char *url, const char *dest, bool report)
+{
+	char part[300];
+	if (snprintf(part, sizeof(part), "%s.part", dest) >= (int)sizeof(part))
+		return -7;
+
+	int ret = DownloadToPart(url, part, report, DOWNLOAD_FILE_MAX_SIZE);
+	if (ret > 0 && !ReplaceFile(part, dest))
+		ret = -7;
+	if (ret <= 0)
+	{
+		RemoveFile(part);
+		gprintf("Download of %s to %s failed%s\n", url, dest, ret == -7 ? " (write error)" : "");
+	}
+	return ret;
 }
 
 int DownloadFileToPath(const char *url, const char *dest, const bool showprogress)
@@ -266,29 +277,25 @@ static bool VerifyManifestSignature(const UpdateManifest &manifest, const char *
 	return ok;
 }
 
+static void ReleaseFileURL(const UpdateManifest &manifest, const UpdateFile &entry, char *url, size_t size)
+{
+	snprintf(url, size, "%s/download/v%u.%u.%u/%s", UPDATE_RELEASES_URL, (unsigned)manifest.version.major,
+			 (unsigned)manifest.version.minor, (unsigned)manifest.version.patch, entry.name);
+}
+
+#ifdef FULLCHANNEL
 // Downloads a file the manifest lists into file. False unless it has exactly
-// the size and SHA-256 the manifest gives; file then holds nothing.
-static bool DownloadReleaseFile(const UpdateManifest &manifest, const UpdateFile &entry, bool showprogress,
+// the size and SHA-256 the manifest gives; file then holds nothing. Only the
+// WAD comes into memory, because WadInstall() installs it from there.
+static bool DownloadReleaseFile(const UpdateManifest &manifest, const UpdateFile &entry, bool report,
 								struct download *file)
 {
 	char url[300];
-	snprintf(url, sizeof(url), "%s/download/v%u.%u.%u/%s", UPDATE_RELEASES_URL, (unsigned)manifest.version.major,
-			 (unsigned)manifest.version.minor, (unsigned)manifest.version.patch, entry.name);
-
-	if (showprogress)
-	{
-		ProgressCancelEnable(true);
-		StartProgress(tr("Downloading file..."), 0, entry.name, true, true);
-	}
+	ReleaseFileURL(manifest, entry, url, sizeof(url));
 	*file = {};
-	file->show_progress = showprogress;
+	file->show_progress = report;
 	file->max_size = entry.size;
 	downloadfile(url, file);
-	if (showprogress)
-	{
-		ProgressStop();
-		ProgressCancelEnable(false);
-	}
 
 	byte digest[WC_SHA256_DIGEST_SIZE];
 	if (file->size == entry.size && wc_Sha256Hash((const byte *)file->data, entry.size, digest) == 0 &&
@@ -301,18 +308,56 @@ static bool DownloadReleaseFile(const UpdateManifest &manifest, const UpdateFile
 	*file = {};
 	return false;
 }
+#endif
 
-// A short write (a full card) removes the file instead of leaving part of it
-static bool WriteWholeFile(const char *path, const char *data, u32 size)
+// The SHA-256 of a file, read a block at a time
+static bool FileSha256(const char *path, byte digest[WC_SHA256_DIGEST_SIZE])
 {
-	FILE *f = fopen(path, "wb");
+	FILE *f = fopen(path, "rb");
 	if (!f)
 		return false;
-	bool ok = fwrite(data, 1, size, f) == size;
-	ok = (fclose(f) == 0) && ok;
-	if (!ok)
-		remove(path);
+	const size_t blockSize = 32 * 1024;
+	byte *block = (byte *)malloc(blockSize);
+	wc_Sha256 sha;
+	bool ok = block && wc_InitSha256(&sha) == 0;
+	if (ok)
+	{
+		size_t n;
+		while ((n = fread(block, 1, blockSize, f)) > 0)
+			if (wc_Sha256Update(&sha, block, n) != 0)
+				ok = false;
+		ok = ok && !ferror(f) && wc_Sha256Final(&sha, digest) == 0;
+		wc_Sha256Free(&sha);
+	}
+	free(block);
+	fclose(f);
 	return ok;
+}
+
+// Downloads a file the manifest lists to path, streamed through path.part: a
+// boot.dol does not fit in the MEM2 GX has left on the Wii. path is replaced
+// only by a file of exactly the size and SHA-256 the manifest gives, and is
+// left as it was otherwise.
+// Returns 1, 0 when the download failed or does not match, -7 on a write error.
+static int DownloadReleaseFileTo(const UpdateManifest &manifest, const UpdateFile &entry, bool report, const char *path)
+{
+	char url[300], part[300];
+	ReleaseFileURL(manifest, entry, url, sizeof(url));
+	if (snprintf(part, sizeof(part), "%s.part", path) >= (int)sizeof(part))
+		return -7;
+
+	int ret = DownloadToPart(url, part, report, entry.size);
+	byte digest[WC_SHA256_DIGEST_SIZE];
+	if (ret > 0 && !((u32)ret == entry.size && FileSha256(part, digest) && memcmp(digest, entry.sha256, sizeof(digest)) == 0))
+	{
+		gprintf("Update: %s failed (%d of %u bytes, or a wrong SHA-256)\n", entry.name, ret, (unsigned)entry.size);
+		ret = 0;
+	}
+	if (ret > 0 && !ReplaceFile(part, path))
+		ret = -7;
+	if (ret <= 0)
+		RemoveFile(part);
+	return ret > 0 ? 1 : ret;
 }
 
 int ApplicationDownload()
@@ -365,14 +410,19 @@ int ApplicationDownload()
 	if (!WindowPrompt(title, msg, tr("Yes"), tr("No")))
 		return 0;
 
+#ifdef FULLCHANNEL
+	ProgressCancelEnable(true);
+	StartProgress(tr("Downloading file..."), 0, loader->name, true, true);
 	struct download update;
-	if (!DownloadReleaseFile(manifest, *loader, true, &update))
+	bool downloaded = DownloadReleaseFile(manifest, *loader, true, &update);
+	ProgressStop();
+	ProgressCancelEnable(false);
+	if (!downloaded)
 	{
 		WindowPrompt(tr("Failed updating"), tr("The download failed or does not match the update information."), tr("OK"));
 		return -1;
 	}
 
-#ifdef FULLCHANNEL
 	StartProgress(tr("Installing the channel..."), 0, UPDATE_FILE, true, false);
 	int error = WadInstall((const u8 *)update.data, update.size, TITLE_ID(0x00010001, 0x554c4e52));
 	ProgressStop();
@@ -389,33 +439,24 @@ int ApplicationDownload()
 		return -1;
 	}
 #else
-	char realpath[250], tmppath[250], bakpath[250];
+	// The running boot.dol stays until a verified one replaces it
+	char realpath[250];
 	snprintf(realpath, sizeof(realpath), "%sboot.dol", Settings.ConfigPath);
-	snprintf(tmppath, sizeof(tmppath), "%sboot.tmp", Settings.ConfigPath);
-	snprintf(bakpath, sizeof(bakpath), "%sboot.bak", Settings.ConfigPath);
-
-	bool written = WriteWholeFile(tmppath, update.data, update.size);
-	MEM2_free(update.data);
-	if (!written)
+	ProgressCancelEnable(true);
+	StartProgress(tr("Downloading file..."), 0, loader->name, true, true);
+	int downloaded = DownloadReleaseFileTo(manifest, *loader, true, realpath);
+	ProgressStop();
+	ProgressCancelEnable(false);
+	if (downloaded == -7)
 	{
 		ShowError(tr("Can't write to destination."));
 		return -1;
 	}
-
-	RemoveFile(bakpath);
-	bool haveBackup = CheckFile(realpath) && RenameFile(realpath, bakpath);
-	if (!haveBackup)
-		RemoveFile(realpath);
-	if (!RenameFile(tmppath, realpath))
+	if (downloaded <= 0)
 	{
-		// Put the loader that works back
-		if (haveBackup)
-			RenameFile(bakpath, realpath);
-		RemoveFile(tmppath);
-		ShowError(tr("Error while updating USB Loader GX."));
+		WindowPrompt(tr("Failed updating"), tr("The download failed or does not match the update information."), tr("OK"));
 		return -1;
 	}
-	RemoveFile(bakpath);
 #endif
 
 	// The Homebrew Channel entry; the release may leave either out
@@ -423,13 +464,11 @@ int ApplicationDownload()
 	for (const char *name : extras)
 	{
 		const UpdateFile *entry = UpdateManifest_Find(&manifest, name);
-		struct download extra;
-		if (!entry || !DownloadReleaseFile(manifest, *entry, false, &extra))
+		if (!entry)
 			continue;
 		char path[250];
 		snprintf(path, sizeof(path), "%s%s", Settings.ConfigPath, name);
-		WriteWholeFile(path, extra.data, extra.size);
-		MEM2_free(extra.data);
+		DownloadReleaseFileTo(manifest, *entry, false, path);
 	}
 
 	return 1;

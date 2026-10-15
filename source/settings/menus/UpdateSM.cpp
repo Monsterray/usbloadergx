@@ -93,13 +93,21 @@ int UpdateSM::GetMenuInternal()
 	//! Settings: Update Cheat Files
 	else if (ret == ++Idx)
 	{
-		if (UpdateCheats() > 0)
-		{
-			InvalidateDiskSpaceCache();
-			WindowPrompt(tr("Successfully Updated"), 0, tr("OK"));
-		}
+		CheatUpdateResult cheats;
+		if (UpdateCheats(cheats) < 0)
+			WindowPrompt(tr("Update Failed"), tr("Can't create directory"), tr("OK"));
+		else if (cheats.games == 0)
+			WindowPrompt(tr("Update Cheat Files"), tr("No games found."), tr("OK"));
 		else
-			WindowPrompt(tr("Update Failed"), 0, tr("OK"));
+		{
+			if (cheats.updated > 0)
+				InvalidateDiskSpaceCache();
+			// tr() can return a long translation
+			char msg[600];
+			snprintf(msg, sizeof(msg), tr("%i of %i cheat files updated. %i games have no cheats on the server, %i downloads failed."),
+					 cheats.updated, cheats.games, cheats.missing, cheats.failed);
+			WindowPrompt(cheats.updated > 0 ? tr("Successfully Updated") : tr("Update Cheat Files"), msg, tr("OK"));
+		}
 	}
 
 	//! Settings: Update Cover Files

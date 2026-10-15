@@ -36,6 +36,9 @@ extern "C"
         // Set: write the body here as it arrives instead of holding it in
         // data, and leave closing it and removing a failed one to the caller.
         FILE *file;
+        // The HTTP status of the last response (after redirects); 0 when no
+        // response came
+        int status;
     };
 
     typedef struct

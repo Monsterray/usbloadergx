@@ -31,8 +31,12 @@
 #include <string.h>
 #include <ogcsys.h>
 #include <string>
+#include <set>
+#include <vector>
 
 #include "update.h"
+#include "CheatTxt.h"
+#include "settings/SettingsEnums.h"
 #include "gecko.h"
 #include "ZipFile.h"
 #include "https.h"
@@ -251,25 +255,115 @@ int UpdateGameTDB()
 	return ret;
 }
 
-int UpdateCheats()
+bool CheatsURL(const char *id, char *url, size_t size)
 {
-	std::string url("https://raw.githubusercontent.com/wiidev/cheats/master/data/txt.zip");
-	std::string ZipPath(Settings.ConfigPath);
-	if (ZipPath.back() != '/')
-		ZipPath += '/';
-	ZipPath += "txt.zip";
+	if (!CheatTxt_IsSafeId(id))
+		return false;
+	std::string pattern(Settings.URL_Cheats);
+	size_t pos = pattern.find("{gameid}");
+	if (pos == std::string::npos)
+	{
+		pattern = CHEATS_URL_DEFAULT;
+		pos = pattern.find("{gameid}");
+	}
+	pattern.replace(pos, 8, id);
+	return snprintf(url, size, "%s", pattern.c_str()) < (int)size;
+}
 
-	int filesize = DownloadFileToPath(url.c_str(), ZipPath.c_str());
+// Writes size bytes to path through path.part, so a full card leaves the
+// file that was there
+bool WriteFileReplacing(const char *path, const char *data, size_t size)
+{
+	char part[300];
+	if (snprintf(part, sizeof(part), "%s.part", path) >= (int)sizeof(part))
+		return false;
+	FILE *f = fopen(part, "wb");
+	if (!f)
+		return false;
+	bool ok = fwrite(data, 1, size, f) == size;
+	ok = (fclose(f) == 0) && ok;
+	ok = ok && ReplaceFile(part, path);
+	if (!ok)
+		RemoveFile(part);
+	return ok;
+}
 
-	if (filesize <= 0)
+int UpdateCheats(CheatUpdateResult &result)
+{
+	result = {};
+	if (!CreateSubfolder(Settings.TxtCheatcodespath))
 		return -1;
 
-	ZipFile zFile(ZipPath.c_str());
+	// The window opens first: reading the game list can take a moment
+	ProgressCancelEnable(true);
+	StartProgress(tr("Updating cheat files"), tr("Please wait..."), 0, false, false);
 
-	bool result = zFile.ExtractAll(Settings.TxtCheatcodespath);
+	// Every game GX knows, from every source, not the filtered view
+	std::vector<struct discHdr *> headers;
+	gameList.GetGameListHeaders(headers, MODE_ALL);
 
-	remove(ZipPath.c_str());
-	return (result ? filesize : -1);
+	struct CheatGame
+	{
+		char id[7];
+		const char *title;
+	};
+	std::vector<CheatGame> games;
+	std::set<std::string> seen; // A game can be on NAND and on the EmuNAND
+	for (struct discHdr *header : headers)
+	{
+		CheatGame game;
+		memcpy(game.id, header->id, 6);
+		game.id[6] = '\0';
+		// Channels have four characters; anything else cannot go into a URL
+		if (!CheatTxt_IsSafeId(game.id) || !seen.insert(game.id).second)
+			continue;
+		game.title = GameTitles.GetTitle(header);
+		games.push_back(game);
+	}
+	result.games = games.size();
+
+	for (int i = 0; i < result.games && !(result.canceled = ProgressCanceled()); ++i)
+	{
+		const CheatGame &game = games[i];
+		char counter[64], url[300], path[300];
+		snprintf(counter, sizeof(counter), "%s  (%i/%i)", game.id, i + 1, result.games);
+		ShowProgress(tr("Updating cheat files"), game.title, counter, i, result.games, false, false);
+
+		if (!CheatsURL(game.id, url, sizeof(url)) ||
+			snprintf(path, sizeof(path), "%s%s.txt", Settings.TxtCheatcodespath, game.id) >= (int)sizeof(path))
+		{
+			result.failed++;
+			continue;
+		}
+
+		// Small enough for memory, and checked before it touches the card
+		struct download file = {};
+		file.max_size = CHEAT_TXT_MAX_SIZE;
+		downloadfile(url, &file);
+		if (file.size > 0 && CheatTxt_IsValid(file.data, file.size, game.id))
+		{
+			// The file on the card stays unless the new one is written whole
+			if (WriteFileReplacing(path, file.data, file.size))
+				result.updated++;
+			else
+				result.failed++;
+		}
+		else if (file.status == 404)
+			result.missing++;
+		else
+		{
+			gprintf("Cheats: %s failed (status %i, %u bytes)\n", game.id, file.status, (unsigned)file.size);
+			result.failed++;
+		}
+		if (file.data)
+			MEM2_free(file.data);
+	}
+
+	ProgressStop();
+	ProgressCancelEnable(false);
+	gprintf("Cheats: %i games, %i updated, %i not on the server, %i failed%s\n", result.games, result.updated,
+			result.missing, result.failed, result.canceled ? ", canceled" : "");
+	return 0;
 }
 
 #ifdef FULLCHANNEL

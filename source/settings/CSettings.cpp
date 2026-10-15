@@ -33,6 +33,7 @@
 #include "language/gettext.h"
 #include "themes/CTheme.h"
 #include "FileOperations/fileops.h"
+#include "network/update.h"
 #include "utils/encrypt.h"
 #include "version.h"
 
@@ -87,7 +88,7 @@ void CSettings::SetDefault()
 	strlcpy(URL_Discs, "https://art.gametdb.com/wii/disc/", sizeof(URL_Discs));
 	strlcpy(URL_DiscsCustom, "https://art.gametdb.com/wii/disccustom/", sizeof(URL_DiscsCustom));
 	strlcpy(URL_GameTDB, "https://www.gametdb.com/wiitdb.zip", sizeof(URL_GameTDB));
-	strlcpy(URL_Cheats, "https://raw.githubusercontent.com/wiidev/cheats/master/data/{gameid}.txt", sizeof(URL_Cheats));
+	strlcpy(URL_Cheats, CHEATS_URL_DEFAULT, sizeof(URL_Cheats));
 	ProxyUsername[0] = 0;
 	ProxyPassword[0] = 0;
 	ProxyAddress[0] = 0;
@@ -1463,6 +1464,9 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "URL_Cheats") == 0)
 	{
+		// The old default: wiidev/cheats no longer exists, so keep the new one
+		if (strstr(value, "githubusercontent.com/wiidev/cheats/") != NULL)
+			return true;
 		if (ValidateURL(value, 2))
 			strlcpy(URL_Cheats, value, sizeof(URL_Cheats));
 		return true;

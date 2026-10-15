@@ -427,6 +427,7 @@ static int tcp_connect(char *host, u16 port)
 // What downloadfile() does with the response once its headers are in.
 static void handle_response(HTTP_INFO *httpinfo, HTTP_RESPONSE *response, struct download *buffer, const char *url)
 {
+    buffer->status = response->status;
     // The website wants to redirect us
     if (response->status == 301 || response->status == 302 || response->status == 303 ||
         response->status == 307 || response->status == 308)
@@ -537,6 +538,7 @@ void downloadfile(const char *url, struct download *buffer)
         MEM2_free(buffer->data);
     buffer->data = NULL;
     buffer->size = 0;
+    buffer->status = 0;
     // Check if we're using HTTPS and set the path
     char *path;
     if (strncmp(url, "https://", 8) == 0)

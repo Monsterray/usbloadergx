@@ -87,5 +87,13 @@ grep -q 'file.file = f;' "$SRC/network/update.cpp" \
 grep -q '"%s.part", dest' "$SRC/network/update.cpp" \
 	|| fail "DownloadFileToPath() writes straight over the destination"
 
+# 11. Cheat files come from codes.rc24.xyz with no certificate check and are
+#     written over the user's. Both downloaders check the body first
+#     (tests/host/cheat_txt_test.c tests the check).
+grep -q 'CheatTxt_IsValid(file.data, file.size' "$SRC/network/update.cpp" \
+	|| fail "Update Cheat Files writes a download without checking it is a cheat file"
+grep -q 'CheatTxt_IsValid(file.data, file.size' "$SRC/prompts/PromptWindows.cpp" \
+	|| fail "CodeDownload() writes a download without checking it is a cheat file"
+
 [ "$status" -eq 0 ] && echo "OK: network bounds guards are in place"
 exit "$status"

@@ -26,6 +26,7 @@
 #include "network/networkops.h"
 #include "network/update.h"
 #include "network/https.h"
+#include "network/CheatTxt.h"
 #include "prompts/PromptWindows.h"
 #include "prompts/PromptWindow.hpp"
 #include "prompts/gameinfo.h"
@@ -1496,83 +1497,52 @@ int CodeDownload(const char *id)
 		char txtpath[250];
 		int txtLen = snprintf(txtpath, sizeof(txtpath), "%s%s.txt", Settings.TxtCheatcodespath, id);
 
+		// The response has no certificate check behind it: it goes to the card
+		// only if it is the cheat file of this game
 		char codeurl[300];
 		struct download file = {};
-		std::string url(Settings.URL_Cheats);
-		if(url.find("{gameid}") != url.npos)
+		file.max_size = CHEAT_TXT_MAX_SIZE;
+		bool valid = false;
+		if (CheatsURL(id, codeurl, sizeof(codeurl)))
 		{
-			url.replace(url.find("{gameid}"), 8, id);
-			downloadfile(url.c_str(), &file);
-		}
-		if (file.size <= 0 || strstr(file.data, "cloudflare") != NULL)
-		{
-			gprintf("Trying backup...\n");
-			snprintf(codeurl, sizeof(codeurl), "https://web.archive.org/web/202009if_/geckocodes.org/txt.php?txt=%s", id);
 			downloadfile(codeurl, &file);
+			valid = file.size > 0 && CheatTxt_IsValid(file.data, file.size, id);
+
+			// A custom URL_Cheats that has nothing: try codes.rc24.xyz
+			std::string fallback(CHEATS_URL_DEFAULT);
+			fallback.replace(fallback.find("{gameid}"), 8, id);
+			if (!valid && fallback != codeurl)
+			{
+				gprintf("Trying backup...\n");
+				downloadfile(fallback.c_str(), &file);
+				valid = file.size > 0 && CheatTxt_IsValid(file.data, file.size, id);
+			}
 		}
 
-		// UTF-8 BOM + partial ID = 7
-		if (file.size > 7)
+		if (valid)
 		{
-			bool validUrl = false;
-			char *textCpy = new (std::nothrow) char[file.size+1];
-			if (textCpy)
+			// An existing file stays unless the new one is written whole
+			if (WriteFileReplacing(txtpath, file.data, file.size))
 			{
-				memcpy(textCpy, file.data, file.size);
-				textCpy[file.size] = '\0';
-				validUrl = (strcasestr(textCpy, "404 Not Found") == 0);
-				delete [] textCpy;
-			}
-
-			if (!validUrl)
-			{
-				snprintf(codeurl, sizeof(codeurl), "%s.txt%s", id, tr( " is not on the server." ));
-				WindowPrompt(tr( "Error:" ), codeurl, tr( "OK" ));
+				snprintf(txtpath + txtLen, sizeof(txtpath) - txtLen, "%s", tr(" has been saved, but you might need to edit some cheats from a computer." ));
+				WindowPrompt(0, txtpath, tr( "OK" ));
+				ret = 0;
 			}
 			else
-			{
-				FILE * pfile = fopen(txtpath, "wb");
-				if (pfile)
-				{
-					fwrite(file.data, 1, file.size, pfile);
-					fclose(pfile);
-					
-					// verify downloaded content - thanks airline38
-					pfile = fopen(txtpath, "rb");
-					if (pfile)
-					{
-						char target[8] = "";
-						fseek(pfile, 0, SEEK_SET);
-						if(fread(target, 1, 7, pfile) != 7)
-							target[0] = 0;
-						fclose(pfile);
-						//printf("target=%s  game id=%s\n",target,id);
-						if (strncmp(target, id, 4) == 0 || strncmp(target + 3, id, 4) == 0)
-						{
-							snprintf(txtpath + txtLen, sizeof(txtpath) - txtLen, "%s", tr(" has been saved, but you might need to edit some cheats from a computer." ));
-							WindowPrompt(0, txtpath, tr( "OK" ));
-							ret = 0;
-						}
-						else
-						{
-							RemoveFile(txtpath);
-							snprintf(codeurl, sizeof(codeurl), "%s.txt%s", id, tr( " is not on the server." ));
-							WindowPrompt(tr( "Error:" ), codeurl, tr( "OK" ));
-						}
-					}
-				}
-				else
-					WindowPrompt(tr("Error:"), tr("Could not write file."), tr( "OK" ));
-			}
-			MEM2_free(file.data);
+				WindowPrompt(tr("Error:"), tr("Could not write file."), tr( "OK" ));
+		}
+		else if (file.size > 0 || file.status == 404)
+		{
+			snprintf(codeurl, sizeof(codeurl), "%s.txt%s", id, tr( " is not on the server." ));
+			WindowPrompt(tr( "Error:" ), codeurl, tr( "OK" ));
 		}
 		else
 		{
-			if (file.size > 0)
-				MEM2_free(file.data);
 			snprintf(codeurl, sizeof(codeurl), "%s.txt%s", id, tr(" could not be downloaded."));
 			WindowPrompt(tr( "Error:" ), codeurl, tr( "OK" ));
 		}
+		if (file.data)
+			MEM2_free(file.data);
 	}
 
 

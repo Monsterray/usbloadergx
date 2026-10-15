@@ -173,7 +173,16 @@ void ExitApp(void)
 	AppCleanUp();
 	WBFS_CloseAll();
 	//! USB goes before the SD card, so exit.log on the card records every step but the last
-	ExitStep("unmounting USB");
+	//! Each partition's unmount writes its cache back to the drive; the handles' deletion in
+	//! UnMountAllUSB() then shuts the USB interface down. exit.log tells the two apart.
+	for (int i = 0; i < DeviceHandler::GetUSBPartitionCount(); ++i)
+	{
+		char step[40];
+		snprintf(step, sizeof(step), "unmounting USB partition %d", i);
+		ExitStep(step);
+		DeviceHandler::Instance()->UnMountUSB(i);
+	}
+	ExitStep("USB interface shutdown");
 	DeviceHandler::Instance()->UnMountAllUSB();
 	ExitStep("USB deinit");
 	USBStorage2_Deinit();

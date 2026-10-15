@@ -41,13 +41,17 @@ int DownloadAllLanguageFiles()
 	}
 	char fullURL[300];
 
+	//! The window opens before the list is downloaded, which takes seconds
+	ProgressCancelEnable(true);
+	StartProgress(tr("Updating Language Files:"), tr("Please wait..."), 0, false, true);
+
 	URL_List LinkList(LanguagesURL);
 	int listsize = LinkList.GetURLCount();
 	int files_downloaded = 0;
 
 	ShowProgress(tr("Updating Language Files:"), 0, 0, 0, listsize, false, true);
 
-	for (int i = 0; i < listsize; i++)
+	for (int i = 0; i < listsize && !ProgressCanceled(); i++)
 	{
 		const char * filename = strrchr(LinkList.GetURL(i), '/');
 		if(filename) filename++;
@@ -84,6 +88,7 @@ int DownloadAllLanguageFiles()
 	}
 
 	ProgressStop();
+	ProgressCancelEnable(false);
 
 	// reload current language file
 	if(Settings.language_path[0] != 0)
@@ -128,16 +133,20 @@ int UpdateLanguageFiles()
 	// ( that has gui eletents in it because this one doesn't)
 	int done = 0;
 
+	//! The window is up before the first download, which takes seconds
+	ProgressCancelEnable(true);
+	StartProgress(tr("Updating Language Files:"), 0, Dir.GetFilename(0), false, true);
+
 	//build the URL, save path, and download each file and save it
-	for(int i = 0; i < Dir.GetFilecount(); ++i)
+	for(int i = 0; i < Dir.GetFilecount() && !ProgressCanceled(); ++i)
 	{
 		snprintf(codeurl, sizeof(codeurl), "%s%s?p=%s", LanguageFilesURL, Dir.GetFilename(i), LOADER_REV);
 		snprintf(savepath, sizeof(savepath), "%s/%s", Settings.languagefiles_path, Dir.GetFilename(i));
 
+		ShowProgress(tr("Updating Language Files:"), 0, Dir.GetFilename(i), i, Dir.GetFilecount(), false, true);
+
 		struct download file = {};
 		downloadfile(codeurl, &file);
-
-		ShowProgress(tr("Updating Language Files:"), 0, Dir.GetFilename(i), i, Dir.GetFilecount(), false, true);
 
 		if (file.size > 0)
 		{
@@ -154,6 +163,7 @@ int UpdateLanguageFiles()
 	}
 
 	ProgressStop();
+	ProgressCancelEnable(false);
 
 	// reload current language file
 	if(Settings.language_path[0] != 0)

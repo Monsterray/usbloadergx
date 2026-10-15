@@ -57,7 +57,10 @@ void ImageDownloader::Start(bool silent)
 	gprintf("CoverDownload start - choices: %04X\n", choices);
 
 	MissingImagesCount = 0;
+	//! Every game is looked up up to three times per kind of image
+	StartProgress(tr("Cover Download"), tr("Please wait..."), 0, false, false);
 	FindMissingImages();
+	ProgressStop();
 
 	if(MissingImagesCount == 0)
 	{

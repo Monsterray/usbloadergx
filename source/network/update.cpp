@@ -156,15 +156,17 @@ int DownloadFileToPath(const char *url, const char *dest, const bool showprogres
 	return ret;
 }
 
-static bool CheckNewGameTDBVersion(const char *url)
+// 1 when the server has another wiitdb.xml than the card, 0 when they are the
+// same, -1 when the server did not answer (that used to read as "up to date")
+static int CheckNewGameTDBVersion(const char *url)
 {
 	gprintf("Checking GameTDB version...\n");
 	struct download file = {};
 	file.gametdbcheck = true;
 	downloadfile(url, &file);
 
-	if (file.gametdbcheck <= 0)
-		return false;
+	if (file.gametdbcheck == 0)
+		return -1;
 
 	std::string Filepath(Settings.titlestxt_path);
 	if (Filepath.back() != '/')
@@ -174,14 +176,14 @@ static bool CheckNewGameTDBVersion(const char *url)
 	GameTDB XML_DB;
 
 	if (!XML_DB.OpenFile(Filepath.c_str()))
-		return true; // If no file exists we need the file
+		return 1; // If no file exists we need the file
 
 	u64 ExistingVersion = XML_DB.GetGameTDBVersion();
 	XML_DB.CloseFile();
 
 	gprintf("Existing GameTDB Version: %llu Online GameTDB Version: %llu\n", ExistingVersion, file.gametdbcheck);
 
-	return (ExistingVersion != file.gametdbcheck);
+	return (ExistingVersion != file.gametdbcheck) ? 1 : 0;
 }
 
 bool initNetwork()
@@ -192,12 +194,15 @@ bool initNetwork()
 	return false;
 }
 
-int UpdateGameTDB()
+// The steps of UpdateGameTDB(), each reporting into the one window it keeps open
+static int UpdateGameTDBSteps()
 {
-	// Create the directory if it doesn't exist
-	CreateSubfolder(Settings.titlestxt_path);
-
-	if (CheckNewGameTDBVersion(Settings.URL_GameTDB) == false)
+	int check = CheckNewGameTDBVersion(Settings.URL_GameTDB);
+	if (ProgressCanceled())
+		return UPDATE_CANCELED;
+	if (check < 0)
+		return -1;
+	if (check == 0)
 	{
 		gprintf("Not updating GameTDB: Version is the same\n");
 		return -2;
@@ -210,21 +215,40 @@ int UpdateGameTDB()
 		ZipPath += '/';
 	ZipPath += "wiitdb.zip";
 
-	int filesize = DownloadFileToPath(Settings.URL_GameTDB, ZipPath.c_str());
-
+	ShowProgress(tr("Updating WiiTDB.xml"), tr("Downloading file..."), "wiitdb.zip", 0, 1, true, true);
+	int filesize = DownloadToFile(Settings.URL_GameTDB, ZipPath.c_str(), true);
 	if (filesize <= 0)
-		return -1;
+		return ProgressCanceled() ? UPDATE_CANCELED : -1;
 
-	ZipFile zFile(ZipPath.c_str());
-
-	bool result = zFile.ExtractAll(Settings.titlestxt_path);
-
+	bool result;
+	{
+		ZipFile zFile(ZipPath.c_str());
+		result = zFile.ExtractAll(Settings.titlestxt_path, false);
+	}
 	remove(ZipPath.c_str());
 
 	// Reload all titles and reload cached titles because the file changed now.
+	ShowProgress(tr("Updating WiiTDB.xml"), tr("Loading game titles..."), 0, 0, 1, false, false);
 	GameTitles.Reset();
 	GameTitles.LoadTitlesFromGameTDB(Settings.titlestxt_path);
+	if (ProgressCanceled())
+		return UPDATE_CANCELED;
 	return (result ? filesize : -1);
+}
+
+int UpdateGameTDB()
+{
+	// Create the directory if it doesn't exist
+	CreateSubfolder(Settings.titlestxt_path);
+
+	// The window opens before anything else: asking the server for the version
+	// alone takes a TLS handshake, several seconds on the Wii
+	ProgressCancelEnable(true);
+	StartProgress(tr("Updating WiiTDB.xml"), tr("Checking for a new version..."), 0, false, false);
+	int ret = UpdateGameTDBSteps();
+	ProgressStop();
+	ProgressCancelEnable(false);
+	return ret;
 }
 
 int UpdateCheats()
@@ -363,9 +387,12 @@ static int DownloadReleaseFileTo(const UpdateManifest &manifest, const UpdateFil
 int ApplicationDownload()
 {
 	// Releases of this fork, not upstream's: upstream's build would replace the fork
+	// A window right away: GitHub's redirect and two TLS handshakes take seconds
+	StartProgress(tr("Checking for updates..."), tr("Please wait..."), 0, false, false);
 	struct download file = {};
 	file.max_size = UPDATE_MANIFEST_MAX_SIZE;
 	downloadfile(UPDATE_RELEASES_URL "/latest/download/update.txt", &file);
+	ProgressStop();
 	if (file.size == 0)
 	{
 		WindowPrompt(tr("Failed updating"), tr("Could not download the update information."), tr("OK"));
@@ -474,6 +501,9 @@ int ApplicationDownload()
 	return 1;
 }
 
+// The Nintendont fork this loader is paired with
+#define NINTENDONT_URL "https://raw.githubusercontent.com/Monsterray/Nintendont/master/"
+
 int UpdateNintendont()
 {
 	char NINUpdatePath[120];
@@ -482,25 +512,41 @@ int UpdateNintendont()
 	// Create the directory if it doesn't exist
 	CreateSubfolder(Settings.NINLoaderPath);
 
+	// One window for all three files, open until the result prompt
+	ProgressCancelEnable(true);
+	StartProgress(tr("Updating Nintendont"), tr("Downloading file..."), "loader.dol", true, true);
+
 	// The boot.dol there stays until a complete one replaces it
-	if (DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/loader/loader.dol", NINUpdatePath) <= 0)
-		return -1;
+	int ret = DownloadToFile(NINTENDONT_URL "loader/loader.dol", NINUpdatePath, true);
+	if (ret > 0)
+	{
+		// loader.dol has priority over boot.dol; boot.bak is what this updater used to leave
+		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%sloader.dol", Settings.NINLoaderPath);
+		RemoveFile(NINUpdatePath);
+		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%sboot.bak", Settings.NINLoaderPath);
+		RemoveFile(NINUpdatePath);
+		// Download icon.png if it doesn't exist
+		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%sicon.png", Settings.NINLoaderPath);
+		if (!CheckFile(NINUpdatePath))
+		{
+			ShowProgress(tr("Updating Nintendont"), tr("Downloading file..."), "icon.png", 0, 1, true, true);
+			DownloadToFile(NINTENDONT_URL "nintendont/icon.png", NINUpdatePath, true);
+		}
+		// Download meta.xml if it doesn't exist (Nintendont will edit meta.xml when it's launched)
+		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%smeta.xml", Settings.NINLoaderPath);
+		if (!CheckFile(NINUpdatePath))
+		{
+			ShowProgress(tr("Updating Nintendont"), tr("Downloading file..."), "meta.xml", 0, 1, true, true);
+			DownloadToFile(NINTENDONT_URL "nintendont/meta.xml", NINUpdatePath, true);
+		}
+	}
 
-	// loader.dol has priority over boot.dol; boot.bak is what this updater used to leave
-	snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%sloader.dol", Settings.NINLoaderPath);
-	RemoveFile(NINUpdatePath);
-	snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%sboot.bak", Settings.NINLoaderPath);
-	RemoveFile(NINUpdatePath);
-	// Download icon.png if it doesn't exist
-	snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%sicon.png", Settings.NINLoaderPath);
-	if (!CheckFile(NINUpdatePath))
-		DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/nintendont/icon.png", NINUpdatePath, false);
-	// Download meta.xml if it doesn't exist (Nintendont will edit meta.xml when it's launched)
-	snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%smeta.xml", Settings.NINLoaderPath);
-	if (!CheckFile(NINUpdatePath))
-		DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/nintendont/meta.xml", NINUpdatePath, false);
-
-	return 1;
+	bool canceled = ret <= 0 && ProgressCanceled();
+	ProgressStop();
+	ProgressCancelEnable(false);
+	if (ret == -7)
+		ShowError(tr("Can't write to destination."));
+	return ret > 0 ? 1 : (canceled ? UPDATE_CANCELED : -1);
 }
 
 void UpdateCovers()

@@ -20,6 +20,7 @@
 #include "themes/CTheme.h"
 #include "utils/timer.h"
 #include "utils/tools.h"
+#include "gecko.h"
 
 extern float gamesize;
 extern int install_abort_signal;
@@ -67,12 +68,17 @@ extern "C" void StartProgress(const char * title, const char * msg1, const char 
 	fSpeed = 0.0f;
 	fLastElapsedTime = 0.0f;
 	fLastProgressDone = 0.0f;
-	progressTotal = progressDone = 0.0f;
+	//! 0 of 1: the bar starts empty, not full, until the first ShowProgress()
+	progressDone = 0;
+	progressTotal = 1;
 	progressCanceled = false;
 	showSize = swSize;
 	showTime = swTime;
 	showProgress = 1;
 	ProgressTimer.reset();
+	//! A window that is already open takes the new title and messages
+	changed = true;
+	changedMessages = true;
 
 	LWP_ResumeThread(progressthread);
 }
@@ -247,10 +253,13 @@ static void UpdateProgressValues(GuiImage *progressbarImg, GuiText *prTxt, GuiTe
 			- progressbarImg->GetWidth(), 0, (progressbarImg->GetWidth() * progressPercent)
 			- progressbarImg->GetWidth(), 0, 0, 0);
 
+	//! One window can go from a step with no size to a download and back
 	if (showTime == true)
 	{
 		timeTxt->SetTextf("%s %d:%02d:%02d", tr( "Time left:" ), (int)h, (int)m, (int)s);
 	}
+	else
+		timeTxt->SetText((const char *) NULL);
 
 	if (showSize == true)
 	{
@@ -262,6 +271,11 @@ static void UpdateProgressValues(GuiImage *progressbarImg, GuiText *prTxt, GuiTe
 			sizeTxt->SetTextf("%0.2fGB/%0.2fGB", done / GB_SIZE, total / GB_SIZE);
 
 		speedTxt->SetTextf("%dKB/s", (int) (fSpeed/KB_SIZE));
+	}
+	else
+	{
+		sizeTxt->SetText((const char *) NULL);
+		speedTxt->SetText((const char *) NULL);
 	}
 
 	//! store current done value for next cycle
@@ -396,12 +410,10 @@ static void ProgressWindow(const char *title, const char *msg1, const char *msg2
 	if (title) promptWindow.Append(&titleTxt);
 	promptWindow.Append(&msg1Txt);
 	promptWindow.Append(&msg2Txt);
-	if (showTime) promptWindow.Append(&timeTxt);
-	if (showSize)
-	{
-		promptWindow.Append(&sizeTxt);
-		promptWindow.Append(&speedTxt);
-	}
+	//! Empty while showTime and showSize are off, which can change while it is open
+	promptWindow.Append(&timeTxt);
+	promptWindow.Append(&sizeTxt);
+	promptWindow.Append(&speedTxt);
 	if(CancelEnabled)
 		promptWindow.Append(&cancelBtn);
 
@@ -410,6 +422,7 @@ static void ProgressWindow(const char *title, const char *msg1, const char *msg2
 	mainWindow->SetState(STATE_DISABLED);
 	mainWindow->Append(&promptWindow);
 	ResumeGui();
+	gprintf("ProgressWindow( %s, %s, %s )\n", progressTitle, progressMsg1, progressMsg2);
 
 	while (promptWindow.GetEffect() > 0) usleep(100);
 

@@ -29,6 +29,9 @@
 #ifndef _UPDATEOPS_H_
 #define _UPDATEOPS_H_
 
+// What an update returns when the user pressed Cancel in its progress window
+#define UPDATE_CANCELED -3
+
 bool initNetwork();
 int UpdateGameTDB();
 int UpdateCheats();

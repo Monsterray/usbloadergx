@@ -49,7 +49,8 @@ class ZipFile
 		~ZipFile();
 		//!Extract all files from a zip file to a directory
 		//!\param dest Destination path to where to extract
-		bool ExtractAll(const char *dest);
+		//! closeProgress false leaves the progress window open for the caller's next step
+		bool ExtractAll(const char *dest, bool closeProgress = true);
 		//!Find a file inside the zip and return if it is existent or not
 		bool FindFile(const char *filename);
 		//!Only needed a part of a filename to find the real one

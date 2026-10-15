@@ -27,6 +27,7 @@
 #include "network/networkops.h"
 #include "network/update.h"
 #include "prompts/PromptWindows.h"
+#include "prompts/ProgressWindow.h"
 #include "sys.h"
 #include "utils/ShowError.h"
 #include "FileOperations/fileops.h"
@@ -104,7 +105,11 @@ int UpdateSM::GetMenuInternal()
 	//! Settings: Update Cover Files
 	else if (ret == ++Idx)
 	{
-		if (!GetDirectorySize(Settings.covers_path))
+		//! Sizing a full covers folder takes a while
+		StartProgress(tr("Cover Download"), tr("Please wait..."), 0, false, false);
+		bool haveCovers = GetDirectorySize(Settings.covers_path) > 0;
+		ProgressStop();
+		if (!haveCovers)
 		{
 			UpdateCovers();
 			InvalidateDiskSpaceCache();
@@ -120,7 +125,7 @@ int UpdateSM::GetMenuInternal()
 	//! Settings: Update WiiTDB.xml
 	else if (ret == ++Idx)
 	{
-		int gameTDB = UpdateGameTDB();
+		int gameTDB = UpdateGameTDB(); // UPDATE_CANCELED needs no prompt
 		if (gameTDB == -2)
 			WindowPrompt(tr("WiiTDB.xml is up to date."), 0, tr("OK"));
 		else if (gameTDB == -1)
@@ -135,12 +140,13 @@ int UpdateSM::GetMenuInternal()
 	//! Settings: Update Nintendont
 	else if (ret == ++Idx)
 	{
-		if (UpdateNintendont() > 0)
+		int nintendont = UpdateNintendont();
+		if (nintendont > 0)
 		{
 			InvalidateDiskSpaceCache();
 			WindowPrompt(tr("Successfully Updated"), 0, tr("OK"));
 		}
-		else
+		else if (nintendont != UPDATE_CANCELED)
 			WindowPrompt(tr("Update Failed"), 0, tr("OK"));
 	}
 

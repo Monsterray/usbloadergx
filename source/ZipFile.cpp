@@ -110,7 +110,7 @@ bool ZipFile::FindFilePart(const char *partfilename, std::string &realname)
 	return false;
 }
 
-bool ZipFile::ExtractAll(const char *dest)
+bool ZipFile::ExtractAll(const char *dest, bool closeProgress)
 {
 	if (!File) return false;
 
@@ -177,6 +177,7 @@ bool ZipFile::ExtractAll(const char *dest)
 				{
 					if(ProgressCanceled()) {
 						Stop = true;
+						failed = true; //! The file is not whole
 						break;
 					}
 					ShowProgress(tr( "Extracting files..." ), 0, pointer + 1, done, uncompressed_size, true, false);
@@ -217,8 +218,11 @@ bool ZipFile::ExtractAll(const char *dest)
 	delete[] buffer;
 	buffer = NULL;
 
-	ProgressStop();
-	ProgressCancelEnable(false);
+	if (closeProgress)
+	{
+		ProgressStop();
+		ProgressCancelEnable(false);
+	}
 
 	return !failed;
 }

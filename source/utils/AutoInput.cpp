@@ -18,6 +18,8 @@
  *                            sd:/x.zip.part; logs the result and MEM2 free
  *   33000 memhog 1700        hold MEM2 until only 1700 KB are free, as on a
  *                            Wii running GX (Dolphin has some 45 MB free)
+ *   60000 memreport          MEM_Report() now, with the browser and its covers
+ *                            still up ("mem autoinput <ms>: ...")
  *
  * Buttons: A B X Y Z START UP DOWN LEFT RIGHT L R. Everything goes to channel
  * 0, merged with whatever a real controller sends. Each event is logged with
@@ -40,7 +42,7 @@
 
 namespace
 {
-enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO, EV_MEMHOG };
+enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO, EV_MEMHOG, EV_MEMREPORT };
 
 struct Event
 {
@@ -121,6 +123,10 @@ void Load()
 		else if (strcasecmp(cmd, "memhog") == 0 && sscanf(line, "%*u %*s %d", &a) == 1)
 		{
 			e.kind = EV_MEMHOG; e.x = a;
+		}
+		else if (strcasecmp(cmd, "memreport") == 0)
+		{
+			e.kind = EV_MEMREPORT;
 		}
 		else if (strcasecmp(cmd, "downloadto") == 0 && sscanf(line, "%*u %*s %255s %255s", url, path) == 2)
 		{
@@ -207,6 +213,13 @@ void AutoInput_Apply(void)
 				}
 				gprintf("autoinput %u: memhog in %u blocks, MEM2 free %u before, %u after\n", ms, blocks,
 						freeBefore, MEM2_freesize());
+				break;
+			}
+			case EV_MEMREPORT:
+			{
+				char where[32];
+				snprintf(where, sizeof(where), "autoinput %u", ms);
+				MEM_Report(where);
 				break;
 			}
 			case EV_DOWNLOADTO:

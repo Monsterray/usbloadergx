@@ -1,6 +1,7 @@
 #include <gctypes.h>
 #include <string.h>
 #include <ogc/system.h>
+#include <ogc/lwp_watchdog.h>
 #include <hbc_agent.h>
 
 #include "mload/mload.h"
@@ -91,10 +92,15 @@ void Sys_Init(void)
 //! out shows where it stopped: StopGX() blanks the video, and the Wii has no other log
 //! once the hbc agent is stopped. The file is written until the devices are unmounted.
 static bool exitLogOpen = false;
+static u64 exitStart = 0;
 
 static void ExitStep(const char *step)
 {
-	gprintf("exit: %s\n", step);
+	//! Milliseconds since the first step: a step that takes minutes shows as a gap
+	if (!exitStart)
+		exitStart = gettime();
+	u32 ms = ticks_to_millisecs(diff_ticks(exitStart, gettime()));
+	gprintf("exit: %u ms %s\n", ms, step);
 	if (!Settings.ConfigPath[0])
 		return;
 	char path[sizeof(Settings.ConfigPath) + 16];
@@ -103,7 +109,7 @@ static void ExitStep(const char *step)
 	if (!f)
 		return;
 	exitLogOpen = true;
-	fprintf(f, "%s\n", step);
+	fprintf(f, "%7u ms  %s\n", ms, step);
 	fclose(f);
 }
 

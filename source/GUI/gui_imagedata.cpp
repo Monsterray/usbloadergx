@@ -29,6 +29,7 @@
 #include "FileOperations/fileops.h"
 #include "utils/ResourceManager.h"
 #include "utils/tools.h"
+#include "memory/mem2.h"
 
 /**
  * Constructor for the GuiImageData class.
@@ -186,7 +187,7 @@ void GuiImageData::LoadTPL(const u8 *img, int imgSize)
 		if(len <= 0)
 			return;
 
-		data = (u8 *) memalign(32, len);
+		data = (u8 *) TEX_alloc(len);
 		if(!data)
 			return;
 

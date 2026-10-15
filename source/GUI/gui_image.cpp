@@ -10,6 +10,7 @@
 
 #include "gui.h"
 #include "settings/CSettings.h"
+#include "memory/mem2.h"
 /**
  * Constructor for the GuiImage class.
  */
@@ -89,7 +90,7 @@ GuiImage::GuiImage(u8 * img, int w, int h)
 
 GuiImage::GuiImage(int w, int h, GXColor c)
 {
-	image = (u8 *) memalign(32, w * h * 4);
+	image = (u8 *) TEX_alloc(w * h * 4);
 	width = w;
 	height = h;
 	imageangle = 0;
@@ -131,7 +132,7 @@ GuiImage::GuiImage(GuiImage &srcimage) :
 	height = srcimage.GetHeight();
 	int len = width * height * 4;
 	if (len % 32) len += (32 - len % 32);
-	image = (u8 *) memalign(32, len);
+	image = (u8 *) TEX_alloc(len);
 	memcpy(image, srcimage.GetImage(), len);
 	DCFlushRange(image, len);
 	imageangle = srcimage.GetAngle();
@@ -158,7 +159,7 @@ GuiImage::GuiImage(GuiImage *srcimage) :
 	height = srcimage->GetHeight();
 	int len = width * height * 4;
 	if (len % 32) len += (32 - len % 32);
-	image = (u8 *) memalign(32, len);
+	image = (u8 *) TEX_alloc(len);
 	memcpy(image, srcimage->GetImage(), len);
 	DCFlushRange(image, len);
 	imageangle = srcimage->GetAngle();
@@ -193,7 +194,7 @@ GuiImage &GuiImage::operator=(GuiImage & srcimage)
 	height = srcimage.GetHeight();
 	int len = width * height * 4;
 	if (len % 32) len += (32 - len % 32);
-	image = (u8 *) memalign(32, len);
+	image = (u8 *) TEX_alloc(len);
 	memcpy(image, srcimage.GetImage(), len);
 	DCFlushRange(image, len);
 	imageangle = srcimage.GetAngle();

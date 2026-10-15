@@ -28,6 +28,7 @@ distribution.
 #include <malloc.h>
 #include "Texture.h"
 #include "video.h"
+#include "memory/mem2.h"
 
 Texture::~Texture()
 {
@@ -107,7 +108,7 @@ void Texture::LoadTextureData(const u8 *data, u16 width, u16 height, u8 fmt)
 		free(texture_data);
 
 	int tex_size = GX_GetTexBufferSize(width, height, fmt, GX_FALSE, 0);
-	texture_data = (u8*) memalign(32, tex_size);
+	texture_data = (u8*) TEX_alloc(tex_size);
 	if(!texture_data)
 		return;
 

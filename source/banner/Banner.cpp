@@ -26,6 +26,7 @@ distribution.
 #include "utils/U8Archive.h"
 #include "utils/LanguageCode.h"
 #include "Banner.h"
+#include "memory/mem2.h"
 
 Banner::Banner()
 	: banner_bin(NULL)
@@ -64,6 +65,8 @@ bool Banner::LoadBanner(const u8 *opening_bnr, u32 len)
 	if(!banner_bin) {
 		return false;
 	}
+	// USB Loader GX: the layout's textures sit in it, so it goes to the MEM1 texture pool
+	banner_bin = (u8 *) TEX_adopt(banner_bin, banner_bin_size);
 
 	layout_banner = LoadLayout(U8Archive(banner_bin, banner_bin_size), "banner", CONF_GetLanguageString());
 
@@ -82,6 +85,7 @@ bool Banner::LoadIcon(const u8 *opening_bnr, u32 len)
 	if(!icon_bin) {
 		return false;
 	}
+	icon_bin = (u8 *) TEX_adopt(icon_bin, icon_bin_size);
 
 	layout_icon = LoadLayout(U8Archive(icon_bin, icon_bin_size), "icon", CONF_GetLanguageString());
 

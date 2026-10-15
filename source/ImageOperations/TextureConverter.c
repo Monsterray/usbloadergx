@@ -28,6 +28,7 @@
 #include <gccore.h>
 #include <malloc.h>
 #include "TextureConverter.h"
+#include "memory/mem2.h"
 
 #define MAXWIDTH 1024.0f
 #define MAXHEIGHT 768.0f
@@ -518,7 +519,7 @@ u8 * GDImageToRGBA8(gdImagePtr * gdImg, int * w, int * h)
 
 	int len =  datasizeRGBA8(width, height);
 
-	u8 * data = (u8 *) memalign(32, len);
+	u8 * data = (u8 *) TEX_alloc(len);
 	if(!data)
 		return NULL;
 
@@ -559,7 +560,7 @@ u8 * FlipRGBAImage(const u8 *src, u32 width, u32 height)
 
 	int len =  datasizeRGBA8(width, height);
 
-	u8 * data = memalign(32, len);
+	u8 * data = TEX_alloc(len);
 	if(!data)
 		return NULL;
 
@@ -592,7 +593,7 @@ u8 * RGB8ToRGBA8(const u8 *src, u32 width, u32 height)
 
 	int len = datasizeRGBA8(width, height);
 
-	u8 * dst = (u8 *) memalign(32, len);
+	u8 * dst = (u8 *) TEX_alloc(len);
 	if(!dst)
 		return NULL;
 

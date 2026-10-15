@@ -13,6 +13,9 @@
  *   40000 download https://example.com/   downloadfile() it now and log the
  *                            size, the time and the start of the body (HTTPS
  *                            and wolfSSL in Dolphin, whose sockets reach the host)
+ *   50000 downloadto https://example.com/x.zip sd:/x.zip
+ *                            DownloadFileToPath() it: streamed to the card through
+ *                            sd:/x.zip.part; logs the result and MEM2 free
  *
  * Buttons: A B X Y Z START UP DOWN LEFT RIGHT L R. Everything goes to channel
  * 0, merged with whatever a real controller sends. Each event is logged with
@@ -29,11 +32,13 @@
 #include "AutoInput.h"
 #include "GUI/gui.h"
 #include "network/https.h"
+#include "network/update.h"
+#include "memory/mem2.h"
 #include "gecko.h"
 
 namespace
 {
-enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD };
+enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO };
 
 struct Event
 {
@@ -43,6 +48,7 @@ struct Event
 	u32 duration;
 	int x, y;
 	std::string url;
+	std::string path;
 };
 
 std::vector<Event> events;
@@ -78,7 +84,7 @@ void Load()
 	if (!f)
 		return;
 
-	char line[320], cmd[16], arg[16], url[256];
+	char line[600], cmd[16], arg[16], url[256], path[256];
 	while (fgets(line, sizeof(line), f))
 	{
 		Event e = {};
@@ -109,6 +115,10 @@ void Load()
 		else if (strcasecmp(cmd, "download") == 0 && sscanf(line, "%*u %*s %255s", url) == 1)
 		{
 			e.kind = EV_DOWNLOAD; e.url = url;
+		}
+		else if (strcasecmp(cmd, "downloadto") == 0 && sscanf(line, "%*u %*s %255s %255s", url, path) == 2)
+		{
+			e.kind = EV_DOWNLOADTO; e.url = url; e.path = path;
 		}
 		else
 		{
@@ -173,6 +183,16 @@ void AutoInput_Apply(void)
 						file.data ? file.data : "");
 				if (file.data)
 					MEM2_free(file.data);
+				break;
+			}
+			case EV_DOWNLOADTO:
+			{
+				u32 freeBefore = MEM2_freesize();
+				u64 begin = gettime();
+				int size = DownloadFileToPath(e.url.c_str(), e.path.c_str(), false);
+				gprintf("autoinput %u: downloadto %s -> %s: %d in %u ms, MEM2 free %u before, %u after\n", ms,
+						e.url.c_str(), e.path.c_str(), size, (u32) ticks_to_millisecs(diff_ticks(begin, gettime())),
+						freeBefore, MEM2_freesize());
 				break;
 			}
 		}

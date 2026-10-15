@@ -160,6 +160,12 @@ bool is_chunked(struct phr_header *headers, size_t num_headers)
 // A shrinking realloc that fails must not be reported as a finished download.
 static bool finish_download(struct download *buffer, size_t size)
 {
+    // The body is in the file; data was only the block it passed through
+    if (buffer->file)
+    {
+        buffer->size = size;
+        return true;
+    }
     char *shrunk = MEM2_realloc(buffer->data, size + 1);
     if (!shrunk)
         return false;
@@ -169,11 +175,56 @@ static bool finish_download(struct download *buffer, size_t size)
     return true;
 }
 
-bool read_chunked(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos)
+// Where the next body bytes go. In memory that is the end of the body, which
+// grows as it fills. For a file it is the start of one fixed block, which
+// body_commit() writes out before the next read, so a body of any size needs
+// no more memory than that block.
+static char *body_window(struct download *buffer, size_t *capacity, size_t received, size_t *room)
+{
+    if (buffer->file)
+    {
+        *room = *capacity;
+        return buffer->data;
+    }
+    if (received == *capacity)
+    {
+#ifdef DEBUG_NETWORK
+        gprintf("Increased buffer size\n");
+#endif
+        // realloc leaves the old block allocated when it fails
+        char *grown = MEM2_realloc(buffer->data, *capacity * 2 + 1);
+        if (!grown) // A custom theme is using too much memory
+        {
+#ifdef DEBUG_NETWORK
+            gprintf("Out of memory!\n");
+#endif
+            errno = ENOMEM;
+            return NULL;
+        }
+        buffer->data = grown;
+        *capacity *= 2;
+    }
+    *room = *capacity - received;
+    return &buffer->data[received];
+}
+
+// Takes len body bytes at p, the window body_window() handed out
+static bool body_commit(struct download *buffer, const char *p, size_t len, size_t *received)
+{
+    // A short write is a full card: the download fails, not the file
+    if (buffer->file && len > 0 && fwrite(p, 1, len, buffer->file) != len)
+        return false;
+    *received += len;
+    return !(buffer->max_size && *received > buffer->max_size);
+}
+
+// pending: body bytes that came with the headers, already at the window's start
+bool read_chunked(HTTP_INFO *httpinfo, struct download *buffer, size_t capacity, size_t pending)
 {
     struct phr_chunked_decoder decoder = {0};
-    size_t rsize, capacity = 4096;
+    size_t received = 0, rsize, room;
     ssize_t pret;
+    char *window;
     int ret;
     decoder.consume_trailer = true;
 #ifdef DEBUG_NETWORK
@@ -185,30 +236,19 @@ bool read_chunked(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos
         {
             if (ProgressCanceled())
                 return false;
-            ShowProgress(start_pos, capacity); // Unknown size for chunked transfers
+            ShowProgress(received, received * 2 + BLOCK_SIZE); // Unknown size for chunked transfers
         }
-        if (start_pos == capacity)
+        if (!(window = body_window(buffer, &capacity, received, &room)))
+            return false;
+        if (pending)
         {
-#ifdef DEBUG_NETWORK
-            gprintf("Increased buffer size\n");
-#endif
-            capacity *= 2;
-            // realloc leaves the old block allocated when it fails
-            char *grown = MEM2_realloc(buffer->data, capacity + 1);
-            if (!grown) // A custom theme is using too much memory
-            {
-#ifdef DEBUG_NETWORK
-                gprintf("Out of memory!\n");
-#endif
-                errno = ENOMEM;
-                return false;
-            }
-            buffer->data = grown;
+            ret = pending;
+            pending = 0;
         }
-        if ((ret = https_read(httpinfo, &buffer->data[start_pos], capacity - start_pos, false)) < 1)
+        else if ((ret = https_read(httpinfo, window, room, false)) < 1)
             return false;
         rsize = ret;
-        pret = phr_decode_chunked(&decoder, &buffer->data[start_pos], &rsize);
+        pret = phr_decode_chunked(&decoder, window, &rsize);
         if (pret == -1)
         {
 #ifdef DEBUG_NETWORK
@@ -216,16 +256,17 @@ bool read_chunked(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos
 #endif
             return false;
         }
-        start_pos += rsize;
-        if (buffer->max_size && start_pos > buffer->max_size)
+        if (!body_commit(buffer, window, rsize, &received))
             return false;
     } while (pret == -2);
-    return finish_download(buffer, start_pos);
+    return finish_download(buffer, received);
 }
 
-bool read_all(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos)
+// pending: body bytes that came with the headers, already at the window's start
+bool read_all(HTTP_INFO *httpinfo, struct download *buffer, size_t capacity, size_t pending)
 {
-    size_t capacity = 4096;
+    size_t received = 0, room;
+    char *window;
     int ret;
 #ifdef DEBUG_NETWORK
     gprintf("Data is not chunked\n");
@@ -236,37 +277,34 @@ bool read_all(HTTP_INFO *httpinfo, struct download *buffer, size_t start_pos)
         {
             if (ProgressCanceled())
                 return false;
-            ShowProgress(start_pos, buffer->content_length);
+            ShowProgress(received, buffer->content_length);
         }
-        if (start_pos == capacity)
+        // Done once the body the server announced is in
+        if (buffer->content_length > 0 && received == buffer->content_length)
+            break;
+        if (!(window = body_window(buffer, &capacity, received, &room)))
+            return false;
+        // Never read past the announced end
+        if (buffer->content_length > 0 && room > buffer->content_length - received)
+            room = buffer->content_length - received;
+        if (pending)
         {
-#ifdef DEBUG_NETWORK
-            gprintf("Increased buffer size\n");
-#endif
-            capacity *= 2;
-            // realloc leaves the old block allocated when it fails
-            char *grown = MEM2_realloc(buffer->data, capacity + 1);
-            if (!grown) // A custom theme is using too much memory
-            {
-#ifdef DEBUG_NETWORK
-                gprintf("Out of memory!\n");
-#endif
-                errno = ENOMEM;
-                return false;
-            }
-            buffer->data = grown;
+            ret = pending;
+            pending = 0;
         }
-        if ((ret = https_read(httpinfo, &buffer->data[start_pos], capacity - start_pos, false)) == 0)
+        else if ((ret = https_read(httpinfo, window, room, false)) == 0)
             break;
         if (ret < 0)
             return false;
-        start_pos += ret;
-        if (buffer->max_size && start_pos > buffer->max_size)
+        if (!body_commit(buffer, window, ret, &received))
+            return false;
+        // More than the server announced
+        if (buffer->content_length > 0 && received > buffer->content_length)
             return false;
     };
-    if (!finish_download(buffer, start_pos))
+    if (!finish_download(buffer, received))
         return false;
-    return (buffer->content_length > 0 && buffer->content_length == start_pos);
+    return (buffer->content_length > 0 && buffer->content_length == received);
 }
 
 bool get_response(HTTP_INFO *httpinfo, HTTP_RESPONSE *resp, bool proxy)
@@ -426,24 +464,23 @@ static void handle_response(HTTP_INFO *httpinfo, HTTP_RESPONSE *response, struct
         // Body bytes that came with the headers; get_response() reads the
         // headers a byte at a time, so normally none
         size_t first = response->buflen - response->pret;
-        buffer->data = MEM2_alloc((first > 4096 ? first : 4096) + 1);
+        // In memory the body starts in this block and grows from it. To a file
+        // every read passes through it and it never grows.
+        size_t block = buffer->file ? BLOCK_SIZE : 4096;
+        size_t capacity = first > block ? first : block;
+        buffer->data = MEM2_alloc(capacity + 1);
         if (!buffer->data)
         {
             https_close(httpinfo);
             return;
         }
-        memcpy(buffer->data, &response->data[response->pret], response->buflen - response->pret);
-        if (buffer->max_size && response->buflen - response->pret > buffer->max_size)
-        {
-            MEM2_free(buffer->data);
-            buffer->data = NULL;
-            https_close(httpinfo);
-            return;
-        }
+        memcpy(buffer->data, &response->data[response->pret], first);
         // Determine how to read the data
         bool dl_valid;
-        if (is_chunked(response->headers, response->num_headers))
-            dl_valid = read_chunked(httpinfo, buffer, response->buflen - response->pret);
+        if (buffer->max_size && first > buffer->max_size)
+            dl_valid = false;
+        else if (is_chunked(response->headers, response->num_headers))
+            dl_valid = read_chunked(httpinfo, buffer, capacity, first);
         else
         {
             buffer->content_length = get_header_value_int(response->headers, response->num_headers, "content-length");
@@ -451,13 +488,22 @@ static void handle_response(HTTP_INFO *httpinfo, HTTP_RESPONSE *response, struct
             if (buffer->max_size && buffer->content_length > buffer->max_size)
                 dl_valid = false;
             else
-                dl_valid = read_all(httpinfo, buffer, response->buflen - response->pret);
+                dl_valid = read_all(httpinfo, buffer, capacity, first);
+        }
+        // The caller of a file download gets the file, never the block
+        if (buffer->file)
+        {
+            MEM2_free(buffer->data);
+            buffer->data = NULL;
         }
         // Check if the download is incomplete
         if (!dl_valid || buffer->size < 1)
         {
             buffer->size = 0;
-            MEM2_free(buffer->data);
+            if (buffer->data)
+                MEM2_free(buffer->data);
+            // A caller may download into the same struct again, which frees data
+            buffer->data = NULL;
 #ifdef DEBUG_NETWORK
             gprintf("Removed incomplete download\n");
 #endif
@@ -489,6 +535,7 @@ void downloadfile(const char *url, struct download *buffer)
     // Always reset the size due to the image downloader looping
     if (buffer->data)
         MEM2_free(buffer->data);
+    buffer->data = NULL;
     buffer->size = 0;
     // Check if we're using HTTPS and set the path
     char *path;

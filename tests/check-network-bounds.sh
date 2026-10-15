@@ -77,5 +77,15 @@ awk '/^s32 network_read\(/ { infn = 1 } infn && /net_read\(/ { found = 1 } infn 
 grep -q 'if (ip == 0)' "$SRC/network/dns.c" \
 	|| fail "getipbynamecached() caches a failed lookup"
 
+# 10. wiitdb.zip is 10 MB and GX can have less than 2 MB of MEM2 free on the Wii.
+#     A download to a file is written as it arrives, never held in memory, and
+#     replaces the destination only once it is complete.
+grep -q 'fwrite(p, 1, len, buffer->file)' "$SRC/network/https.c" \
+	|| fail "downloadfile() does not write a file download as it arrives"
+grep -q 'file.file = f;' "$SRC/network/update.cpp" \
+	|| fail "DownloadFileToPath() holds the whole download in memory"
+grep -q '"%s.part", dest' "$SRC/network/update.cpp" \
+	|| fail "DownloadFileToPath() writes straight over the destination"
+
 [ "$status" -eq 0 ] && echo "OK: network bounds guards are in place"
 exit "$status"

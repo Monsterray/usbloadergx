@@ -57,9 +57,71 @@
 #include <wolfssl/wolfcrypt/ed25519.h>
 #include <wolfssl/wolfcrypt/hash.h>
 
-/****************************************************************************
- * Checking if an Update is available
- ***************************************************************************/
+// A file download is written to the card as it arrives, so its size is not
+// bound by memory. wiitdb.zip is 10 MB; this only stops a body with no end
+// (the connection has no certificate check) from filling the card.
+#define DOWNLOAD_FILE_MAX_SIZE (64 * 1024 * 1024)
+
+// Puts part in the place of dest. The old dest stays until part is in place,
+// and comes back if part cannot be renamed. FAT does not rename over a file.
+static bool ReplaceFile(const char *part, const char *dest)
+{
+	char bak[300];
+	if (snprintf(bak, sizeof(bak), "%s.bak", dest) >= (int)sizeof(bak))
+		return false;
+	bool hadOld = CheckFile(dest);
+	if (hadOld)
+	{
+		RemoveFile(bak);
+		if (!RenameFile(dest, bak))
+			return false;
+	}
+	if (!RenameFile(part, dest))
+	{
+		if (hadOld)
+			RenameFile(bak, dest);
+		return false;
+	}
+	if (hadOld)
+		RemoveFile(bak);
+	return true;
+}
+
+// Downloads url to dest through dest.part, writing each block as it arrives:
+// on the Wii GX can have less than 2 MB of MEM2 free, too little to hold
+// wiitdb.zip. dest is replaced only by a complete download, and dest.part is
+// removed whatever happens. With report set the download reports into the
+// progress window that is open and stops when it is cancelled.
+// Returns the size, 0 when the download failed, -7 when the card cannot take it.
+static int DownloadToFile(const char *url, const char *dest, bool report)
+{
+	char part[300];
+	if (snprintf(part, sizeof(part), "%s.part", dest) >= (int)sizeof(part))
+		return -7;
+	FILE *f = fopen(part, "wb");
+	if (!f)
+		return -7;
+
+	struct download file = {};
+	file.show_progress = report;
+	file.max_size = DOWNLOAD_FILE_MAX_SIZE;
+	file.file = f;
+	downloadfile(url, &file);
+
+	bool writeFailed = ferror(f) != 0;
+	writeFailed = (fclose(f) != 0) || writeFailed;
+	if (!writeFailed && file.size > 0)
+	{
+		if (ReplaceFile(part, dest))
+			return file.size;
+		writeFailed = true;
+	}
+
+	RemoveFile(part);
+	gprintf("Download of %s to %s failed%s\n", url, dest, writeFailed ? " (write error)" : "");
+	return writeFailed ? -7 : 0;
+}
+
 int DownloadFileToPath(const char *url, const char *dest, const bool showprogress)
 {
 	if (showprogress)
@@ -71,43 +133,16 @@ int DownloadFileToPath(const char *url, const char *dest, const bool showprogres
 		StartProgress(tr("Downloading file..."), 0, filename, true, true);
 	}
 
-	struct download file = {};
-	file.show_progress = showprogress;
-	downloadfile(url, &file);
-	if (file.size > 0)
-	{
-		FILE *savefile = fopen(dest, "wb");
-		if (!savefile)
-		{
-			MEM2_free(file.data);
-			if (showprogress)
-				ShowError(tr("Can't write to destination."));
-			ProgressStop();
-			ProgressCancelEnable(false);
-			return -7;
-		}
-		size_t written = fwrite(file.data, 1, file.size, savefile);
-		fclose(savefile);
-		MEM2_free(file.data);
-		// A full card writes a short file, and the caller would install it
-		if (written != file.size)
-		{
-			remove(dest);
-			if (showprogress)
-			{
-				ShowError(tr("Can't write to destination."));
-				ProgressStop();
-				ProgressCancelEnable(false);
-			}
-			return -7;
-		}
-	}
+	int ret = DownloadToFile(url, dest, showprogress);
+
 	if (showprogress)
 	{
 		ProgressStop();
 		ProgressCancelEnable(false);
+		if (ret == -7)
+			ShowError(tr("Can't write to destination."));
 	}
-	return file.size;
+	return ret;
 }
 
 static bool CheckNewGameTDBVersion(const char *url)
@@ -404,40 +439,29 @@ int UpdateNintendont()
 {
 	char NINUpdatePath[120];
 	snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%sboot.dol", Settings.NINLoaderPath);
-	char NINUpdatePathBak[120];
-	snprintf(NINUpdatePathBak, sizeof(NINUpdatePathBak), "%sboot.bak", Settings.NINLoaderPath);
 
 	// Create the directory if it doesn't exist
 	CreateSubfolder(Settings.NINLoaderPath);
-	// Rename existing boot.dol file to boot.bak
-	if (CheckFile(NINUpdatePath))
-		RenameFile(NINUpdatePath, NINUpdatePathBak);
 
-	if (DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/loader/loader.dol", NINUpdatePath) > 0)
-	{
-		// Remove existing loader.dol file if found as it has priority over boot.dol, and boot.bak
-		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%s/loader.dol", Settings.NINLoaderPath);
-		RemoveFile(NINUpdatePath);
-		RemoveFile(NINUpdatePathBak);
-		// Download icon.png if it doesn't exist
-		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%s/icon.png", Settings.NINLoaderPath);
-		if (!CheckFile(NINUpdatePath))
-			DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/nintendont/icon.png", NINUpdatePath, false);
-		// Download meta.xml if it doesn't exist (Nintendont will edit meta.xml when it's launched)
-		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%s/meta.xml", Settings.NINLoaderPath);
-		if (!CheckFile(NINUpdatePath))
-			DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/nintendont/meta.xml", NINUpdatePath, false);
+	// The boot.dol there stays until a complete one replaces it
+	if (DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/loader/loader.dol", NINUpdatePath) <= 0)
+		return -1;
 
-		return 1;
-	}
-	else
-	{
-		// Restore backup file if found
-		RemoveFile(NINUpdatePath);
-		if (CheckFile(NINUpdatePathBak))
-			RenameFile(NINUpdatePathBak, NINUpdatePath);
-	}
-	return -1;
+	// loader.dol has priority over boot.dol; boot.bak is what this updater used to leave
+	snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%sloader.dol", Settings.NINLoaderPath);
+	RemoveFile(NINUpdatePath);
+	snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%sboot.bak", Settings.NINLoaderPath);
+	RemoveFile(NINUpdatePath);
+	// Download icon.png if it doesn't exist
+	snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%sicon.png", Settings.NINLoaderPath);
+	if (!CheckFile(NINUpdatePath))
+		DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/nintendont/icon.png", NINUpdatePath, false);
+	// Download meta.xml if it doesn't exist (Nintendont will edit meta.xml when it's launched)
+	snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%smeta.xml", Settings.NINLoaderPath);
+	if (!CheckFile(NINUpdatePath))
+		DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/nintendont/meta.xml", NINUpdatePath, false);
+
+	return 1;
 }
 
 void UpdateCovers()

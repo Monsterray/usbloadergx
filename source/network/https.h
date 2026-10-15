@@ -5,6 +5,7 @@
 #ifndef _HTTPS_H_
 #define _HTTPS_H_
 
+#include <stdio.h>
 #include <wolfssl/ssl.h>
 
 #include "dns.h"
@@ -30,7 +31,11 @@ extern "C"
         u64 content_length;
         u64 max_size;       // Fail a body longer than this; 0 means no limit
         u64 size;
+        // The body, terminated one byte past size. NULL for a file download.
         char *data;
+        // Set: write the body here as it arrives instead of holding it in
+        // data, and leave closing it and removing a failed one to the caller.
+        FILE *file;
     };
 
     typedef struct

@@ -87,6 +87,26 @@ void Sys_Init(void)
 	SYS_SetPowerCallback(__Sys_PowerCallback);
 }
 
+//! Each step of leaving GX goes to <config>/exit.log as it starts, so a hang on the way
+//! out shows where it stopped: StopGX() blanks the video, and the Wii has no other log
+//! once the hbc agent is stopped. The file is written until the devices are unmounted.
+static bool exitLogOpen = false;
+
+static void ExitStep(const char *step)
+{
+	gprintf("exit: %s\n", step);
+	if (!Settings.ConfigPath[0])
+		return;
+	char path[sizeof(Settings.ConfigPath) + 16];
+	snprintf(path, sizeof(path), "%sexit.log", Settings.ConfigPath);
+	FILE *f = fopen(path, exitLogOpen ? "a" : "w");
+	if (!f)
+		return;
+	exitLogOpen = true;
+	fprintf(f, "%s\n", step);
+	fclose(f);
+}
+
 void AppCleanUp(void)
 {
 	static bool app_clean = false;
@@ -94,18 +114,22 @@ void AppCleanUp(void)
 		return;
 
 	app_clean = true;
+	ExitStep("AppCleanUp");
 
 	//! Every exit and every boot of a game, a channel or a homebrew app comes
 	//! through here before IOS is reloaded or memory overwritten, so nothing of
 	//! the agent may run or point at GX's code afterwards.
 	hbc_agent_stop();
+	ExitStep("agent stopped");
 
 	BannerAsync::ThreadExit();
+	ExitStep("banner thread ended");
 
 	GameTitles.WriteCachedTitles(Settings.titlestxt_path);
 	Settings.Save();
 
 	ExitGUIThreads();
+	ExitStep("GUI thread ended");
 	StopGX();
 	wiilight(0);
 
@@ -126,17 +150,21 @@ void AppCleanUp(void)
 	ThreadedTask::DestroyInstance();
 	SoundHandler::DestroyInstance();
 	GCGames::DestroyInstance();
+	ExitStep("network");
 	DeinitNetwork();
 	GameTitles.SetDefault();
 
+	ExitStep("audio");
 	ShutdownAudio();
 
 	ResourceManager::DestroyInstance();
 
+	ExitStep("controllers");
 	if (shutdownRequested)
 		Wpad_Disconnect();
 	else
 		WPAD_Shutdown();
+	ExitStep("NAND");
 	ISFS_Deinitialize();
 }
 
@@ -144,7 +172,10 @@ void ExitApp(void)
 {
 	AppCleanUp();
 	WBFS_CloseAll();
+	ExitStep("unmounting");
 	DeviceHandler::DestroyInstance();
+	//! The card is gone: gecko output only from here
+	gprintf("exit: USB\n");
 	USBStorage2_Deinit();
 	USB_Deinitialize();
 	if (Settings.PlaylogUpdate)
@@ -248,6 +279,7 @@ void Sys_LoadHBC(void)
 
 	ExitApp();
 
+	gprintf("exit: launching the Homebrew Channel\n");
 	WII_Initialize();
 
 	// Can't use HBC Stub address here as it's overwritten with forwarder's TitleID for "return to" feature.

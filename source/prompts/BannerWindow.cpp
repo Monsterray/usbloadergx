@@ -407,6 +407,8 @@ void BannerWindow::ChangeGame(bool playsound)
 			}
 		}
 	}
+	else if (header->type == TYPE_GAME_HOMEBREW)
+		newBanner = BNRInstance::Instance()->CreateHomebrewBanner(header);
 	else
 	{
 		BNRInstance::Instance()->Load(header);

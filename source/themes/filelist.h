@@ -1,7 +1,7 @@
 /****************************************************************************
  * USB Loader GX resource files.
  * This file is generated automatically.
- * Includes 210 files.
+ * Includes 212 files.
  *
  * NOTE:
  * Any manual modification of this file will be overwriten by the generation.
@@ -111,6 +111,8 @@
 #include "menu_button_emunand_over_png.h"
 #include "menu_button_gc_png.h"
 #include "menu_button_gc_over_png.h"
+#include "menu_button_homebrew_png.h"
+#include "menu_button_homebrew_over_png.h"
 #include "menu_button_nand_png.h"
 #include "menu_button_nand_over_png.h"
 #include "menu_button_over_png.h"
@@ -325,6 +327,8 @@ RecourceFile Resources::RecourceFiles[] =
 	{"menu_button_emunand_over.png", menu_button_emunand_over_png, menu_button_emunand_over_png_size, NULL, 0},
 	{"menu_button_gc.png", menu_button_gc_png, menu_button_gc_png_size, NULL, 0},
 	{"menu_button_gc_over.png", menu_button_gc_over_png, menu_button_gc_over_png_size, NULL, 0},
+	{"menu_button_homebrew.png", menu_button_homebrew_png, menu_button_homebrew_png_size, NULL, 0},
+	{"menu_button_homebrew_over.png", menu_button_homebrew_over_png, menu_button_homebrew_over_png_size, NULL, 0},
 	{"menu_button_nand.png", menu_button_nand_png, menu_button_nand_png_size, NULL, 0},
 	{"menu_button_nand_over.png", menu_button_nand_over_png, menu_button_nand_over_png_size, NULL, 0},
 	{"menu_button_over.png", menu_button_over_png, menu_button_over_png_size, NULL, 0},

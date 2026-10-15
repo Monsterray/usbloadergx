@@ -38,6 +38,7 @@
 #include "GameList.h"
 #include "memory/memory.h"
 #include "Channels/channels.h"
+#include "homebrewboot/HomebrewApps.h"
 #include "cache/cache.hpp"
 
 enum
@@ -429,6 +430,11 @@ int GameList::GetGameListHeaders(std::vector<struct discHdr *> &tmplist, short L
 	// Filter EmuNAND channel list if selected
 	if (LoaderMode & MODE_EMUCHANNELS)
 		InternalGetGameListHeaders(tmplist, Channels::Instance()->GetEmuHeaders());
+
+	//! Homebrew apps only when asked for: MODE_ALL is for titles, categories, cheats and
+	//! artwork, which have nothing for an app
+	if (LoaderMode != MODE_ALL && (LoaderMode & MODE_HOMEBREW))
+		InternalGetGameListHeaders(tmplist, HomebrewApps::Instance()->GetHeaders());
 
 	return tmplist.size();
 }

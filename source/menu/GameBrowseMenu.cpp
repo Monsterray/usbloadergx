@@ -8,6 +8,7 @@
 #include "GUI/gui_gamegrid.h"
 #include "GUI/gui_gamecarousel.h"
 #include "GUI/GuiBannerGrid.h"
+#include "homebrewboot/HomebrewApps.h"
 #include "GUI/LoadCoverImage.h"
 #include "prompts/PromptWindows.h"
 #include "prompts/gameinfo.h"
@@ -82,6 +83,8 @@ GameBrowseMenu::GameBrowseMenu()
 	btnhomenandOver = Resources::GetImageData("menu_button_nand_over.png");
 	btnhomeemunand = Resources::GetImageData("menu_button_emunand.png");
 	btnhomeemunandOver = Resources::GetImageData("menu_button_emunand_over.png");
+	btnhomehomebrew = Resources::GetImageData("menu_button_homebrew.png");
+	btnhomehomebrewOver = Resources::GetImageData("menu_button_homebrew_over.png");
 	btnhomecustom = Resources::GetImageData("menu_button_custom.png");
 	btnhomecustomOver = Resources::GetImageData("menu_button_custom_over.png");
 	btnloadermodeOver = Resources::GetImageData("loader_mode_over.png");
@@ -185,6 +188,10 @@ GameBrowseMenu::GameBrowseMenu()
 	homeBtnImgEmunand->SetWidescreen(Settings.widescreen);
 	homeBtnImgEmunandOver = new GuiImage(btnhomeemunandOver);
 	homeBtnImgEmunandOver->SetWidescreen(Settings.widescreen);
+	homeBtnImgHomebrew = new GuiImage(btnhomehomebrew);
+	homeBtnImgHomebrew->SetWidescreen(Settings.widescreen);
+	homeBtnImgHomebrewOver = new GuiImage(btnhomehomebrewOver);
+	homeBtnImgHomebrewOver->SetWidescreen(Settings.widescreen);
 	homeBtnImgCustom = new GuiImage(btnhomecustom);
 	homeBtnImgCustom->SetWidescreen(Settings.widescreen);
 	homeBtnImgCustomOver = new GuiImage(btnhomecustomOver);
@@ -486,6 +493,8 @@ GameBrowseMenu::~GameBrowseMenu()
 	delete btnhomenandOver;
 	delete btnhomeemunand;
 	delete btnhomeemunandOver;
+	delete btnhomehomebrew;
+	delete btnhomehomebrewOver;
 	delete btnhomecustom;
 	delete btnhomecustomOver;
 	delete btnloadermodeOver;
@@ -539,6 +548,8 @@ GameBrowseMenu::~GameBrowseMenu()
 	delete homeBtnImgNandOver;
 	delete homeBtnImgEmunand;
 	delete homeBtnImgEmunandOver;
+	delete homeBtnImgHomebrew;
+	delete homeBtnImgHomebrewOver;
 	delete homeBtnImgCustom;
 	delete homeBtnImgCustomOver;
 	delete poweroffBtnImg;
@@ -807,6 +818,12 @@ void GameBrowseMenu::ReloadBrowser(bool firstRun)
 			homeBtnTT->SetText(tr("Displaying EmuNAND games"));
 			homeBtn->SetImage(homeBtnImgEmunand);
 			homeBtn->SetImageOver(homeBtnImgEmunandOver);
+		}
+		else if (Settings.GameDisplayType == DISP_HOMEBREW)
+		{
+			homeBtnTT->SetText(tr("Displaying homebrew apps"));
+			homeBtn->SetImage(homeBtnImgHomebrew);
+			homeBtn->SetImageOver(homeBtnImgHomebrewOver);
 		}
 		else if (Settings.GameDisplayType == DISP_CUSTOM)
 		{
@@ -1121,7 +1138,16 @@ void GameBrowseMenu::ReloadBrowser(bool firstRun)
 	Append(homeScreenBtn);
 	Append(homeBtn);
 	Append(settingsBtn);
-	Append(homebrewBtn);
+	//! With the source button (layout 2), homebrew is one of its sources and its bar slot
+	//! holds the players filter. A theme from the card drew its bar for the homebrew button
+	//! and knows nothing of the filter, so the filter takes the slot it gave homebrew.
+	if (Settings.LayoutVersion >= 2)
+	{
+		if (Settings.theme[0])
+			playersBtn->SetPosition(homebrewBtn->GetLeftPos(), homebrewBtn->GetTopPos());
+	}
+	else
+		Append(homebrewBtn);
 	Append(installBtn);
 
 	if (Settings.godmode || !(Settings.ParentalBlocks & BLOCK_COVER_DOWNLOADS))
@@ -1260,6 +1286,12 @@ int GameBrowseMenu::MainLoop()
 			else if (Settings.GameDisplayType == DISP_NAND)
 				Settings.GameDisplayType = DISP_EMUNAND;
 			else if (Settings.GameDisplayType == DISP_EMUNAND)
+			{
+				//! The apps folder may have changed since the last look
+				Settings.GameDisplayType = DISP_HOMEBREW;
+				HomebrewApps::Instance()->Reload();
+			}
+			else if (Settings.GameDisplayType == DISP_HOMEBREW)
 			{
 				Settings.GameDisplayType = DISP_CUSTOM;
 				if (Settings.LoaderMode & MODE_WIIGAMES)
@@ -1641,7 +1673,8 @@ int GameBrowseMenu::MainLoop()
 		gprintf("\tgameinfo clicked\n");
 		int SelectedGame = GetSelectedGame();
 		gameInfo->ResetState();
-		if (SelectedGame >= 0 && SelectedGame < gameList.size())
+		//! wiitdb.xml has nothing on a homebrew app
+		if (SelectedGame >= 0 && SelectedGame < gameList.size() && gameList[SelectedGame]->type != TYPE_GAME_HOMEBREW)
 		{
 			rockout(gameList[SelectedGame]);
 			SetState(STATE_DISABLED);
@@ -1871,7 +1904,8 @@ void GameBrowseMenu::UpdateClock()
 
 void GameBrowseMenu::UpdateGameInfoText(struct discHdr *header)
 {
-	if (!header)
+	//! A homebrew app's ID is made up: it has no region, and showing it means nothing
+	if (!header || header->type == TYPE_GAME_HOMEBREW)
 	{
 		Remove(GameRegionTxt);
 		delete GameRegionTxt;
@@ -1986,6 +2020,16 @@ int GameBrowseMenu::OpenClickedGame(struct discHdr *header)
 {
 	int choice = -1;
 	int oldFavLevel = 0;
+
+	//! A homebrew app gets the homebrew prompt in every layout; game windows, game settings
+	//! and quick boot are for games
+	if (header && header->type == TYPE_GAME_HOMEBREW)
+	{
+		SetState(STATE_DISABLED);
+		HomebrewApps::Launch(header);
+		SetState(STATE_DEFAULT);
+		return MENU_NONE;
+	}
 
 	if (searchBar)
 	{

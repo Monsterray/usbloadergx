@@ -57,6 +57,8 @@ class GameBrowseMenu : public GuiWindow
 		GuiImageData * btnhomenandOver;
 		GuiImageData * btnhomeemunand;
 		GuiImageData * btnhomeemunandOver;
+		GuiImageData * btnhomehomebrew;
+		GuiImageData * btnhomehomebrewOver;
 		GuiImageData * btnhomecustom;
 		GuiImageData * btnhomecustomOver;
 		GuiImageData * btnloadermodeOver;
@@ -110,6 +112,8 @@ class GameBrowseMenu : public GuiWindow
 		GuiImage * homeBtnImgNandOver;
 		GuiImage * homeBtnImgEmunand;
 		GuiImage * homeBtnImgEmunandOver;
+		GuiImage * homeBtnImgHomebrew;
+		GuiImage * homeBtnImgHomebrewOver;
 		GuiImage * homeBtnImgCustom;
 		GuiImage * homeBtnImgCustomOver;
 		GuiImage * poweroffBtnImg;

@@ -172,6 +172,15 @@ void * BannerAsync::BannerAsyncThread(void *arg)
 					}
 				}
 			}
+			else if (InUse->header->type == TYPE_GAME_HOMEBREW)
+			{
+				//! Its icon.png in the Homebrew Channel's icon layout
+				CustomBanner *hbBanner = BNRInstance::Instance()->CreateHomebrewIcon(InUse->header);
+				if (hbBanner) {
+					InUse->swap(*hbBanner);
+					delete hbBanner;
+				}
+			}
 			else
 			{
 				BNRInstance::Instance()->Load(InUse->header);

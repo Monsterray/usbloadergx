@@ -17,7 +17,8 @@ enum
 	TYPE_GAME_GC_DISC		= 0x03,
 	TYPE_GAME_GC_EXTRACTED	= 0x04,
 	TYPE_GAME_NANDCHAN		= 0x05,
-	TYPE_GAME_EMUNANDCHAN	= 0x06
+	TYPE_GAME_EMUNANDCHAN	= 0x06,
+	TYPE_GAME_HOMEBREW		= 0x07
 };
 
 enum
@@ -27,6 +28,7 @@ enum
 	MODE_NANDCHANNELS	= 0x02,
 	MODE_EMUCHANNELS	= 0x04,
 	MODE_GCGAMES		= 0x08,
+	MODE_HOMEBREW		= 0x10, //! Only when asked for by itself: MODE_ALL leaves homebrew out
 	MODE_ALL			= 0xFF
 };
 
@@ -36,7 +38,8 @@ enum
 	DISP_WII			= 0x01,
 	DISP_NAND			= 0x02,
 	DISP_EMUNAND		= 0x04,
-	DISP_GC				= 0x08
+	DISP_GC				= 0x08,
+	DISP_HOMEBREW		= 0x10
 };
 
 enum

@@ -41,6 +41,8 @@ distribution.
 #include "settings/GameTitles.h"
 #include "wstring.hpp"
 #include "OpeningBNR.hpp"
+#include "homebrewboot/HomebrewApps.h"
+#include "homebrewboot/HomebrewXML.h"
 
 BNRInstance *BNRInstance::instance = NULL;
 
@@ -528,6 +530,55 @@ CustomBanner *OpeningBNR::CreateGCBanner(const discHdr *header)
 	banner->SetBannerTextureScale(Settings.GCBannerScale);
 
 	return banner;
+}
+
+//! The custom banner is the Homebrew Channel's layout: name, author, version, date and
+//! description panes, and a picture pane sized for a 128x48 icon.png.
+CustomBanner *OpeningBNR::CreateHomebrewBanner(const discHdr *header)
+{
+	std::string folder = HomebrewApps::Folder(header);
+	HomebrewXML meta;
+	meta.LoadHomebrewXMLData((folder + "meta.xml").c_str());
+
+	CustomBanner *banner = new CustomBanner;
+	banner->LoadBanner(Resources::GetFile("custom_banner.bnr"), Resources::GetFileSize("custom_banner.bnr"));
+
+	u8 *icon = NULL;
+	u32 iconSize = 0;
+	if (LoadFileToMem((folder + "icon.png").c_str(), &icon, &iconSize) >= 0 && icon)
+	{
+		banner->SetBannerPngImage("HBPic.tpl", icon, iconSize);
+		free(icon);
+	}
+
+	banner->SetBannerText("T_PF", tr("Homebrew"));
+	banner->SetBannerText("T_name", GameTitles.GetTitle(header));
+	banner->SetBannerText("T_Coded_by", tr("Developer:"));
+	banner->SetBannerText("T_coder", meta.GetCoder() && *meta.GetCoder() ? meta.GetCoder() : tr("Unknown"));
+	banner->SetBannerText("T_versiontext", tr("Version:"));
+	banner->SetBannerText("T_version", meta.GetVersion() ? meta.GetVersion() : " ");
+	banner->SetBannerText("T_Released", tr("Released:"));
+	banner->SetBannerText("T_release_date", meta.GetReleasedate() ? meta.GetReleasedate() : " ");
+	banner->SetBannerText("T_short_descript", meta.GetShortDescription() && *meta.GetShortDescription() ? meta.GetShortDescription() : " ");
+	return banner;
+}
+
+CustomBanner *OpeningBNR::CreateHomebrewIcon(const discHdr *header)
+{
+	CustomBanner *newBanner = new CustomBanner;
+	newBanner->LoadIcon(Resources::GetFile("custom_banner.bnr"), Resources::GetFileSize("custom_banner.bnr"));
+
+	u8 *icon = NULL;
+	u32 iconSize = 0;
+	if (LoadFileToMem((HomebrewApps::Folder(header) + "icon.png").c_str(), &icon, &iconSize) >= 0 && icon)
+	{
+		newBanner->SetIconPngImage("Iconpng.tpl", icon, iconSize);
+		free(icon);
+	}
+	else
+		newBanner->SetIconPngImage("Iconpng.tpl", Resources::GetFile("gc_icon_bg.png"), Resources::GetFileSize("gc_icon_bg.png"));
+	//! The template's own HBLogo, the Homebrew Channel's, stays
+	return newBanner;
 }
 
 CustomBanner *OpeningBNR::CreateGCIcon(const discHdr *header)

@@ -107,6 +107,9 @@ public:
 	bool LoadChannelBanner(const discHdr *header);
 	CustomBanner *CreateGCBanner(const discHdr *header);
 	CustomBanner *CreateGCIcon(const discHdr *header);
+	//! A homebrew app's banner and icon from its meta.xml and icon.png
+	CustomBanner *CreateHomebrewBanner(const discHdr *header);
+	CustomBanner *CreateHomebrewIcon(const discHdr *header);
 
 	const u8 *Get() const { return (const u8 *)imetHdr; }
 	u32 GetSize() const { return filesize; }

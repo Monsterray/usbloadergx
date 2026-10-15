@@ -97,5 +97,15 @@ grep -q 'format(printf, 1, 2)' "$SRC/gecko.h" \
 grep -qE '\bgprintf\(tmp\)' "$SRC/StartUpProcess.cpp" \
 	&& fail "SetTextf() passes an expanded message to gprintf as a format"
 
+# 14. GX's MEM2 heap runs from 0x90200000 to the top of the SYS arena less what
+#     libogc takes later. Nothing may write a fixed address inside it while GX
+#     runs, and the heap must leave out the hbc agent's records at 0x91800000.
+grep -q 'static u32 \*buffer = (u32 \*) 0x93' "$SRC/usbloader/disc.c" \
+	&& fail "disc.c reads the disc into a fixed address inside the MEM2 heap"
+grep -q 'homebrewbuffer = EXECUTE_ADDR' "$SRC/homebrewboot/BootHomebrew.cpp" \
+	&& fail "the homebrew image is copied to EXECUTE_ADDR while GX still runs"
+grep -q 'memmove(EXECUTE_ADDR, homebrewbuffer' "$SRC/homebrewboot/BootHomebrew.cpp" \
+	|| fail "RunAppbooter() does not move the image to EXECUTE_ADDR at the end"
+
 [ "$status" -eq 0 ] && echo "OK: system and NAND bounds guards are in place"
 exit "$status"

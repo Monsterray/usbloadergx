@@ -16,18 +16,25 @@
 #include "gecko.h"
 #include "app_booter_bin.h"
 #include "usbloader/disc.h"
+#include "memory/mem2.h"
 
 #define EXECUTE_ADDR ((u8 *)0x92000000)
 #define BOOTER_ADDR ((u8 *)0x93000000)
 #define ARGS_ADDR ((u8 *)0x93200000)
 // The homebrew may not reach the address the app booter is copied to.
 #define MAX_HOMEBREW_SIZE ((u32)(BOOTER_ADDR - EXECUTE_ADDR))
+// The arguments must stay below libogc's IPC buffer at 0x933E0000
+#define MAX_ARGS_SIZE 0x100000
+
+//! GX's MEM2 heap covers EXECUTE_ADDR, BOOTER_ADDR and ARGS_ADDR. The image waits
+//! in a heap block and moves to EXECUTE_ADDR only in RunAppbooter(), after the last
+//! allocation: it was copied there while GX still ran, over whatever the heap kept.
 
 typedef void (*entrypoint)(void);
 
 extern bool isWiiVC; // in sys.cpp
 
-static u8 *homebrewbuffer = EXECUTE_ADDR;
+static u8 *homebrewbuffer = NULL;
 static u32 homebrewsize = 0;
 static std::vector<std::string> Arguments;
 
@@ -48,15 +55,23 @@ int CopyHomebrewMemory(u8 *temp, u32 pos, u32 len)
 	if (pos > MAX_HOMEBREW_SIZE || len > MAX_HOMEBREW_SIZE - pos)
 		return 0;
 
-	homebrewsize += len;
-	memcpy((homebrewbuffer) + pos, temp, len);
+	if (pos + len > homebrewsize)
+	{
+		u8 *grown = (u8 *) MEM2_realloc(homebrewbuffer, pos + len);
+		if (!grown)
+			return 0;
+		homebrewbuffer = grown;
+		homebrewsize = pos + len;
+	}
+	memcpy(homebrewbuffer + pos, temp, len);
 
 	return 1;
 }
 
 void FreeHomebrewBuffer()
 {
-	homebrewbuffer = EXECUTE_ADDR;
+	MEM2_free(homebrewbuffer);
+	homebrewbuffer = NULL;
 	homebrewsize = 0;
 
 	Arguments.clear();
@@ -72,51 +87,60 @@ static inline bool IsSpecialELF(const u8 *buf)
 	return (*(u32 *)buf == 0x7F454C46 && buf[0x24] == 0);
 }
 
-static int SetupARGV(struct __argv *args)
+//! The struct __argv and its command line, laid out for ARGS_ADDR but built in MEM1,
+//! which RunAppbooter() does not overwrite
+static u8 *BuildArgs(u32 *size)
 {
-	if (!args)
-		return -1;
+	u32 length = 1;
+	for (u32 i = 0; i < Arguments.size(); i++)
+		length += Arguments[i].size() + 1;
 
+	u32 total = sizeof(struct __argv) + length;
+	if (total > MAX_ARGS_SIZE)
+		return NULL;
+	u8 *block = (u8 *) MEM1_alloc(total);
+	if (!block)
+		return NULL;
+
+	struct __argv *args = (struct __argv *) block;
+	char *commandLine = (char *) (block + sizeof(struct __argv));
 	bzero(args, sizeof(struct __argv));
 	args->argvMagic = ARGV_MAGIC;
+	args->length = length;
+	args->commandLine = (char *) ARGS_ADDR + sizeof(struct __argv);
 
 	u32 argc = 0;
 	u32 position = 0;
-	u32 stringlength = 1;
-
-	/** Append Arguments **/
 	for (u32 i = 0; i < Arguments.size(); i++)
 	{
-		stringlength += Arguments[i].size() + 1;
-	}
-
-	args->length = stringlength;
-	//! Put the argument into mem2 too, to avoid overwriting it
-	args->commandLine = (char *)ARGS_ADDR + sizeof(struct __argv);
-
-	/** Append Arguments **/
-	for (u32 i = 0; i < Arguments.size(); i++)
-	{
-		memcpy(&args->commandLine[position], Arguments[i].c_str(), Arguments[i].size() + 1);
+		memcpy(&commandLine[position], Arguments[i].c_str(), Arguments[i].size() + 1);
 		position += Arguments[i].size() + 1;
 		argc++;
 	}
+	commandLine[length - 1] = '\0';
 
 	args->argc = argc;
-
-	args->commandLine[args->length - 1] = '\0';
-	args->argv = &args->commandLine;
+	//! Where commandLine will be, not where this copy is
+	args->argv = (char **) (ARGS_ADDR + offsetof(struct __argv, commandLine));
 	args->endARGV = args->argv + 1;
 
-	Arguments.clear();
-
-	return 0;
+	*size = total;
+	return block;
 }
 
 static int RunAppbooter()
 {
-	if (homebrewsize == 0)
+	if (homebrewsize == 0 || !homebrewbuffer)
 		return -1;
+
+	u8 *args = NULL;
+	u32 argsSize = 0;
+	if (!IsDollZ(homebrewbuffer) && !IsSpecialELF(homebrewbuffer))
+	{
+		args = BuildArgs(&argsSize);
+		if (!args)
+			return -1;
+	}
 
 	ExitApp();
 
@@ -129,23 +153,6 @@ static int RunAppbooter()
 		gprintf("Reloaded to IOS%d\n", IOS_GetVersion());
 	}
 
-	DCFlushRange(homebrewbuffer, homebrewsize);
-	ICInvalidateRange(homebrewbuffer, homebrewsize);
-
-	memcpy(BOOTER_ADDR, app_booter_bin, app_booter_bin_size);
-	DCFlushRange(BOOTER_ADDR, app_booter_bin_size);
-	ICInvalidateRange(BOOTER_ADDR, app_booter_bin_size);
-
-	entrypoint entry = (entrypoint)BOOTER_ADDR;
-
-	if (!IsDollZ(homebrewbuffer) && !IsSpecialELF(homebrewbuffer))
-	{
-		struct __argv args;
-		SetupARGV(&args);
-		memcpy(ARGS_ADDR, &args, sizeof(struct __argv));
-		DCFlushRange(ARGS_ADDR, sizeof(struct __argv) + args.length);
-	}
-
 	loadStub();
 	Set_Stub(returnTo(false));
 
@@ -153,6 +160,24 @@ static int RunAppbooter()
 
 	SYS_ResetSystem(SYS_SHUTDOWN, 0, 0);
 	u32 level = IRQ_Disable();
+
+	//! From here on nothing allocates or frees, and the heap blocks under these
+	//! addresses are dead. The image's own block may overlap EXECUTE_ADDR.
+	memmove(EXECUTE_ADDR, homebrewbuffer, homebrewsize);
+	DCFlushRange(EXECUTE_ADDR, homebrewsize);
+	ICInvalidateRange(EXECUTE_ADDR, homebrewsize);
+
+	if (args)
+	{
+		memcpy(ARGS_ADDR, args, argsSize);
+		DCFlushRange(ARGS_ADDR, argsSize);
+	}
+
+	memcpy(BOOTER_ADDR, app_booter_bin, app_booter_bin_size);
+	DCFlushRange(BOOTER_ADDR, app_booter_bin_size);
+	ICInvalidateRange(BOOTER_ADDR, app_booter_bin_size);
+
+	entrypoint entry = (entrypoint)BOOTER_ADDR;
 	CloseExceptionVectors();
 	entry();
 	IRQ_Restore(level);
@@ -171,6 +196,15 @@ int BootHomebrew(const char *filepath)
 	rewind(file);
 
 	if (filesize > MAX_HOMEBREW_SIZE)
+	{
+		fclose(file);
+		return -1;
+	}
+
+	MEM2_free(homebrewbuffer);
+	homebrewsize = 0;
+	homebrewbuffer = (u8 *) MEM2_alloc(filesize);
+	if (!homebrewbuffer)
 	{
 		fclose(file);
 		return -1;

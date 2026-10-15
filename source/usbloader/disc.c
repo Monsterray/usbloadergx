@@ -38,7 +38,9 @@ extern u32 AppEntrypoint;
 #define WII_MAGIC   0x5D1C9EA3
 
 /* Disc pointers */
-static u32 *buffer = (u32 *) 0x93000000;
+//! The partition table and disc header reads. It was 0x93000000, inside GX's MEM2
+//! heap, which those reads wrote over whenever the DVD button mounted a disc.
+static u32 buffer[0x80 / sizeof(u32)] ATTRIBUTE_ALIGN(32);
 static u8 *diskid = (u8 *) Disc_ID;
 static u32 rmode_reg = 0;
 GXRModeObj *rmode = NULL;

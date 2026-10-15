@@ -413,7 +413,7 @@ int UpdateNintendont()
 	if (CheckFile(NINUpdatePath))
 		RenameFile(NINUpdatePath, NINUpdatePathBak);
 
-	if (DownloadFileToPath("https://raw.githubusercontent.com/FIX94/Nintendont/master/loader/loader.dol", NINUpdatePath) > 0)
+	if (DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/loader/loader.dol", NINUpdatePath) > 0)
 	{
 		// Remove existing loader.dol file if found as it has priority over boot.dol, and boot.bak
 		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%s/loader.dol", Settings.NINLoaderPath);
@@ -422,11 +422,11 @@ int UpdateNintendont()
 		// Download icon.png if it doesn't exist
 		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%s/icon.png", Settings.NINLoaderPath);
 		if (!CheckFile(NINUpdatePath))
-			DownloadFileToPath("https://raw.githubusercontent.com/FIX94/Nintendont/master/nintendont/icon.png", NINUpdatePath, false);
+			DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/nintendont/icon.png", NINUpdatePath, false);
 		// Download meta.xml if it doesn't exist (Nintendont will edit meta.xml when it's launched)
 		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%s/meta.xml", Settings.NINLoaderPath);
 		if (!CheckFile(NINUpdatePath))
-			DownloadFileToPath("https://raw.githubusercontent.com/FIX94/Nintendont/master/nintendont/meta.xml", NINUpdatePath, false);
+			DownloadFileToPath("https://raw.githubusercontent.com/Monsterray/Nintendont/master/nintendont/meta.xml", NINUpdatePath, false);
 
 		return 1;
 	}

@@ -5,6 +5,8 @@
  ***************************************************************************/
 #include <unistd.h>
 #include "gui_image_async.h"
+#include "memory/mem2.h"
+#include "gecko.h"
 
 std::vector<GuiImageAsync *> GuiImageAsync::List;
 lwp_t GuiImageAsync::Thread = LWP_THREAD_NULL;
@@ -81,6 +83,29 @@ void GuiImageAsync::ClearQueue()
 	LWP_MutexLock(ListLock);
 	List.clear();
 	LWP_MutexUnlock(ListLock);
+}
+
+bool GuiImageAsync::WaitIdle(u32 timeoutMs)
+{
+	for (u32 waited = 0; InUse != NULL; waited++)
+	{
+		if (waited >= timeoutMs * 10)
+			return false;
+		usleep(100);
+	}
+	return true;
+}
+
+//! Declared in gui_imagedata.h. The pool takes no new texture after TEX_close(), but
+//! the loader thread may be decoding a cover into a block it got just before: the
+//! pixels are written until its callback returns, so wait for that. Then nothing of
+//! GX writes the pool again. The queue goes too, as nothing will draw it.
+void GuiTexturePoolClose(void)
+{
+	TEX_close();
+	GuiImageAsync::ClearQueue();
+	if (!GuiImageAsync::WaitIdle(2000))
+		gprintf("mem: texture pool closed while a cover was still loading\n");
 }
 
 void * GuiImageAsync::GuiImageAsyncThread(void *arg)

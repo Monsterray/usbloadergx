@@ -14,6 +14,8 @@ class GuiImageAsync: public GuiImage
 		virtual ~GuiImageAsync();
 
 		static void ClearQueue();
+		//! Waits up to timeoutMs for the loader thread to finish the image it is loading
+		static bool WaitIdle(u32 timeoutMs);
 	private:
 		GuiImageData *imgData;
 		ImageLoaderCallback callback;

@@ -4,6 +4,7 @@
 #include <malloc.h>
 #include <string.h>
 #include <ogc/system.h>
+#include <ogc/cache.h>
 #define HBC_AGENT_LAYOUT_ONLY
 #define HBC_NETLOG_LAYOUT_ONLY
 #include <hbc_agent.h>
@@ -29,6 +30,31 @@
 
 // Forbid the use of MEM2 through malloc
 u32 MALLOC_MEM2 = 0;
+
+//! The MEM1 texture pool: MEM1 nothing uses while the menus run, lent to the GUI's
+//! texture pixels (TEX_alloc) from TEX_init() until TEX_close(). docs/MEMORY-MAP.md
+//! lists every boot path that writes there, and each one runs after AppCleanUp(),
+//! which closes the pool. Only texture pixels go here: nothing libogc, IOS or a
+//! device reads or writes, and nothing a boot path still uses after AppCleanUp().
+//! - low: from 0x80004000 (under it: OS globals, exception vectors, the HBC stub
+//!   at 0x80001800, a game's code handler, the hbc netlog at 0x80002F20, libogc's
+//!   exception table at 0x80003000) up to GX's own image (.init at 0x80B00000).
+//!   The game's DOL, an apploader's or a booted app's sections load here.
+//! - high: 0x81700000-0x81800000, which the newlib heap is kept out of
+//!   (MAX_MEM1_ARENA_LO). The apploader puts the game's FST there, channels
+//!   their BI2 at 0x817FE000, and libogc a crash screen at 0x81700000.
+#define TEX_LOW_START			0x80004000
+#define TEX_HIGH_START			0x81700000
+#define TEX_HIGH_END			0x81800000
+//! Less than this below GX's image is not worth a pool
+#define TEX_LOW_MIN_SIZE		(1024 * 1024)
+
+extern "C" char __app_start[];	// GX's entry point, the first byte of its image
+
+enum { TEX_UNOPENED, TEX_OPEN, TEX_CLOSED };
+static CMEM2Alloc g_texLo;
+static CMEM2Alloc g_texHi;
+static volatile int g_texState = TEX_UNOPENED;
 
 //! The heap is two pools, one on each side of the hbc records. An allocation never
 //! spans the records; the lower pool is tried first.
@@ -97,6 +123,41 @@ static void *mem2_reallocate(void *p, unsigned int s)
 	memcpy(n, p, old < s ? old : s);
 	pool->release(p);
 	return n;
+}
+
+//! The texture pool a MEM1 pointer came from, or NULL. Its ranges stay known after
+//! TEX_close(), so a texture freed late is still routed here and dropped, and never
+//! reaches newlib's free().
+static CMEM2Alloc *tex_owner(void *p)
+{
+	if (g_texLo.Owns(p))
+		return &g_texLo;
+	if (g_texHi.Owns(p))
+		return &g_texHi;
+	return 0;
+}
+
+//! NULL once the pool is closed (or was never opened)
+static void *tex_allocate(unsigned int s)
+{
+	if (g_texState != TEX_OPEN)
+		return 0;
+	void *p = g_texLo.allocate(s);
+	return p ? p : g_texHi.allocate(s);
+}
+
+static unsigned int tex_free(void)
+{
+	return g_texState == TEX_OPEN ? g_texLo.FreeSize() + g_texHi.FreeSize() : 0;
+}
+
+static unsigned int tex_largest(void)
+{
+	if (g_texState != TEX_OPEN)
+		return 0;
+	unsigned int lo = g_texLo.LargestFree();
+	unsigned int hi = g_texHi.LargestFree();
+	return lo > hi ? lo : hi;
 }
 
 extern "C"
@@ -188,14 +249,18 @@ unsigned int MEM2_largestfree()
 void MEM_Report(const char *where)
 {
 	struct mallinfo mi = mallinfo();
-	void *loBase, *hiBase;
-	unsigned int loSize, hiSize;
+	void *loBase, *hiBase, *texLoBase, *texHiBase;
+	unsigned int loSize, hiSize, texLoSize, texHiSize;
 	g_mem2lo.info(loBase, loSize);
 	g_mem2hi.info(hiBase, hiSize);
-	gprintf("mem %s: arena1 %p-%p heap %u used %u free %u | pool %p+%u %p+%u free %u largest %u | arena2 %p-%p\n",
+	g_texLo.info(texLoBase, texLoSize);
+	g_texHi.info(texHiBase, texHiSize);
+	gprintf("mem %s: arena1 %p-%p heap %u used %u free %u | pool %p+%u %p+%u free %u largest %u | arena2 %p-%p"
+			" | tex %p+%u %p+%u free %u largest %u\n",
 			where, SYS_GetArena1Lo(), SYS_GetArena1Hi(), mi.arena, mi.uordblks, mi.fordblks,
 			loBase, loSize, hiBase, hiSize, MEM2_freesize(), MEM2_largestfree(),
-			SYS_GetArena2Lo(), SYS_GetArena2Hi());
+			SYS_GetArena2Lo(), SYS_GetArena2Hi(),
+			texLoBase, texLoSize, texHiBase, texHiSize, tex_free(), tex_largest());
 }
 
 void *MEM1_alloc(unsigned int s)
@@ -210,7 +275,11 @@ void *MEM1_memalign(unsigned int a, unsigned int s)
 
 void MEM1_free(void *p)
 {
-	__real_free(p);
+	CMEM2Alloc *tex = tex_owner(p);
+	if (tex)
+		tex->release(p);
+	else
+		__real_free(p);
 }
 
 void *MEM1_realloc(void *p, unsigned int s)
@@ -316,11 +385,13 @@ void __wrap_free(void *p)
 	if (((u32)p & 0x10000000) != 0)
 	{
 		mem2_release(p);
+		return;
 	}
+	CMEM2Alloc *tex = tex_owner(p);
+	if (tex)
+		tex->release(p);
 	else
-	{
 		__real_free(p);
-	}
 }
 
 static void *realloc_impl(void *p, size_t size)
@@ -343,6 +414,23 @@ static void *realloc_impl(void *p, size_t size)
 			memcpy(n, p, old < size ? old : size);
 			mem2_release(p);
 		}
+		return n;
+	}
+	// ptr from the MEM1 texture pool: no room there (or closed) moves it out
+	CMEM2Alloc *tex = tex_owner(p);
+	if (tex)
+	{
+		n = tex->reallocate(p, size);
+		if (n != 0) {
+			return n;
+		}
+		n = malloc_impl(size);
+		if (n == 0) {
+			return 0;
+		}
+		unsigned int old = tex->usableSize(p);
+		memcpy(n, p, old < size ? old : size);
+		tex->release(p);
 		return n;
 	}
 	// ptr from malloc
@@ -373,7 +461,64 @@ size_t __wrap_malloc_usable_size(void *p)
 {
 	if (((u32)p & 0x10000000) != 0)
 		return mem2_usable(p);
+	CMEM2Alloc *tex = tex_owner(p);
+	if (tex)
+		return tex->usableSize(p);
 	return __real_malloc_usable_size(p);
+}
+
+void TEX_init(void)
+{
+	if (g_texState != TEX_UNOPENED)
+		return;
+
+	u32 lo = TEX_LOW_START;
+	u32 hi = (u32) __app_start & ~31;
+	if (hi >= lo + TEX_LOW_MIN_SIZE)
+		g_texLo.init((void *) lo, (void *) hi);
+
+	//! The top MiB only while the newlib heap is below it. Arena1Hi stays lowered
+	//! after TEX_close() too: a newlib block up there would look like a texture to free().
+	if ((u32) SYS_GetArena1Lo() <= TEX_HIGH_START && (u32) SYS_GetArena1Hi() == TEX_HIGH_END)
+	{
+		SYS_SetArena1Hi((void *) TEX_HIGH_START);
+		g_texHi.init((void *) TEX_HIGH_START, (void *) TEX_HIGH_END);
+	}
+	g_texState = TEX_OPEN;
+}
+
+void TEX_close(void)
+{
+	int was = g_texState;
+	g_texState = TEX_CLOSED;
+	if (was != TEX_OPEN)
+		return;
+	if (g_texLo.getEndAddress())
+		g_texLo.close();
+	if (g_texHi.getEndAddress())
+		g_texHi.close();
+}
+
+void *TEX_alloc(unsigned int s)
+{
+	void *p = tex_allocate(s);
+	if (!p)
+		p = memalign_impl(32, s);
+	TRACE_BIG("TEX_alloc", s, p);
+	return p;
+}
+
+void *TEX_adopt(void *p, unsigned int s)
+{
+	if (!p || !s || tex_owner(p))
+		return p;
+	void *t = tex_allocate(s);
+	if (!t)
+		return p;
+	memcpy(t, p, s);
+	DCFlushRange(t, s);
+	__wrap_free(p);
+	return t;
 }
 
 } ///extern "C"

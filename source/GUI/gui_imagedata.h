@@ -66,4 +66,9 @@ class GuiImageData
 		u8 format; //!< Texture format
 };
 
+//! Closes the MEM1 texture pool (TEX_alloc in memory/mem2.h) for good, once no texture
+//! is being written. AppCleanUp() calls it first: every boot path that writes that
+//! MEM1 runs after AppCleanUp().
+void GuiTexturePoolClose(void);
+
 #endif

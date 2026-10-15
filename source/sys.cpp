@@ -120,6 +120,7 @@ void AppCleanUp(void)
 		return;
 
 	app_clean = true;
+	GuiTexturePoolClose(); // before anything of a game or app is written to MEM1
 	ExitStep("AppCleanUp");
 
 	//! Every exit and every boot of a game, a channel or a homebrew app comes

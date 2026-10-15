@@ -26,6 +26,19 @@ unsigned int MEM2_freesize();
 unsigned int MEM2_largestfree();
 void MEM_Report(const char *where);
 
+//! The MEM1 texture pool (mem2.cpp): MEM1 that only boot paths write, and only after
+//! AppCleanUp(). TEX_init() opens it once start-up is done; GuiTexturePoolClose()
+//! closes it for good at the top of AppCleanUp(). free(), realloc() and
+//! malloc_usable_size() route a pool pointer by address, also after the close.
+void TEX_init(void);
+void TEX_close(void);
+//! 32-byte aligned pixels for GX: the pool, else memalign(32, s). Texture data only:
+//! never a buffer IOS, a device or a boot path uses.
+void *TEX_alloc(unsigned int s);
+//! Moves a texture buffer of s bytes into the pool when it fits there and frees the
+//! old one. Returns the buffer to use from now on.
+void *TEX_adopt(void *p, unsigned int s);
+
 #ifdef __cplusplus
 }
 #endif

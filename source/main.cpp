@@ -50,6 +50,8 @@ int main(int argc, char *argv[])
 
 	if(StartUpProcess::Run(argc, argv) < 0)
 		return -1;
+	// MEM1 for the menus' textures; after start-up, whose IOS reloads are done by now
+	TEX_init();
 	MEM_Report("startup done");
 
 	MainMenu(MENU_DISCLIST);

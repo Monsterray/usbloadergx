@@ -34,9 +34,17 @@ void CMEM2Alloc::clear(void)
 	memset(m_baseAddress, 0, (u8 *)m_endAddress - (u8 *)m_baseAddress);
 }
 
+void CMEM2Alloc::close(void)
+{
+	LockMutex lock(m_mutex);
+	m_closed = true;
+}
+
 unsigned int CMEM2Alloc::usableSize(void *p)
 {
 	LockMutex lock(m_mutex);
+	if (m_closed)
+		return 0;
 	return p == 0 ? 0 : ((SBlock *)p - 1)->s * sizeof (SBlock);
 }
 
@@ -46,6 +54,8 @@ void *CMEM2Alloc::allocate(unsigned int s)
 		s = 1;
 	//
 	LockMutex lock(m_mutex);
+	if (m_closed)
+		return 0;
 	//
 	s = (s - 1) / sizeof (SBlock) + 1;
 	// First block
@@ -106,6 +116,8 @@ void CMEM2Alloc::release(void *p)
 		return;
 
 	LockMutex lock(m_mutex);
+	if (m_closed)
+		return;
 	SBlock *i = (SBlock *)p - 1;
 	i->f = true;
 
@@ -148,6 +160,8 @@ void *CMEM2Alloc::reallocate(void *p, unsigned int s)
 	s = (s - 1) / sizeof (SBlock) + 1;
 	{
 		LockMutex lock(m_mutex);
+		if (m_closed)
+			return 0;
 
 		//out of memory /* Dimok */
 		if (i + s + 1 >= m_endAddress)
@@ -203,6 +217,8 @@ unsigned int CMEM2Alloc::LargestFree()
 {
 	LockMutex lock(m_mutex);
 
+	if (m_closed)
+		return 0;
 	if (m_first == 0)
 		return (const char *) m_endAddress - (const char *) m_baseAddress;
 
@@ -226,6 +242,8 @@ unsigned int CMEM2Alloc::FreeSize()
 {
 	LockMutex lock(m_mutex);
 
+	if (m_closed)
+		return 0;
 	if (m_first == 0)
 		return (const char *) m_endAddress - (const char *) m_baseAddress;
 

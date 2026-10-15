@@ -15,6 +15,9 @@ public:
 	void init(void *addr, void *end);
 	void cleanup(void);
 	void clear(void);
+	//! For good: allocate() and reallocate() fail, release() leaves the block alone and
+	//! nothing walks the blocks again, whatever is written over them afterwards
+	void close(void);
 	unsigned int usableSize(void *p);
 	void forceEndAddress(void *newAddr) { m_endAddress = (SBlock *)newAddr; }
 	void *getEndAddress(void) const { return m_endAddress; }
@@ -23,7 +26,7 @@ public:
 	bool Owns(const void *p) const { return p >= (const void *) m_baseAddress && p < (const void *) m_endAddress; }
 	unsigned int LargestFree();
 	//
-	CMEM2Alloc(void) : m_baseAddress(0), m_endAddress(0), m_first(0), m_mutex(0) { }
+	CMEM2Alloc(void) : m_baseAddress(0), m_endAddress(0), m_first(0), m_mutex(0), m_closed(false) { }
 private:
 	struct SBlock
 	{
@@ -36,6 +39,7 @@ private:
 	SBlock *m_endAddress;
 	SBlock *m_first;
 	mutex_t m_mutex;
+	bool m_closed;
 private:
 	CMEM2Alloc(const CMEM2Alloc &);
 };

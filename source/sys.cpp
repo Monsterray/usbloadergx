@@ -172,16 +172,20 @@ void ExitApp(void)
 {
 	AppCleanUp();
 	WBFS_CloseAll();
-	ExitStep("unmounting");
-	DeviceHandler::DestroyInstance();
-	//! The card is gone: gecko output only from here
-	gprintf("exit: USB\n");
+	//! USB goes before the SD card, so exit.log on the card records every step but the last
+	ExitStep("unmounting USB");
+	DeviceHandler::Instance()->UnMountAllUSB();
+	ExitStep("USB deinit");
 	USBStorage2_Deinit();
 	USB_Deinitialize();
+	ExitStep("play log");
 	if (Settings.PlaylogUpdate)
 		Playlog_Delete(); // Don't show USB Loader GX in the Wii message board
 
+	ExitStep("magic patches");
 	MagicPatches(0);
+	ExitStep("unmounting SD, then the next program");
+	DeviceHandler::DestroyInstance();
 }
 
 void Sys_Reboot(void)
@@ -250,6 +254,7 @@ void Sys_LoadMenu(void)
 
 void Sys_BackToLoader(void)
 {
+	ExitStep("Sys_BackToLoader");
 	ExitApp();
 
 	if (hbcStubAvailable())
@@ -266,6 +271,7 @@ void Sys_BackToLoader(void)
 
 void Sys_LoadHBC(void)
 {
+	ExitStep("Sys_LoadHBC");
 	// A Wii VC inject cannot launch a title from here; boot the HBC it found
 	// installed (channels.cpp) the way a channel is booted.
 	if (isWiiVC && HBCTID)

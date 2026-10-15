@@ -42,5 +42,17 @@ echo "$text_loop" | grep -q 'data_start\[i\]' \
 grep -qE '\b(strcpy|strcat)\(' "$SRC/usbloader/splits.c" \
 	&& fail "splits.c uses an unbounded string copy for split file names"
 
+# 5. The MEM1 texture pool (memory/mem2.cpp) lies where games, apploaders and
+#    booted apps load. AppCleanUp() must close it before it does anything else,
+#    and only main.cpp may open it, after start-up and its IOS reloads.
+cleanup=$(awk '/^void AppCleanUp\(void\)/ { on = 1 } on { print } on && /^}/ { exit }' "$SRC/sys.cpp")
+[ -n "$cleanup" ] || fail "could not locate AppCleanUp() in sys.cpp"
+echo "$cleanup" | grep -A1 'app_clean = true;' | grep -q 'GuiTexturePoolClose();' \
+	|| fail "AppCleanUp() does not close the MEM1 texture pool right after app_clean = true"
+opens=$(grep -rl --include='*.c' --include='*.cpp' 'TEX_init()' "$SRC" | grep -v 'memory/mem2.cpp' | sed "s|^$SRC/||")
+[ "$opens" = "main.cpp" ] || fail "TEX_init() is called from somewhere other than main.cpp: $opens"
+awk '/StartUpProcess::Run/ { run = NR } /TEX_init\(\)/ { init = NR } END { exit !(run && init > run) }' "$SRC/main.cpp" \
+	|| fail "main.cpp opens the MEM1 texture pool before start-up has run"
+
 [ "$status" -eq 0 ] && echo "OK: disc boot path guards are in place"
 exit "$status"

@@ -30,6 +30,7 @@
 #include "usbloader/MountGamePartition.h"
 #include "usbloader/wdvd.h"
 #include "mload/mload_modules.h"
+#include "memory/mem2.h"
 #include "audio.h"
 #include "gecko.h"
 #include "menu.h"
@@ -211,6 +212,7 @@ int MainMenu(int menu)
 
 	while (currentMenu != MENU_EXIT)
 	{
+		MEM_Report("menu");
 		switch (currentMenu)
 		{
 			case MENU_SETTINGS:

@@ -39,16 +39,18 @@ int main(int argc, char *argv[])
 	// init video
 	InitVideo();
 	// video frame buffers must be in mem1
-	MEM2_init(48);
+	MEM2_init();
 	// init gecko
 	InitGecko();
 	// redirect stdout and stderr to gecko
 	USBGeckoOutput();
+	MEM_Report("start");
 
 	setlocale(LC_ALL, "en_US.UTF-8");
 
 	if(StartUpProcess::Run(argc, argv) < 0)
 		return -1;
+	MEM_Report("startup done");
 
 	MainMenu(MENU_DISCLIST);
 	return 0;

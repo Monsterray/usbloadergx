@@ -1,10 +1,7 @@
 #include "mem2alloc.hpp"
 
 #include <ogc/system.h>
-#include <algorithm>
 #include <string.h>
-
-#define IOS_RELOAD_AREA		0x90200000
 
 class LockMutex
 {
@@ -13,17 +10,6 @@ public:
 	LockMutex(mutex_t &m) : m_mutex(m) { LWP_MutexLock(m_mutex); }
 	~LockMutex(void) { LWP_MutexUnlock(m_mutex); }
 };
-
-void CMEM2Alloc::init(unsigned int size)
-{
-	m_first = 0;
-	m_baseAddress = (SBlock *) std::max(((u32)SYS_GetArena2Lo() + 31) & ~31, (u32)IOS_RELOAD_AREA);
-	m_endAddress = (SBlock *) ((char *)m_baseAddress + std::min((u32)(size * 0x100000), SYS_GetArena2Size() & ~31));
-	if (m_endAddress > (SBlock *) 0x93300000) //rest is reserved for usb/usb2/network and other stuff... (0xE0000 bytes)
-		m_endAddress = (SBlock *) 0x93300000;
-	SYS_SetArena2Lo(m_endAddress);
-	LWP_MutexInit(&m_mutex, 0);
-}
 
 void CMEM2Alloc::init(void *addr, void *end)
 {
@@ -38,9 +24,6 @@ void CMEM2Alloc::cleanup(void)
 	LWP_MutexDestroy(m_mutex);
 	m_mutex = 0;
 	m_first = 0;
-	// Try to release the range we took through SYS functions
-	if (SYS_GetArena2Lo() == m_endAddress)
-		SYS_SetArena2Lo(m_baseAddress);
 	m_baseAddress = 0;
 	m_endAddress = 0;
 }
@@ -213,6 +196,30 @@ void *CMEM2Alloc::reallocate(void *p, unsigned int s)
 	memcpy(n, p, i->s * sizeof (SBlock));
 	release(p);
 	return n;
+}
+
+//! The biggest block an allocation can still get, in bytes
+unsigned int CMEM2Alloc::LargestFree()
+{
+	LockMutex lock(m_mutex);
+
+	if (m_first == 0)
+		return (const char *) m_endAddress - (const char *) m_baseAddress;
+
+	unsigned int largest = 0;
+	for (SBlock *i = m_first; i != 0; i = i->next)
+	{
+		unsigned int s = 0;
+		if (i->f && i->next != 0)
+			s = i->s;
+		else if (i->f)
+			s = m_endAddress - i - 1;
+		else if (i->next == 0 && m_endAddress - i > (int) i->s + 2)
+			s = m_endAddress - i - i->s - 2;
+		if (s > largest)
+			largest = s;
+	}
+	return largest * sizeof(SBlock);
 }
 
 unsigned int CMEM2Alloc::FreeSize()

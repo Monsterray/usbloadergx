@@ -12,7 +12,6 @@ public:
 	void *allocate(unsigned int s);
 	void release(void *p);
 	void *reallocate(void *p, unsigned int s);
-	void init(unsigned int size);
 	void init(void *addr, void *end);
 	void cleanup(void);
 	void clear(void);
@@ -21,6 +20,8 @@ public:
 	void *getEndAddress(void) const { return m_endAddress; }
 	void info(void *&address, unsigned int &size) const { address = m_baseAddress; size = (const char *)m_endAddress - (const char *)m_baseAddress; }
 	unsigned int FreeSize();
+	bool Owns(const void *p) const { return p >= (const void *) m_baseAddress && p < (const void *) m_endAddress; }
+	unsigned int LargestFree();
 	//
 	CMEM2Alloc(void) : m_baseAddress(0), m_endAddress(0), m_first(0), m_mutex(0) { }
 private:

@@ -16,6 +16,8 @@
  *   50000 downloadto https://example.com/x.zip sd:/x.zip
  *                            DownloadFileToPath() it: streamed to the card through
  *                            sd:/x.zip.part; logs the result and MEM2 free
+ *   33000 memhog 1700        hold MEM2 until only 1700 KB are free, as on a
+ *                            Wii running GX (Dolphin has some 45 MB free)
  *
  * Buttons: A B X Y Z START UP DOWN LEFT RIGHT L R. Everything goes to channel
  * 0, merged with whatever a real controller sends. Each event is logged with
@@ -38,7 +40,7 @@
 
 namespace
 {
-enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO };
+enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO, EV_MEMHOG };
 
 struct Event
 {
@@ -116,6 +118,10 @@ void Load()
 		{
 			e.kind = EV_DOWNLOAD; e.url = url;
 		}
+		else if (strcasecmp(cmd, "memhog") == 0 && sscanf(line, "%*u %*s %d", &a) == 1)
+		{
+			e.kind = EV_MEMHOG; e.x = a;
+		}
 		else if (strcasecmp(cmd, "downloadto") == 0 && sscanf(line, "%*u %*s %255s %255s", url, path) == 2)
 		{
 			e.kind = EV_DOWNLOADTO; e.url = url; e.path = path;
@@ -183,6 +189,24 @@ void AutoInput_Apply(void)
 						file.data ? file.data : "");
 				if (file.data)
 					MEM2_free(file.data);
+				break;
+			}
+			case EV_MEMHOG:
+			{
+				// Held until GX exits: the test is what still works with this little
+				u32 freeBefore = MEM2_freesize();
+				u32 keep = (u32) e.x * 1024, blocks = 0;
+				// The heap has more than one region, so this takes several blocks
+				for (u32 size = 32 << 20; size >= 16 << 10 && MEM2_freesize() > keep;)
+				{
+					u32 want = MEM2_freesize() - keep;
+					if (MEM2_alloc(want < size ? want : size))
+						blocks++;
+					else
+						size /= 2;
+				}
+				gprintf("autoinput %u: memhog in %u blocks, MEM2 free %u before, %u after\n", ms, blocks,
+						freeBefore, MEM2_freesize());
 				break;
 			}
 			case EV_DOWNLOADTO:

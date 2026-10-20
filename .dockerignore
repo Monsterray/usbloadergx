@@ -4,3 +4,10 @@ usbloader_gx.zip
 boot.dol
 boot.elf
 *.map
+
+# Local-only working folders, never build inputs: Dolphin profiles and frame dumps,
+# agent worktrees (each a full copy of the repo), bench install staging
+.dev/
+.claude/
+.runs/
+.mcp.json

@@ -143,8 +143,10 @@ sleep 2
 rm -f "$SD/autoinput.txt"
 [ -z "$(gx_pids)" ] || echo "WARNING: Dolphin still running: $(gx_pids | tr '\n' ' ')" >&2
 
-# Keep the last KEEP frames.
-ls -v "$U"/Dump/Frames/*.png 2>/dev/null | tail -n "$KEEP" | while read -r f; do cp "$f" "$OUT/frames/"; done
+# Keep the last KEEP frames, and drop the rest: a long run dumps thousands, and the
+# profile's Dump/Frames grew to 8 GB when they stayed there.
+ls -v "$U"/Dump/Frames/*.png 2>/dev/null | tail -n "$KEEP" | while read -r f; do mv "$f" "$OUT/frames/"; done
+rm -f "$U"/Dump/Frames/*.png
 N=$(ls "$OUT/frames" | wc -l | tr -d ' ')
 cp "$U"/Logs/dolphin.log "$OUT/" 2>/dev/null || true
 # Dolphin closing the socket ends the reader; give it a moment, then stop it regardless.

@@ -1,5 +1,6 @@
 #include <gctypes.h>
 #include <string.h>
+#include <malloc.h>
 #include <ogc/system.h>
 #include <ogc/lwp_watchdog.h>
 #include <hbc_agent.h>
@@ -123,6 +124,25 @@ static bool exitingApp = false;
 static void UnmountUSB(void)
 {
 	WBFS_CloseAll();
+
+	//! One sector read, timed, before the unmount: tells a drive that has gone to sleep
+	//! (a late first access) from writes that are slow (a quick read, then a slow unmount)
+	const DISC_INTERFACE *usb = DeviceHandler::GetUSB0Interface();
+	if (usb && DeviceHandler::GetUSBPartitionCount() > 0)
+	{
+		u8 *sector = (u8 *)memalign(32, 4096);
+		if (sector)
+		{
+			u64 start = gettime();
+			bool ok = usb->readSectors(0, 1, sector);
+			char step[64];
+			snprintf(step, sizeof(step), "USB sector 0 read %s in %u ms", ok ? "ok" : "FAILED",
+					 (unsigned)ticks_to_millisecs(diff_ticks(start, gettime())));
+			ExitStep(step);
+			free(sector);
+		}
+	}
+
 	for (int i = 0; i < DeviceHandler::GetUSBPartitionCount(); ++i)
 	{
 		char step[40];

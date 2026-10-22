@@ -113,6 +113,27 @@ static void ExitStep(const char *step)
 	fclose(f);
 }
 
+//! Set by ExitApp(): leaving GX, as opposed to booting a game, which needs USB after
+//! AppCleanUp()
+static bool exitingApp = false;
+
+//! USB goes before the SD card, so exit.log on the card records every step but the last.
+//! Each partition's unmount writes its cache back to the drive; the handles' deletion in
+//! UnMountAllUSB() then shuts the USB interface down. exit.log tells the two apart.
+static void UnmountUSB(void)
+{
+	WBFS_CloseAll();
+	for (int i = 0; i < DeviceHandler::GetUSBPartitionCount(); ++i)
+	{
+		char step[40];
+		snprintf(step, sizeof(step), "unmounting USB partition %d", i);
+		ExitStep(step);
+		DeviceHandler::Instance()->UnMountUSB(i);
+	}
+	ExitStep("USB interface shutdown");
+	DeviceHandler::Instance()->UnMountAllUSB();
+}
+
 void AppCleanUp(void)
 {
 	static bool app_clean = false;
@@ -157,6 +178,11 @@ void AppCleanUp(void)
 	ThreadedTask::DestroyInstance();
 	SoundHandler::DestroyInstance();
 	GCGames::DestroyInstance();
+	//! On an exit, USB is unmounted while the network, audio, controllers and NAND still
+	//! run: after them, the unmount took 21 s on the bench Wii. Every thread that reads
+	//! the drive (GUI, banners, images, the agent, ThreadedTask) has ended by here.
+	if (exitingApp)
+		UnmountUSB();
 	ExitStep("network");
 	DeinitNetwork();
 	GameTitles.SetDefault();
@@ -177,20 +203,9 @@ void AppCleanUp(void)
 
 void ExitApp(void)
 {
+	exitingApp = true;
 	AppCleanUp();
-	WBFS_CloseAll();
-	//! USB goes before the SD card, so exit.log on the card records every step but the last
-	//! Each partition's unmount writes its cache back to the drive; the handles' deletion in
-	//! UnMountAllUSB() then shuts the USB interface down. exit.log tells the two apart.
-	for (int i = 0; i < DeviceHandler::GetUSBPartitionCount(); ++i)
-	{
-		char step[40];
-		snprintf(step, sizeof(step), "unmounting USB partition %d", i);
-		ExitStep(step);
-		DeviceHandler::Instance()->UnMountUSB(i);
-	}
-	ExitStep("USB interface shutdown");
-	DeviceHandler::Instance()->UnMountAllUSB();
+	UnmountUSB(); // done already, unless AppCleanUp() ran before for a boot that returned
 	ExitStep("USB deinit");
 	USBStorage2_Deinit();
 	USB_Deinitialize();

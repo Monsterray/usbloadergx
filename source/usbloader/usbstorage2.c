@@ -214,6 +214,13 @@ s32 USBStorage2_ReadSectors(u32 port, u32 sector, u32 numSectors, void *buffer)
 	return ret;
 }
 
+static bool skipUnchangedWrites = false;
+
+void USBStorage2_SkipUnchangedWrites(bool on)
+{
+	skipUnchangedWrites = on;
+}
+
 s32 USBStorage2_WriteSectors(u32 port, u32 sector, u32 numSectors, const void *buffer)
 {
 	u8 *buf = (u8 *) buffer;
@@ -227,6 +234,18 @@ s32 USBStorage2_WriteSectors(u32 port, u32 sector, u32 numSectors, const void *b
 		mem2_ptr = (u8 *) MEM2_alloc(MAX_SECTOR_SIZE * MAX_BUFFER_SECTORS);
 
 	USBStorage2_SetPort(port);
+
+	//! A FAT unmount rewrites its FSInfo sector even when nothing changed. On the bench
+	//! Wii one sector write to a flash drive took from 21 s to minutes while a read took
+	//! 1 ms, and leaving GX sat on a black screen that long. Reading first costs a
+	//! millisecond; a write of the bytes the drive already holds is skipped.
+	if (skipUnchangedWrites && mem2_ptr && numSectors <= MAX_BUFFER_SECTORS)
+	{
+		u32 size = numSectors * hdd_sector_size[port];
+		if (IOS_IoctlvFormat(hid, fd, USB_IOCTL_UMS_READ_SECTORS, "ii:d", sector, numSectors, mem2_ptr, size) >= 0 &&
+			memcmp(mem2_ptr, buffer, size) == 0)
+			return 0;
+	}
 
 	s32 write_size, write_secs;
 

@@ -18,6 +18,8 @@ extern "C"
 
 	s32 USBStorage2_SetPort(u32 port);
 	s32 USBStorage2_GetPort();
+	//! While on, a write whose sectors already hold those bytes is skipped (PartitionHandle::UnMount)
+	void USBStorage2_SkipUnchangedWrites(bool on);
 
 #define DEVICE_TYPE_WII_UMS (('W'<<24)|('U'<<16)|('M'<<8)|'S')
 

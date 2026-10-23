@@ -125,41 +125,6 @@ static void UnmountUSB(void)
 {
 	WBFS_CloseAll();
 
-	//! A sector read took 1 ms and the FAT unmount 21 to 223 s, though GX writes nothing
-	//! to USB while browsing: the unmount's one certain write is the FSInfo sector. Time
-	//! that write alone, with the very bytes just read, as the unmount itself would.
-	PartitionHandle *usb = DeviceHandler::GetUSBPartitionCount() > 0 ? DeviceHandler::Instance()->GetUSBHandleFromPartition(0) : NULL;
-	int part = DeviceHandler::PartitionToPortPartition(0);
-	u8 *sector = usb ? (u8 *)memalign(32, 4096) : NULL;
-	if (sector && strncmp(usb->GetFSName(part), "FAT32", 5) == 0)
-	{
-		const DISC_INTERFACE *io = usb->GetDiscInterface();
-		u32 lba = usb->GetLBAStart(part);
-		char step[80];
-		if (io && io->readSectors(lba, 1, sector))
-		{
-			u32 fsinfo = lba + (sector[0x30] | (sector[0x31] << 8));
-			u64 start = gettime();
-			bool read = fsinfo > lba && io->readSectors(fsinfo, 1, sector);
-			u32 readMs = ticks_to_millisecs(diff_ticks(start, gettime()));
-			//! "RRaA" at 0 and "rrAa" at 0x1E4: an FSInfo sector, nothing else gets written
-			if (read && memcmp(sector, "RRaA", 4) == 0 && memcmp(sector + 0x1E4, "rrAa", 4) == 0)
-			{
-				start = gettime();
-				bool written = io->writeSectors(fsinfo, 1, sector);
-				snprintf(step, sizeof(step), "FSInfo sector %u: read %u ms, same bytes written %s in %u ms", fsinfo,
-						 readMs, written ? "ok" : "FAILED", (unsigned)ticks_to_millisecs(diff_ticks(start, gettime())));
-			}
-			else
-				snprintf(step, sizeof(step), "FSInfo sector %u: read %s in %u ms, no FSInfo signature", fsinfo,
-						 read ? "ok" : "FAILED", readMs);
-		}
-		else
-			snprintf(step, sizeof(step), "boot sector %u read FAILED", lba);
-		ExitStep(step);
-	}
-	free(sector);
-
 	for (int i = 0; i < DeviceHandler::GetUSBPartitionCount(); ++i)
 	{
 		char step[40];

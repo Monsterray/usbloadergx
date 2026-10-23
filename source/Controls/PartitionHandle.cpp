@@ -36,6 +36,7 @@
 #include "utils/uncompress.h"
 #include "BootSector.h"
 #include "PartitionHandle.h"
+#include "usbloader/usbstorage2.h"
 
 //! libfat stuff
 extern "C"
@@ -206,8 +207,12 @@ void PartitionHandle::UnMount(int pos)
 	char DeviceSyn[20];
 	snprintf(DeviceSyn, sizeof(DeviceSyn), "%s:", MountNameList[pos].c_str());
 
-	// Closing all open Files write back the cache
+	// Closing all open Files write back the cache. An unmount rewrites the FSInfo
+	// sector even when nothing changed, and that one write took minutes on a flash
+	// drive (usbstorage2.c): skip writes of what the drive already holds.
+	USBStorage2_SkipUnchangedWrites(true);
 	fatUnmount(DeviceSyn);
+	USBStorage2_SkipUnchangedWrites(false);
 	// Closing all open Files write back the cache
 	ntfsUnmount(DeviceSyn, true);
 	// Closing all open Files write back the cache

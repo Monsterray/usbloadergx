@@ -23,6 +23,9 @@ extern "C"
 #ifdef USB_BENCH
 	//! The cIOS bench build only (utils/UsbBench.cpp): no skip in unmounts, and write counters
 	void USBStorage2_BenchNoSkip(bool on);
+	//! On by default: every USB write is refused, until -benchwrites=1
+	void USBStorage2_BenchReadOnly(bool on);
+	u32 USBStorage2_BenchRefused(void);
 	void USBStorage2_BenchWrites(u32 *calls, u32 *sectors, u32 *failed, u32 *totalMs, u32 *maxUs);
 #endif
 

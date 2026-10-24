@@ -1,4 +1,4 @@
-"""usb_bench.py [--mode io|launch] [--skip 0|1] [--limit S] [--dol PATH] [--wait S] [--dry-run]
+"""usb_bench.py [--mode io|launch|dump] [--allow-writes] [--skip 0|1] [--limit S] [--dol PATH] [--wait S] [--dry-run]
 -- time USB Loader GX's USB work on the bench Wii's cIOS 249.
 
 Runs the bench build (`bash scripts/build.sh bench` -> .dev/usbbench/boot.dol,
@@ -11,9 +11,13 @@ usbbench.log (the measurements) and exit.log (the exit, its unmount timed).
 Everything is kept in .runs/usb_bench/<time>-<mode>/.
 
 GX exits to HBC by itself at the end, so the job leaves the Wii in HBC. It
-writes to the USB drive (one FSInfo sector rewritten with its own bytes, and
-<usb>:/usbbench/GXGlobal.cfg) and to the review folder on SD. It installs
-nothing and never touches a cIOS.
+writes to the review folder on SD, installs nothing and never touches a cIOS.
+It writes nothing to the USB drive unless --allow-writes is given: the build
+refuses every USB write by default, since the d2x fork's debug cIOS was found
+(2026-10-24) to land writes as junk on the bench drive. With --allow-writes,
+io mode rewrites one FSInfo sector with its own bytes and saves
+<usb>:/usbbench/GXGlobal.cfg. --mode dump only reads: FAT1 against FAT2, the
+FSInfo, root directory and usbbench sectors, for what earlier writes left.
 
 On the shared bench Wii, run it only as a queue job:
 
@@ -92,11 +96,13 @@ def main():
         print(__doc__)
         return 0
     mode = opt(a, "--mode", "io")
-    if mode not in ("io", "launch"):
-        sys.exit("--mode is io or launch")
+    if mode not in ("io", "launch", "dump"):
+        sys.exit("--mode is io, launch or dump")
     dol = pathlib.Path(opt(a, "--dol", REPO / ".dev" / "usbbench" / "boot.dol"))
     tool = os.environ.get("HBC_TOOL", "C:/projects/hbc-reborn/tools/hbc.py")
     args = ["-ios=249", "-bench=" + mode]
+    if "--allow-writes" in a:
+        args.append("-benchwrites=1")
     if "--skip" in a:
         args.append("-benchskip=" + opt(a, "--skip", "0"))
     if "--limit" in a:

@@ -14,6 +14,13 @@
  *   -benchskip=0|1  whether the exit's unmount skips writes of unchanged
  *                   sectors (4029590c, GX's default). Default: 0 for io, so
  *                   the unmount does the writes libfat asks for, 1 for launch
+ *   -bench=dump     reads only: the FAT32 boot and FSInfo sectors, FAT1
+ *                   against FAT2 sector by sector, the root directory and the
+ *                   usbbench folder, each flagged when it holds a Bulk-Only
+ *                   command block ("USBC") or zeros; then the exit
+ *   -benchwrites=1  lets GX write to the drive. Without it every USB write is
+ *                   refused in usbstorage2.c before IOS sees it: a cIOS whose
+ *                   writes land as junk (d2x fork, 2026-10-24) must not touch it
  *   -benchlimit=S   a step still running after S seconds (default 600) ends
  *                   the run through hbc_agent_fatal_now(), back to HBC
  *
@@ -47,7 +54,7 @@
 
 #define REVIEW_CONFIG "sd:/apps/usbloader_gx_review/"
 
-static bool launchMode = false;
+static bool launchMode = false, dumpMode = false, writesAllowed = false;
 static int skipArg = -1;
 static u32 limitS = 600;
 static bool logOpen = false;
@@ -129,11 +136,16 @@ void UsbBench_Init(int argc, char *argv[])
 			continue;
 		if (strcmp(argv[i], "-bench=launch") == 0)
 			launchMode = true;
+		else if (strcmp(argv[i], "-bench=dump") == 0)
+			dumpMode = true;
+		else if (strcmp(argv[i], "-benchwrites=1") == 0)
+			writesAllowed = true;
 		else if (strncmp(argv[i], "-benchskip=", 11) == 0)
 			skipArg = atoi(argv[i] + 11) ? 1 : 0;
 		else if (strncmp(argv[i], "-benchlimit=", 12) == 0 && atoi(argv[i] + 12) > 0)
 			limitS = atoi(argv[i] + 12);
 	}
+	USBStorage2_BenchReadOnly(!writesAllowed);
 	//! A wiiload start passes only the file's name: use the review build's folder
 	//! (scripts/wii_install.py), never an installed release's.
 	if (argc < 1 || !argv || !argv[0] || !strchr(argv[0], ':'))
@@ -367,16 +379,207 @@ static void LaunchReads(void)
 	Step(NULL);
 }
 
+//! -bench=dump: what a cIOS's writes left on the drive, read only
+
+static u32 Le16(const u8 *p)
+{
+	return p[0] | (p[1] << 8);
+}
+
+static u32 Le32(const u8 *p)
+{
+	return p[0] | (p[1] << 8) | (p[2] << 16) | ((u32)p[3] << 24);
+}
+
+static const char *Kind(const u8 *s)
+{
+	if (memcmp(s, "USBC", 4) == 0)
+		return "USBC";
+	for (int i = 0; i < 512; ++i)
+		if (s[i])
+			return "data";
+	return "zeros";
+}
+
+//! The first 32 bytes as hex
+static const char *Hex32(const u8 *s)
+{
+	static char buf[2][72];
+	static int n = 0;
+	char *b = buf[n++ & 1];
+	for (int i = 0; i < 32; ++i)
+		snprintf(b + i * 2, 3, "%02x", s[i]);
+	return b;
+}
+
+static void DumpSector(const DISC_INTERFACE *io, u8 *buf, u32 lba, const char *what)
+{
+	if (!io->readSectors(lba, 1, buf))
+		Log("LBA %u %s: READ FAILED", lba, what);
+	else
+		Log("LBA %u %s: %s %s", lba, what, Kind(buf), Hex32(buf));
+}
+
+//! One FAT entry, from the FAT that starts at fat
+static u32 FatEntry(const DISC_INTERFACE *io, u8 *buf, u32 fat, u32 cluster)
+{
+	if (!io->readSectors(fat + cluster / 128, 1, buf))
+		return 0xFFFFFFFF;
+	return Le32(buf + (cluster % 128) * 4) & 0x0FFFFFFF;
+}
+
+static void Dump(void)
+{
+	PartitionHandle *usb = DeviceHandler::GetUSBPartitionCount() > 0 ? DeviceHandler::Instance()->GetUSBHandleFromPartition(0) : NULL;
+	int part = DeviceHandler::PartitionToPortPartition(0);
+	const DISC_INTERFACE *io = usb ? usb->GetDiscInterface() : NULL;
+	const u32 chunk = 64;
+	u8 *a = (u8 *)memalign(32, chunk * 512), *b = (u8 *)memalign(32, chunk * 512);
+	if (!io || !a || !b)
+	{
+		Log("dump: SKIPPED, no USB partition or memory");
+		free(a);
+		free(b);
+		return;
+	}
+	u32 lba = usb->GetLBAStart(part);
+	Step("dump boot sector");
+	if (!io->readSectors(lba, 1, a))
+	{
+		Log("dump: boot sector %u READ FAILED", lba);
+		free(a);
+		free(b);
+		Step(NULL);
+		return;
+	}
+	u32 bps = Le16(a + 11), spc = a[13], res = Le16(a + 14), nfats = a[16];
+	u32 fatsz = Le32(a + 0x24), rootclus = Le32(a + 0x2C), fsinfo = Le16(a + 0x30), backup = Le16(a + 0x32);
+	Log("dump: boot sector %u: %s; %u bytes/sector, %u sectors/cluster, %u reserved, %u FATs of %u sectors, "
+		"root cluster %u, FSInfo +%u, backup +%u",
+		lba, Kind(a), bps, spc, res, nfats, fatsz, rootclus, fsinfo, backup);
+	if (bps != 512 || !spc || (spc & (spc - 1)) || nfats < 1 || nfats > 2 || !fatsz || rootclus < 2 ||
+		memcmp(a + 0x52, "FAT32", 5) != 0)
+	{
+		Log("dump: no FAT32 BPB here; boot sector %s", Hex32(a));
+		free(a);
+		free(b);
+		Step(NULL);
+		return;
+	}
+	DumpSector(io, a, lba + fsinfo, "FSInfo");
+	DumpSector(io, a, lba + backup, "backup boot sector");
+	DumpSector(io, a, lba + backup + 1, "backup FSInfo");
+
+	u32 fat1 = lba + res, fat2 = fat1 + fatsz, data = fat1 + nfats * fatsz;
+
+	//! FAT1 against FAT2: libfat writes both copies, so a sector that differs, or
+	//! holds a command block, is where a write went wrong
+	Step("dump FATs");
+	u32 differ = 0, usbc = 0, failed = 0;
+	u64 t = gettime();
+	for (u32 i = 0; i < fatsz; i += chunk)
+	{
+		u32 n = fatsz - i < chunk ? fatsz - i : chunk;
+		bool okA = io->readSectors(fat1 + i, n, a);
+		bool okB = nfats < 2 || io->readSectors(fat2 + i, n, b);
+		if (!okA || !okB)
+		{
+			failed += n;
+			continue;
+		}
+		for (u32 j = 0; j < n; ++j)
+		{
+			const u8 *sa = a + j * 512, *sb = b + j * 512;
+			bool ca = memcmp(sa, "USBC", 4) == 0, cb = nfats == 2 && memcmp(sb, "USBC", 4) == 0;
+			bool d = nfats == 2 && memcmp(sa, sb, 512) != 0;
+			usbc += ca + cb;
+			differ += d;
+			if ((d || ca || cb) && differ + usbc <= 40)
+				Log("FAT sector %u: FAT1 LBA %u %s %s | FAT2 LBA %u %s %s", i + j, fat1 + i + j, Kind(sa), Hex32(sa),
+					fat2 + i + j, nfats == 2 ? Kind(sb) : "-", nfats == 2 ? Hex32(sb) : "-");
+		}
+	}
+	Log("dump: FATs compared, %u sectors each: %u differ, %u start with USBC, %u unreadable, in %s", fatsz, differ,
+		usbc, failed, Ms(UsSince(t)));
+	if (io->readSectors(fat1, 1, a))
+		Log("FAT1 sector 0 entries 0-1: %08x %08x (expect 0ffffff8 0fffffff, or with clean flags)", Le32(a),
+			Le32(a + 4));
+
+	//! The root directory: each sector's kind, its short names, and usbbench
+	Step("dump root directory");
+	u32 cluster = rootclus, folder = 0, names = 0, folderLba = 0;
+	char list[200] = "";
+	for (int c = 0; c < 8 && cluster >= 2 && cluster < 0x0FFFFFF7; ++c)
+	{
+		u32 first = data + (cluster - 2) * spc;
+		for (u32 sct = 0; sct < spc; ++sct)
+		{
+			if (!io->readSectors(first + sct, 1, a))
+			{
+				Log("root LBA %u: READ FAILED", first + sct);
+				continue;
+			}
+			const char *k = Kind(a);
+			if (strcmp(k, "zeros") != 0 || sct == 0)
+				Log("root cluster %u sector %u, LBA %u: %s %s", cluster, sct, first + sct, k, Hex32(a));
+			for (int e = 0; e < 16; ++e)
+			{
+				const u8 *ent = a + e * 32;
+				if (ent[0] == 0 || ent[0] == 0xE5 || ent[11] == 0x0F)
+					continue;
+				++names;
+				if (strlen(list) + 14 < sizeof(list))
+				{
+					char name[16];
+					snprintf(name, sizeof(name), "%.8s.%.3s ", (const char *)ent, (const char *)ent + 8);
+					strcat(list, name);
+				}
+				if (memcmp(ent, "USBBENCH   ", 11) == 0)
+				{
+					folder = (Le16(ent + 20) << 16) | Le16(ent + 26);
+					folderLba = first + sct;
+				}
+			}
+		}
+		cluster = FatEntry(io, a, fat1, cluster);
+	}
+	Log("root directory: %u entries: %s", names, list);
+
+	if (!folder)
+		Log("usbbench folder: no entry in the root directory");
+	else
+	{
+		Step("dump usbbench folder");
+		u32 first = data + (folder - 2) * spc;
+		u32 e1 = FatEntry(io, a, fat1, folder), e2 = nfats == 2 ? FatEntry(io, a, fat2, folder) : 0;
+		Log("usbbench folder: entry in LBA %u, cluster %u at LBA %u; FAT1 entry %08x, FAT2 entry %08x", folderLba,
+			folder, first, e1, e2);
+		Log("usbbench FAT entries live in FAT1 LBA %u and FAT2 LBA %u", fat1 + folder / 128, fat2 + folder / 128);
+		for (u32 sct = 0; sct < spc; ++sct)
+			DumpSector(io, a, first + sct, sct == 0 ? "usbbench sector 0 (expect . and ..)" : "usbbench");
+	}
+	Step(NULL);
+	free(a);
+	free(b);
+}
+
 void UsbBench_Run(void)
 {
 	bool skip = skipArg >= 0 ? skipArg == 1 : launchMode;
 	PartitionHandle *usb = DeviceHandler::GetUSBPartitionCount() > 0 ? DeviceHandler::Instance()->GetUSBHandleFromPartition(0) : NULL;
 	int part = DeviceHandler::PartitionToPortPartition(0);
 
-	Log("USB Loader GX cIOS bench, mode %s, exit unmount %s, step limit %u s", launchMode ? "launch" : "io",
+	Log("USB Loader GX cIOS bench, mode %s, USB writes %s, exit unmount %s, step limit %u s",
+		dumpMode ? "dump" : launchMode ? "launch" : "io", writesAllowed ? "ALLOWED" : "refused (read-only)",
 		skip ? "skips unchanged sectors (default)" : "writes everything (no skip)", limitS);
 	Log("IOS %d r%d (loader IOS setting %d)%s", IOS_GetVersion(), IOS_GetRevision(), Settings.LoaderIOS,
 		IOS_GetVersion() == 249 ? "" : " -- NOT cIOS 249");
+	//! The refusal is in usbstorage2.c, the cIOS driver; IOS58's libogc driver has none
+	if (!writesAllowed && IOS_GetVersion() < 200)
+	{
+		Log("not on a cIOS, so writes cannot be refused: back to HBC with no clean-up");
+		hbc_agent_fatal_now(0x55534242, "usbbench: IOS %d, read-only needs a cIOS", IOS_GetVersion());
+	}
 	Log("USB partitions: %d; partition 0: %s, mounted as %s:, LBA %u, %u sectors", DeviceHandler::GetUSBPartitionCount(),
 		usb ? usb->GetFSName(part) : "none", usb ? usb->MountName(part) : "-", usb ? usb->GetLBAStart(part) : 0,
 		usb ? usb->GetSecCount(part) : 0);
@@ -384,14 +587,21 @@ void UsbBench_Run(void)
 
 	LWP_CreateThread(&watchThread, Watch, NULL, NULL, 16 * 1024, LWP_PRIO_HIGHEST);
 
-	GameListLoad();
-	if (launchMode)
-		LaunchReads();
+	if (dumpMode)
+		Dump();
 	else
 	{
-		SectorWrite();
-		SettingsSave();
+		GameListLoad();
+		if (launchMode)
+			LaunchReads();
+		else
+		{
+			SectorWrite();
+			SettingsSave();
+		}
 	}
+	if (!writesAllowed)
+		Log("USB writes refused so far: %u", USBStorage2_BenchRefused());
 
 	//! (b) The exit: its unmount is timed in exit.log, as on every exit
 	USBStorage2_BenchNoSkip(!skip);

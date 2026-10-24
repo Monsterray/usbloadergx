@@ -1,4 +1,4 @@
-"""usb_bench.py --mode io|launch|dump [--allow-writes] [--skip 0|1] [--limit S] [--boot S] [--read KIB] [--one BYTES]
+"""usb_bench.py --mode io|launch|dump [--allow-writes] [--skip 0|1] [--limit S] [--boot S] [--read KIB] [--one BYTES] [--allow-di-reads]
                 [--dol PATH] [--wait S] [--dry-run]
 -- time USB Loader GX's USB work on the bench Wii's cIOS 249.
 
@@ -11,7 +11,10 @@ Everything goes to .runs/usb_bench/<time>-<mode>/.
 
   io      game list load, one FSInfo sector rewritten 3x, GXGlobal.cfg saved to USB 2x, exit
   launch  game list load, then a USB Wii game's launch up to its apploader: fragment list,
-          DIP USB mode, disc and partition open, partition reads through the DIP; exit
+          DIP USB mode, disc and partition open; with --allow-di-reads, partition reads
+          through the DIP too. Those hung IOS itself on the bench drive at every size, on
+          stock d2x and on the fork (2026-10-24): no guard or agent can leave that, and the
+          Wii needs a power cycle. Never pass it for an unattended run.
   dump    reads only: boot/FSInfo sectors, FAT1 against FAT2, root directory, usbbench folder
 
 Safety, as WiiStation's bench scripts do it (scripts/wii_targets.py, Gamecube/hbc_home.c,
@@ -135,6 +138,8 @@ def main():
     p.add_argument("--boot", type=int, help="seconds for GX's start-up (default 180)")
     p.add_argument("--read", type=int, choices=(32, 64, 128, 256, 512, 1024),
                    help="launch mode: KiB per sequential WDVD_Read (default 1024)")
+    p.add_argument("--allow-di-reads", action="store_true",
+                   help="launch mode: read the partition through the DIP (has hung IOS: needs someone at the Wii)")
     p.add_argument("--one", type=int, help="launch mode: one WDVD_Read of BYTES (32..1048576, x32) instead")
     p.add_argument("--dol", type=pathlib.Path, default=REPO / ".dev" / "usbbench" / "boot.dol")
     p.add_argument("--wait", type=int, default=1800, help="seconds to wait for HBC to come back")
@@ -152,6 +157,8 @@ def main():
         args.append(f"-benchboot={o.boot}")
     if o.read:
         args.append(f"-benchread={o.read}")
+    if o.allow_di_reads:
+        args.append("-benchdiread=1")
     if o.one:
         if not (32 <= o.one <= 1048576 and o.one % 32 == 0):
             sys.exit("--one is 32 to 1048576 bytes, a multiple of 32")

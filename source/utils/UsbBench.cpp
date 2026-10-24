@@ -25,6 +25,12 @@
  *                   the run through hbc_agent_fatal_now(), back to HBC
  *   -benchread=K    launch mode: the sequential WDVD_Read size in KiB, 32 to 1024
  *                   (default 1024); 32 MiB are read either way
+ *   -benchdiread=1  launch mode: allow WDVD_Read through the DIP after the partition
+ *                   opens. Off by default: on the bench drive the first such read, at
+ *                   any size, hung IOS itself on stock d2x and on the fork
+ *                   (2026-10-24), which no guard or agent can leave; the Wii needed a
+ *                   power cycle each time. Without it the launch stops after
+ *                   WDVD_OpenPartition.
  *   -benchone=B     launch mode: one WDVD_Read of B bytes (32 to 1 MiB, a multiple
  *                   of 32) at partition offset 0 instead of the read benchmarks
  *   -benchboot=S    the same for GX's start-up, from main() to the menu
@@ -66,7 +72,7 @@
 
 #define REVIEW_CONFIG "sd:/apps/usbloader_gx_review/"
 
-static bool launchMode = false, dumpMode = false, writesAllowed = false;
+static bool launchMode = false, dumpMode = false, writesAllowed = false, diReads = false;
 static int skipArg = -1;
 static u32 limitS = 600, bootS = 180, readKiB = 1024, oneRead = 0;
 static volatile u32 stepLimit = 600;
@@ -161,7 +167,14 @@ static void *Watch(void *)
 		u32 limit = stepLimit;
 		if (start && ticks_to_secs(diff_ticks(start, gettime())) >= limit)
 		{
-			Log("TIMEOUT: %s still running after %u s; back to HBC in 5 s", stepName ? stepName : "?", limit);
+			//! No Log(): its SD write is an IPC to IOS, and a step that ran over is most
+			//! likely IOS stuck (the DI reads of 2026-10-24), which would hold the guard
+			//! here for good. The TV and the agent's kept log need no IOS.
+			char line[160];
+			snprintf(line, sizeof(line), "TIMEOUT: %s still running after %u s; back to HBC in 5 s",
+					 stepName ? stepName : "?", limit);
+			gprintf("usbbench: %s\n", line);
+			ScreenLine(line);
 			usleep(5 * 1000 * 1000);
 			//! _now: no exit clean-up, which writes the USB cache back and hung on
 			//! a cIOS whose writes took 17 s each
@@ -204,6 +217,8 @@ void UsbBench_Init(int argc, char *argv[])
 			dumpMode = true;
 		else if (strcmp(argv[i], "-benchwrites=1") == 0)
 			writesAllowed = true;
+		else if (strcmp(argv[i], "-benchdiread=1") == 0)
+			diReads = true;
 		else if (strncmp(argv[i], "-benchskip=", 11) == 0)
 			skipArg = atoi(argv[i] + 11) ? 1 : 0;
 		else if (strncmp(argv[i], "-benchlimit=", 12) == 0 && atoi(argv[i] + 12) > 0)
@@ -617,6 +632,13 @@ static void LaunchReads(void)
 		return;
 
 	char what[100];
+	if (!diReads)
+	{
+		Log("partition reads: SKIPPED. They hung IOS on this drive (needs a power cycle); -benchdiread=1 allows them");
+		WDVD_ClosePartition();
+		Step(NULL);
+		return;
+	}
 	if (oneRead)
 	{
 		//! -benchone=BYTES: one WDVD_Read at partition offset 0 and nothing more, so a

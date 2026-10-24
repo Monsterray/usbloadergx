@@ -15,7 +15,7 @@
  *                   sectors (4029590c, GX's default). Default: 0 for io, so
  *                   the unmount does the writes libfat asks for, 1 for launch
  *   -benchlimit=S   a step still running after S seconds (default 600) ends
- *                   the run through hbc_agent_fatal(), back to HBC
+ *                   the run through hbc_agent_fatal_now(), back to HBC
  *
  * Each line goes to gprintf() (the hbc netlog) and to <config>/usbbench.log,
  * reopened per line; the exit's own steps go to exit.log as always.
@@ -99,7 +99,9 @@ static void *Watch(void *)
 		if (start && ticks_to_secs(diff_ticks(start, gettime())) >= limitS)
 		{
 			Log("TIMEOUT: %s still running after %u s; back to HBC", stepName ? stepName : "?", limitS);
-			hbc_agent_fatal(0x55534242, "usbbench: %s over %u s", stepName ? stepName : "?", limitS);
+			//! _now: no exit clean-up, which writes the USB cache back and hung on
+			//! a cIOS whose writes took 17 s each
+			hbc_agent_fatal_now(0x55534242, "usbbench: %s over %u s", stepName ? stepName : "?", limitS);
 		}
 	}
 	return NULL;
@@ -211,6 +213,21 @@ static void SectorWrite(void)
 	ok = io->readSectors(fsinfo, 1, check);
 	Log("FSInfo read back %s in %s, %s", ok ? "ok" : "FAILED", Ms(UsSince(t)),
 		ok && memcmp(sector, check, 512) == 0 ? "bytes unchanged" : "BYTES DIFFER");
+	if (ok && memcmp(sector, check, 512) != 0)
+	{
+		//! Which bytes the drive gave back changed: written -> read, the first 8 of them
+		int n = 0;
+		for (int i = 0; i < 512; ++i)
+		{
+			if (sector[i] == check[i])
+				continue;
+			if (n < 8)
+				Log("  offset 0x%03x: wrote %02x, read %02x", i, sector[i], check[i]);
+			++n;
+		}
+		Log("  %d of 512 bytes differ; read back starts %02x%02x%02x%02x, ends at 0x1fc %02x%02x%02x%02x", n,
+			check[0], check[1], check[2], check[3], check[0x1fc], check[0x1fd], check[0x1fe], check[0x1ff]);
+	}
 	Step(NULL);
 	free(sector);
 	free(check);
@@ -379,6 +396,8 @@ void UsbBench_Run(void)
 	//! (b) The exit: its unmount is timed in exit.log, as on every exit
 	USBStorage2_BenchNoSkip(!skip);
 	Log("exit: back to HBC; exit.log times the unmount");
+	//! The watch stays on: an unmount past the limit leaves exit.log at that step
+	Step("exit");
 	Sys_BackToLoader();
 }
 

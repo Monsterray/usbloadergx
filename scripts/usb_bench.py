@@ -1,9 +1,11 @@
-"""usb_bench.py [--mode io|launch] [--skip 0|1] [--limit S] [--dol PATH] [--dry-run]
+"""usb_bench.py [--mode io|launch] [--skip 0|1] [--limit S] [--dol PATH] [--wait S] [--dry-run]
 -- time USB Loader GX's USB work on the bench Wii's cIOS 249.
 
 Runs the bench build (`bash scripts/build.sh bench` -> .dev/usbbench/boot.dol,
-source/utils/UsbBench.cpp) with `hbc.py run boot.dol -- -ios=249 -bench=MODE`,
-prints what GX prints, then fetches the two small logs it leaves in the review
+source/utils/UsbBench.cpp) with `hbc.py send boot.dol -- -ios=249 -bench=MODE`,
+waits for GX's agent to answer and then for HBC to answer again (GX sends no
+netlog, so `run` would wait out its timeout), keeps GX's output (`hbc.py
+lastlog`), then fetches the two small logs it leaves in the review
 build's folder (sd:/apps/usbloader_gx_review/, scripts/wii_install.py):
 usbbench.log (the measurements) and exit.log (the exit, its unmount timed).
 Everything is kept in .runs/usb_bench/<time>-<mode>/.
@@ -27,6 +29,7 @@ import os
 import pathlib
 import subprocess
 import sys
+import time
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 REVIEW = "sd:/apps/usbloader_gx_review/"
@@ -49,6 +52,34 @@ def hbc(tool, *args, timeout=None, log=None):
     if log:
         log.write_text("".join(out), encoding="utf-8")
     return rc, "".join(out)
+
+
+def version(tool):
+    """What answers on 4299: "1.10.9" (HBC), "... agent" (GX's agent), or None."""
+    try:
+        p = subprocess.run([sys.executable, tool, "version"], capture_output=True, text=True, timeout=20)
+    except subprocess.TimeoutExpired:
+        return None
+    return p.stdout.strip() if p.returncode == 0 and p.stdout.strip() else None
+
+
+def wait_for_hbc(tool, limit_s):
+    """After the send: GX's agent answers while it runs, nothing answers during its
+    IOS reloads and exit, then HBC answers again. True once HBC is back."""
+    start = time.monotonic()
+    seen_gx = False
+    last = ""
+    while time.monotonic() - start < limit_s:
+        v = version(tool)
+        state = "gx" if v and v.endswith("agent") else "hbc" if v else "none"
+        if state != last:
+            print(f"[{time.monotonic() - start:6.0f} s] {state}: {v or 'no answer'}", flush=True)
+            last = state
+        seen_gx = seen_gx or state in ("gx", "none")
+        if state == "hbc" and seen_gx and time.monotonic() - start > 30:
+            return True
+        time.sleep(10)
+    return False
 
 
 def main():
@@ -82,9 +113,15 @@ def main():
     # A run that stops early must not leave the last run's logs to be read as its own
     for name in ("usbbench.log", "exit.log"):
         hbc(tool, "rm", REVIEW + name)
-    run_rc, _ = hbc(tool, "--timeout", "3000", "run", str(dol), "--", *args, log=out / "run.log")
-    print(f"run exited {run_rc}", flush=True)
-    hbc(tool, "wait", "180")
+    send_rc, _ = hbc(tool, "send", str(dol), "--", *args)
+    if send_rc != 0:
+        sys.exit("HBC did not start the bench build")
+    back = wait_for_hbc(tool, int(opt(a, "--wait", "3000")))
+    if not back:
+        print("STUCK: HBC did not answer again in time; the Wii needs someone to bring it back", flush=True)
+        return 1
+    hbc(tool, "lastlog", log=out / "lastlog.txt")
+    hbc(tool, "crash", log=out / "crash.txt")
     ok = True
     for name in ("usbbench.log", "exit.log"):
         rc, _ = hbc(tool, "get", REVIEW + name, str(out / name))
@@ -92,8 +129,6 @@ def main():
             ok = False
             continue
         print(f"== {name}\n" + (out / name).read_text(encoding="utf-8", errors="replace"), flush=True)
-    if run_rc == 3:
-        hbc(tool, "crash", log=out / "crash.txt")
     bench = (out / "usbbench.log").read_text(errors="replace") if (out / "usbbench.log").exists() else ""
     exitlog = (out / "exit.log").read_text(errors="replace") if (out / "exit.log").exists() else ""
     ok = ok and "exit: back to HBC" in bench and "unmounting SD" in exitlog

@@ -370,7 +370,7 @@ void LoaderSettings::SetOptionNames()
 	Options->SetName(Idx++, "%s", tr( "Memory Card Blocks Size" ));
 	Options->SetName(Idx++, "%s", tr( "Slot B Emulation" ));
 	Options->SetName(Idx++, "%s", tr( "Hybrid EXI" ));
-	Options->SetName(Idx++, "%s", tr( "Large Disc Cache" ));
+	Options->SetName(Idx++, "%s", tr( "Large Disc Cache (Experimental)" ));
 	Options->SetName(Idx++, "%s", tr( "USB-HID Controller" ));
 	Options->SetName(Idx++, "%s", tr( "GameCube Controller" ));
 	Options->SetName(Idx++, "%s", tr( "Wii U GamePad Slot" ));
@@ -612,7 +612,7 @@ void LoaderSettings::SetOptionValues()
 	//! Settings: NIN Memory Card Blocks Size
 	Options->SetValue(Idx++, "%d", MEM_CARD_BLOCKS(Settings.NINMCSize));
 
-	//! Settings: NIN Slot B Emulation, Hybrid EXI, Large Disc Cache (cfg v11/v12 loaders)
+	//! Settings: NIN Slot B Emulation, Hybrid EXI, Large Disc Cache (only loaders with a caps record)
 	Options->SetValue(Idx++, "%s", tr(OnOffText[Settings.NINSlotBEmu]));
 	Options->SetValue(Idx++, "%s", tr(OnOffText[Settings.NINHybridEXI]));
 	Options->SetValue(Idx++, "%s", tr(OnOffText[Settings.NINLargeCache]));
@@ -1153,6 +1153,8 @@ int LoaderSettings::GetMenuInternal()
 	else if (ret == ++Idx)
 	{
 		if (++Settings.NINLargeCache >= MAX_ON_OFF) Settings.NINLargeCache = 0;
+		if (Settings.NINLargeCache == ON)
+			WindowPrompt(tr("Warning:"), tr("The large disc cache is experimental. Some games, such as Twilight Princess, have problems with it. Use at your own risk."), tr("Ok"));
 	}
 
 	//! Settings: NIN USB-HID controller

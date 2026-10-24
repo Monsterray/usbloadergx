@@ -234,7 +234,7 @@ void GCGameLoadSM::SetOptionNames()
 		Options->SetName(Idx++, "%s", tr( "Memory Card Blocks Size" ));
 		Options->SetName(Idx++, "%s", tr( "Slot B Emulation" ));
 		Options->SetName(Idx++, "%s", tr( "Hybrid EXI" ));
-		Options->SetName(Idx++, "%s", tr( "Large Disc Cache" ));
+		Options->SetName(Idx++, "%s", tr( "Large Disc Cache (Experimental)" ));
 		Options->SetName(Idx++, "%s", tr( "USB-HID Controller" ));
 		Options->SetName(Idx++, "%s", tr( "GameCube Controller" ));
 		Options->SetName(Idx++, "%s", tr( "Wii U GamePad Slot" ));
@@ -917,6 +917,8 @@ int GCGameLoadSM::GetMenuInternal()
 	else if (currentGCmode == GC_MODE_NINTENDONT && ret == ++Idx)
 	{
 		if (++GameConfig.NINLargeCache >= MAX_ON_OFF) GameConfig.NINLargeCache = INHERIT;
+		if (GameConfig.NINLargeCache == ON)
+			WindowPrompt(tr("Warning:"), tr("The large disc cache is experimental. Some games, such as Twilight Princess, have problems with it. Use at your own risk."), tr("Ok"));
 	}
 
 	//! Settings: NIN USB-HID Controller

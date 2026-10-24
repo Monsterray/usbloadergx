@@ -21,9 +21,18 @@
 
 #define NIN_MAGIC					0x01070CF6
 #define NIN_CFG_VERSION				0x0000000A
-// Highest version GX writes. Only a loader that names its version with "$$CfgVersion:"
-// (the user's fork) gets more than NIN_CFG_VERSION; a newer one upgrades the config itself.
-#define NIN_CFG_VERSION_MAX			0x0000000C
+
+// What a loader accepts, from its NIN_CFG_CAPS record ("$$NinCfgCaps", 32-byte aligned).
+// With a record, GX sends `version` and keeps only the bits in the masks; without one it
+// goes by the "$$Version:" revision and NIN_CFG_VERSION.
+typedef struct NIN_CFG_CAPS_INFO
+{
+	bool found;
+	u32 version;		// the NIN_CFG version the loader takes
+	u32 size;			// its sizeof(NIN_CFG)
+	u32 config_mask;	// Config bits a launcher may set
+	u32 video_mask;		// VideoMode bits a launcher may set
+} NIN_CFG_CAPS_INFO;
 
 typedef struct NIN_CFG
 {
@@ -73,9 +82,9 @@ enum ninconfig
 	NIN_CFG_CC_RUMBLE	= (1<<17),	// v4.431 cfg version 8
 	NIN_CFG_SKIP_IPL	= (1<<18),	// v4.435
 	NIN_CFG_BBA_EMU		= (1<<19),	// v6.487 cfg version 9
-	NIN_CFG_HYBRID_EXI	= (1<<20),	// cfg version 11: Slot B uses the real device
-	NIN_CFG_MC_SLOTB_EMU	= (1<<21),	// cfg version 12: emulate a card in Slot B too
-	NIN_CFG_LARGE_CACHE	= (1<<23),	// cfg version 12: large ISO cache instead of 3 MB
+	NIN_CFG_HYBRID_EXI	= (1<<20),	// Slot B uses the real device; caps record only
+	NIN_CFG_MC_SLOTB_EMU	= (1<<21),	// emulate a card in Slot B too; caps record only
+	NIN_CFG_LARGE_CACHE	= (1<<23),	// large ISO cache instead of 3 MB; caps record only
 };
 
 enum ninvideomode
@@ -96,16 +105,16 @@ enum ninvideomode
 
 	NIN_VID_PROG		= (1<<4),
 	NIN_VID_PATCH_PAL50 = (1<<5),	// v3.368 cfg version 6
-	NIN_VID_DF_FORCE	= (1<<6),	// cfg version 12: override the game's deflicker (replaces FORCE_DF)
-	NIN_VID_DF_ON		= (1<<7),	// cfg version 12: the forced deflicker state
+	NIN_VID_DF_FORCE	= (1<<6),	// override the game's deflicker (replaces FORCE_DF); caps record only
+	NIN_VID_DF_ON		= (1<<7),	// the forced deflicker state; caps record only
 };
 
 // Settings.NINDeflicker / game NINDeflicker values
 enum
 {
-	NIN_DEFLICKER_GAME = 0,	// the game's own filter (cfg < 12: off when the video mode is forced)
+	NIN_DEFLICKER_GAME = 0,	// the game's own filter (FORCE_DF loaders: off when the video mode is forced)
 	NIN_DEFLICKER_ON,
-	NIN_DEFLICKER_OFF,		// forced off; cfg 12 only
+	NIN_DEFLICKER_OFF,		// forced off; only loaders whose video_mask has DF_FORCE
 	NIN_DEFLICKER_MAX
 };
 

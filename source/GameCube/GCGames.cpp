@@ -711,12 +711,17 @@ int nintendontBuildDate(const char *NIN_loader_path, char *NINBuildDate)
 	return 0;
 }
 
-int nintendontVersion(const char *NIN_loader_path, char *NINVersion, int len, u32 *cfgVersion)
+static u32 ReadBE32(const u8 *p)
+{
+	return (u32)p[0] << 24 | (u32)p[1] << 16 | (u32)p[2] << 8 | p[3];
+}
+
+int nintendontVersion(const char *NIN_loader_path, char *NINVersion, int len, NIN_CFG_CAPS_INFO *caps)
 {
 	char NIN_loader[100];
 	u32 NINRev = 0;
-	if (cfgVersion)
-		*cfgVersion = 0;
+	if (caps)
+		memset(caps, 0, sizeof(*caps));
 	snprintf(NIN_loader, sizeof(NIN_loader), "%sboot.dol", NIN_loader_path);
 	if (!CheckFile(NIN_loader))
 		snprintf(NIN_loader, sizeof(NIN_loader), "%sloader.dol", NIN_loader_path);
@@ -725,8 +730,9 @@ int nintendontVersion(const char *NIN_loader_path, char *NINVersion, int len, u3
 		u8 *buffer = NULL;
 		u32 filesize = 0;
 		const char *str = "$$Version:";
-		// The user's fork writes the NIN_CFG version it takes as "$$CfgVersion:0x0000000C".
-		const char *cfgStr = "$$CfgVersion:";
+		// NIN_CFG_CAPS: "$$NinCfgCaps" (no NUL), then BE u32 version, size, config_mask, video_mask
+		const char *capsStr = "$$NinCfgCaps";
+		const u32 capsLen = 12 + 4 * 4;
 		if (LoadFileToMem(NIN_loader, &buffer, &filesize))
 		{
 			for (u32 i = 0; i + strlen(str) <= filesize; i += 32)
@@ -738,21 +744,19 @@ int nintendontVersion(const char *NIN_loader_path, char *NINVersion, int len, u3
 					snprintf(NINVersion, len, "%.*s", (int)(filesize - start), (const char *)buffer + start);
 					const char *dot = strchr(NINVersion, '.');
 					NINRev = dot ? atoi(dot + 1) : 0;
-					if (!cfgVersion)
+					if (!caps)
 						break;
 				}
-				else if (cfgVersion && i + strlen(cfgStr) + 10 <= filesize && memcmp(buffer + i, cfgStr, strlen(cfgStr)) == 0)
+				else if (caps && !caps->found && i + capsLen <= filesize && memcmp(buffer + i, capsStr, 12) == 0)
 				{
-					char hex[11];
-					memcpy(hex, buffer + i + strlen(cfgStr), 10);
-					hex[10] = '\0';
-					char *end;
-					unsigned long v = strtoul(hex, &end, 16);
-					if (end == hex + 10 && v <= 0xFF)
-						*cfgVersion = v;
-					if (NINRev)
-						break;
+					caps->found = true;
+					caps->version = ReadBE32(buffer + i + 12);
+					caps->size = ReadBE32(buffer + i + 16);
+					caps->config_mask = ReadBE32(buffer + i + 20);
+					caps->video_mask = ReadBE32(buffer + i + 24);
 				}
+				if (NINRev && caps && caps->found)
+					break;
 			}
 			free(buffer);
 		}

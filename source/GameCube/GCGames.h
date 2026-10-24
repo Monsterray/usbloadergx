@@ -25,7 +25,8 @@
 
 // NINBuildDate receives 20 characters and a terminator, so it needs 21 bytes.
 int nintendontBuildDate(const char *NIN_loader_path, char* NINBuildDate);
-int nintendontVersion(const char *NIN_loader_path, char* NINVersion, int len, u32 *cfgVersion = NULL);
+// caps receives the loader's NIN_CFG_CAPS record, if it has one.
+int nintendontVersion(const char *NIN_loader_path, char* NINVersion, int len, NIN_CFG_CAPS_INFO *caps = NULL);
 
 class GCGames
 {

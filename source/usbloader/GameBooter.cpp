@@ -1361,6 +1361,9 @@ int GameBooter::BootNintendont(struct discHdr *gameHdr)
 	u8 ninBBAChoice = game_cfg->NINBBA == INHERIT ? Settings.NINBBA : game_cfg->NINBBA;
 	u8 ninBBAProfileChoice = game_cfg->NINBBAProfile == INHERIT ? Settings.NINBBAProfile : game_cfg->NINBBAProfile;
 	u8 ninGamepadChoice = game_cfg->NINWiiUGamepadSlot == INHERIT ? Settings.NINWiiUGamepadSlot : game_cfg->NINWiiUGamepadSlot;
+	u8 ninHybridEXIChoice = game_cfg->NINHybridEXI == INHERIT ? Settings.NINHybridEXI : game_cfg->NINHybridEXI;
+	u8 ninSlotBEmuChoice = game_cfg->NINSlotBEmu == INHERIT ? Settings.NINSlotBEmu : game_cfg->NINSlotBEmu;
+	u8 ninLargeCacheChoice = game_cfg->NINLargeCache == INHERIT ? Settings.NINLargeCache : game_cfg->NINLargeCache;
 
 	const char *ninLoaderPath = game_cfg->NINLoaderPath.size() == 0 ? Settings.NINLoaderPath : game_cfg->NINLoaderPath.c_str();
 
@@ -1398,10 +1401,11 @@ int GameBooter::BootNintendont(struct discHdr *gameHdr)
 	char NINVersion[7] = "";
 	u32 NINRev = 0;
 	bool NINArgsboot = false;
-	NINRev = nintendontVersion(ninLoaderPath, NINVersion, sizeof(NINVersion));
+	u32 NINCfgMarker = 0;
+	NINRev = nintendontVersion(ninLoaderPath, NINVersion, sizeof(NINVersion), &NINCfgMarker);
 	if (NINRev > 0) // Version available since 3.324
 	{
-		gprintf("NIN: Nintendont revision = %d \n", NINRev);
+		gprintf("NIN: Nintendont revision = %d, $$CfgVersion %u\n", NINRev, NINCfgMarker);
 		NINArgsboot = true; //	no need to check argsboot string, 3.324+ supports it.
 	}
 	else
@@ -1520,6 +1524,9 @@ int GameBooter::BootNintendont(struct discHdr *gameHdr)
 		NIN_cfg_version = 9;
 	else if (NINRev >= 493)
 		NIN_cfg_version = 10;
+	// A loader that names its version takes that one; a newer one upgrades ours.
+	if (NINRev >= 493 && NINCfgMarker > NIN_cfg_version)
+		NIN_cfg_version = NINCfgMarker < NIN_CFG_VERSION_MAX ? NINCfgMarker : NIN_CFG_VERSION_MAX;
 
 	// Check USB device
 	if (gameHdr->type != TYPE_GAME_GC_DISC && strncmp(RealPath, "usb", 3) == 0)
@@ -1850,6 +1857,16 @@ int GameBooter::BootNintendont(struct discHdr *gameHdr)
 	if (NIN_cfg_version >= 10 && isWiiU())
 		nin_config->WiiUGamepadSlot = ninGamepadChoice; // v6.493+
 
+	// Slot B: the real device beside an emulated Slot A (Wii only), or a second emulated card
+	if (NIN_cfg_version >= 11 && ninHybridEXIChoice && ninMCEmulationChoice && !isWiiU())
+		nin_config->Config |= NIN_CFG_HYBRID_EXI;
+	else if (NIN_cfg_version >= 12 && ninSlotBEmuChoice && ninMCEmulationChoice)
+		nin_config->Config |= NIN_CFG_MC_SLOTB_EMU;
+
+	// Large ISO cache
+	if (NIN_cfg_version >= 12 && ninLargeCacheChoice)
+		nin_config->Config |= NIN_CFG_LARGE_CACHE;
+
 	// Setup Video Mode
 	if (ninVideoChoice == DML_VIDEO_NONE) // No video mode changes
 	{
@@ -1868,7 +1885,7 @@ int GameBooter::BootNintendont(struct discHdr *gameHdr)
 			if (nin_config->VideoMode & NIN_VID_FORCE_MASK)
 				nin_config->VideoMode |= NIN_VID_FORCE;
 
-			if (ninDeflickerChoice)
+			if (ninDeflickerChoice == NIN_DEFLICKER_ON && NIN_cfg_version < 12)
 				nin_config->VideoMode |= NIN_VID_FORCE_DF; // v2.208+
 
 			if (ninPal50PatchChoice)
@@ -1883,8 +1900,14 @@ int GameBooter::BootNintendont(struct discHdr *gameHdr)
 	if (ninProgressivePatch)
 		nin_config->VideoMode |= NIN_VID_PROG;
 
+	// cfg v12: deflicker is its own setting, whatever the video mode
+	if (NIN_cfg_version >= 12 && ninDeflickerChoice == NIN_DEFLICKER_ON)
+		nin_config->VideoMode |= NIN_VID_DF_FORCE | NIN_VID_DF_ON;
+	else if (NIN_cfg_version >= 12 && ninDeflickerChoice == NIN_DEFLICKER_OFF)
+		nin_config->VideoMode |= NIN_VID_DF_FORCE;
+
 	gprintf("NIN: Active device %s\n", nin_config->Config & NIN_CFG_USB ? "USB" : "SD");
-	gprintf("NIN: config 0x%08x\n", nin_config->Config);
+	gprintf("NIN: cfg version %u, config 0x%08x\n", NIN_cfg_version, nin_config->Config);
 	gprintf("NIN: Video mode 0x%08x\n", nin_config->VideoMode);
 
 	// Set game language setting

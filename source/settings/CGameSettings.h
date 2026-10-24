@@ -59,6 +59,9 @@ typedef struct _GameCFG
 	short NINBBA;
 	short NINBBAProfile;
 	short NINWiiUGamepadSlot;
+	short NINHybridEXI;
+	short NINSlotBEmu;
+	short NINLargeCache;
 	short NINMCEmulation;
 	short NINMCSize;
 	short NINUSBHID;
@@ -132,6 +135,9 @@ typedef struct _GameCFG
 		this->NINBBA = game.NINBBA;
 		this->NINBBAProfile = game.NINBBAProfile;
 		this->NINWiiUGamepadSlot = game.NINWiiUGamepadSlot;
+		this->NINHybridEXI = game.NINHybridEXI;
+		this->NINSlotBEmu = game.NINSlotBEmu;
+		this->NINLargeCache = game.NINLargeCache;
 		this->NINMCEmulation = game.NINMCEmulation;
 		this->NINMCSize = game.NINMCSize;
 		this->NINUSBHID = game.NINUSBHID;

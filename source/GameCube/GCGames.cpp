@@ -711,10 +711,12 @@ int nintendontBuildDate(const char *NIN_loader_path, char *NINBuildDate)
 	return 0;
 }
 
-int nintendontVersion(const char *NIN_loader_path, char *NINVersion, int len)
+int nintendontVersion(const char *NIN_loader_path, char *NINVersion, int len, u32 *cfgVersion)
 {
 	char NIN_loader[100];
 	u32 NINRev = 0;
+	if (cfgVersion)
+		*cfgVersion = 0;
 	snprintf(NIN_loader, sizeof(NIN_loader), "%sboot.dol", NIN_loader_path);
 	if (!CheckFile(NIN_loader))
 		snprintf(NIN_loader, sizeof(NIN_loader), "%sloader.dol", NIN_loader_path);
@@ -723,17 +725,33 @@ int nintendontVersion(const char *NIN_loader_path, char *NINVersion, int len)
 		u8 *buffer = NULL;
 		u32 filesize = 0;
 		const char *str = "$$Version:";
+		// The user's fork writes the NIN_CFG version it takes as "$$CfgVersion:0x0000000C".
+		const char *cfgStr = "$$CfgVersion:";
 		if (LoadFileToMem(NIN_loader, &buffer, &filesize))
 		{
 			for (u32 i = 0; i + strlen(str) <= filesize; i += 32)
 			{
-				if (memcmp(buffer + i, str, strlen(str)) == 0)
+				if (!NINRev && memcmp(buffer + i, str, strlen(str)) == 0)
 				{
-					// Write buffer in NINVersion
-					snprintf(NINVersion, len, "%s", buffer + i + strlen(str));
+					// Write buffer in NINVersion, never past the end of the file
+					const u32 start = i + strlen(str);
+					snprintf(NINVersion, len, "%.*s", (int)(filesize - start), (const char *)buffer + start);
 					const char *dot = strchr(NINVersion, '.');
 					NINRev = dot ? atoi(dot + 1) : 0;
-					break;
+					if (!cfgVersion)
+						break;
+				}
+				else if (cfgVersion && i + strlen(cfgStr) + 10 <= filesize && memcmp(buffer + i, cfgStr, strlen(cfgStr)) == 0)
+				{
+					char hex[11];
+					memcpy(hex, buffer + i + strlen(cfgStr), 10);
+					hex[10] = '\0';
+					char *end;
+					unsigned long v = strtoul(hex, &end, 16);
+					if (end == hex + 10 && v <= 0xFF)
+						*cfgVersion = v;
+					if (NINRev)
+						break;
 				}
 			}
 			free(buffer);

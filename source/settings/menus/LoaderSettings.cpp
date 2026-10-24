@@ -46,6 +46,14 @@ static const char * OnOffText[] =
 	trNOOP( "Auto" )
 };
 
+// Indexed by NIN_DEFLICKER_*; OFF only differs from Auto with a cfg v12 Nintendont
+static const char * NINDeflickerText[] =
+{
+	trNOOP( "Auto" ),
+	trNOOP( "ON" ),
+	trNOOP( "OFF" )
+};
+
 static const char * OnOffAskText[] =
 {
 	trNOOP( "OFF" ),
@@ -360,6 +368,9 @@ void LoaderSettings::SetOptionNames()
 	Options->SetName(Idx++, "%s", tr( "BBA Net Profile" ));
 	Options->SetName(Idx++, "%s", tr( "Memory Card Emulation" ));
 	Options->SetName(Idx++, "%s", tr( "Memory Card Blocks Size" ));
+	Options->SetName(Idx++, "%s", tr( "Slot B Emulation" ));
+	Options->SetName(Idx++, "%s", tr( "Hybrid EXI" ));
+	Options->SetName(Idx++, "%s", tr( "Large Disc Cache" ));
 	Options->SetName(Idx++, "%s", tr( "USB-HID Controller" ));
 	Options->SetName(Idx++, "%s", tr( "GameCube Controller" ));
 	Options->SetName(Idx++, "%s", tr( "Wii U GamePad Slot" ));
@@ -554,7 +565,7 @@ void LoaderSettings::SetOptionValues()
 	Options->SetValue(Idx++, "%s", tr(NINCfgText[Settings.NINSettings]));
 
 	//! Settings: NIN Video Deflicker
-	Options->SetValue(Idx++, "%s", tr(OnOffText[Settings.NINDeflicker]));
+	Options->SetValue(Idx++, "%s", tr(NINDeflickerText[Settings.NINDeflicker]));
 
 	//! Settings: NIN PAL50 Patch
 	Options->SetValue(Idx++, "%s", tr(OnOffText[Settings.NINPal50Patch]));
@@ -600,6 +611,11 @@ void LoaderSettings::SetOptionValues()
 
 	//! Settings: NIN Memory Card Blocks Size
 	Options->SetValue(Idx++, "%d", MEM_CARD_BLOCKS(Settings.NINMCSize));
+
+	//! Settings: NIN Slot B Emulation, Hybrid EXI, Large Disc Cache (cfg v11/v12 loaders)
+	Options->SetValue(Idx++, "%s", tr(OnOffText[Settings.NINSlotBEmu]));
+	Options->SetValue(Idx++, "%s", tr(OnOffText[Settings.NINHybridEXI]));
+	Options->SetValue(Idx++, "%s", tr(OnOffText[Settings.NINLargeCache]));
 
 	//! Settings: NIN USB-HID controller
 	Options->SetValue(Idx++, "%s", tr(OnOffText[Settings.NINUSBHID]));
@@ -1028,7 +1044,7 @@ int LoaderSettings::GetMenuInternal()
 	//! Settings: NIN Video Deflicker
 	else if (ret == ++Idx)
 	{
-		if (++Settings.NINDeflicker >= MAX_ON_OFF) Settings.NINDeflicker = 0;
+		if (++Settings.NINDeflicker >= NIN_DEFLICKER_MAX) Settings.NINDeflicker = 0;
 	}
 
 	//! Settings: NIN PAL50 Patch
@@ -1119,6 +1135,24 @@ int LoaderSettings::GetMenuInternal()
 		if (++Settings.NINMCSize >= 6) Settings.NINMCSize = 0;
 		if (Settings.NINMCSize == 5)
 			WindowPrompt(tr("Warning:"), tr("Memory Card with 2043 blocs has issues with Nintendont. Use at your own risk."), tr("Ok"));
+	}
+
+	//! Settings: NIN Slot B Emulation
+	else if (ret == ++Idx)
+	{
+		if (++Settings.NINSlotBEmu >= MAX_ON_OFF) Settings.NINSlotBEmu = 0;
+	}
+
+	//! Settings: NIN Hybrid EXI
+	else if (ret == ++Idx)
+	{
+		if (++Settings.NINHybridEXI >= MAX_ON_OFF) Settings.NINHybridEXI = 0;
+	}
+
+	//! Settings: NIN Large Disc Cache
+	else if (ret == ++Idx)
+	{
+		if (++Settings.NINLargeCache >= MAX_ON_OFF) Settings.NINLargeCache = 0;
 	}
 
 	//! Settings: NIN USB-HID controller

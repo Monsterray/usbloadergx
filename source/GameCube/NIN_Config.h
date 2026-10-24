@@ -21,6 +21,9 @@
 
 #define NIN_MAGIC					0x01070CF6
 #define NIN_CFG_VERSION				0x0000000A
+// Highest version GX writes. Only a loader that names its version with "$$CfgVersion:"
+// (the user's fork) gets more than NIN_CFG_VERSION; a newer one upgrades the config itself.
+#define NIN_CFG_VERSION_MAX			0x0000000C
 
 typedef struct NIN_CFG
 {
@@ -70,6 +73,9 @@ enum ninconfig
 	NIN_CFG_CC_RUMBLE	= (1<<17),	// v4.431 cfg version 8
 	NIN_CFG_SKIP_IPL	= (1<<18),	// v4.435
 	NIN_CFG_BBA_EMU		= (1<<19),	// v6.487 cfg version 9
+	NIN_CFG_HYBRID_EXI	= (1<<20),	// cfg version 11: Slot B uses the real device
+	NIN_CFG_MC_SLOTB_EMU	= (1<<21),	// cfg version 12: emulate a card in Slot B too
+	NIN_CFG_LARGE_CACHE	= (1<<23),	// cfg version 12: large ISO cache instead of 3 MB
 };
 
 enum ninvideomode
@@ -90,6 +96,17 @@ enum ninvideomode
 
 	NIN_VID_PROG		= (1<<4),
 	NIN_VID_PATCH_PAL50 = (1<<5),	// v3.368 cfg version 6
+	NIN_VID_DF_FORCE	= (1<<6),	// cfg version 12: override the game's deflicker (replaces FORCE_DF)
+	NIN_VID_DF_ON		= (1<<7),	// cfg version 12: the forced deflicker state
+};
+
+// Settings.NINDeflicker / game NINDeflicker values
+enum
+{
+	NIN_DEFLICKER_GAME = 0,	// the game's own filter (cfg < 12: off when the video mode is forced)
+	NIN_DEFLICKER_ON,
+	NIN_DEFLICKER_OFF,		// forced off; cfg 12 only
+	NIN_DEFLICKER_MAX
 };
 
 enum ninlanguage

@@ -37,6 +37,14 @@ static const char * OnOffText[] =
 	trNOOP( "Auto" )
 };
 
+// Indexed by NIN_DEFLICKER_*; OFF only differs from Auto with a cfg v12 Nintendont
+static const char * NINDeflickerText[] =
+{
+	trNOOP( "Auto" ),
+	trNOOP( "ON" ),
+	trNOOP( "OFF" )
+};
+
 static const char * OnOffAskText[] =
 {
 	trNOOP( "OFF" ),
@@ -224,6 +232,9 @@ void GCGameLoadSM::SetOptionNames()
 		Options->SetName(Idx++, "%s", tr( "BBA Net Profile" ));
 		Options->SetName(Idx++, "%s", tr( "Memory Card Emulation" ));
 		Options->SetName(Idx++, "%s", tr( "Memory Card Blocks Size" ));
+		Options->SetName(Idx++, "%s", tr( "Slot B Emulation" ));
+		Options->SetName(Idx++, "%s", tr( "Hybrid EXI" ));
+		Options->SetName(Idx++, "%s", tr( "Large Disc Cache" ));
 		Options->SetName(Idx++, "%s", tr( "USB-HID Controller" ));
 		Options->SetName(Idx++, "%s", tr( "GameCube Controller" ));
 		Options->SetName(Idx++, "%s", tr( "Wii U GamePad Slot" ));
@@ -379,7 +390,7 @@ void GCGameLoadSM::SetOptionValues()
 		if(GameConfig.NINDeflicker == INHERIT)
 			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
-			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINDeflicker]));
+			Options->SetValue(Idx++, "%s", tr(NINDeflickerText[GameConfig.NINDeflicker]));
 
 		//! Settings: NIN PAL50 Patch
 		if(GameConfig.NINPal50Patch == INHERIT)
@@ -471,6 +482,24 @@ void GCGameLoadSM::SetOptionValues()
 			Options->SetValue(Idx++, "%s", tr("Use global"));
 		else
 			Options->SetValue(Idx++, "%d", MEM_CARD_BLOCKS(GameConfig.NINMCSize));
+
+		//! Settings: NIN Slot B Emulation
+		if(GameConfig.NINSlotBEmu == INHERIT)
+			Options->SetValue(Idx++, "%s", tr("Use global"));
+		else
+			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINSlotBEmu]));
+
+		//! Settings: NIN Hybrid EXI
+		if(GameConfig.NINHybridEXI == INHERIT)
+			Options->SetValue(Idx++, "%s", tr("Use global"));
+		else
+			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINHybridEXI]));
+
+		//! Settings: NIN Large Disc Cache
+		if(GameConfig.NINLargeCache == INHERIT)
+			Options->SetValue(Idx++, "%s", tr("Use global"));
+		else
+			Options->SetValue(Idx++, "%s", tr(OnOffText[GameConfig.NINLargeCache]));
 
 		//! Settings: NIN USB-HID Controller
 		if(GameConfig.NINUSBHID == INHERIT)
@@ -763,7 +792,7 @@ int GCGameLoadSM::GetMenuInternal()
 	//! Settings: NIN Video Deflicker
 	if(currentGCmode == GC_MODE_NINTENDONT && ret == ++Idx)
 	{
-		if (++GameConfig.NINDeflicker >= MAX_ON_OFF) GameConfig.NINDeflicker = INHERIT;
+		if (++GameConfig.NINDeflicker >= NIN_DEFLICKER_MAX) GameConfig.NINDeflicker = INHERIT;
 	}
 
 	//! Settings: NIN PAL50 Patch
@@ -870,6 +899,24 @@ int GCGameLoadSM::GetMenuInternal()
 		if (++GameConfig.NINMCSize >= 6) GameConfig.NINMCSize = INHERIT;
 		if (GameConfig.NINMCSize == 5)
 			WindowPrompt(tr("Warning:"), tr("Memory Card with 2043 blocs has issues with Nintendont. Use at your own risk."), tr("Ok"));
+	}
+
+	//! Settings: NIN Slot B Emulation
+	else if (currentGCmode == GC_MODE_NINTENDONT && ret == ++Idx)
+	{
+		if (++GameConfig.NINSlotBEmu >= MAX_ON_OFF) GameConfig.NINSlotBEmu = INHERIT;
+	}
+
+	//! Settings: NIN Hybrid EXI
+	else if (currentGCmode == GC_MODE_NINTENDONT && ret == ++Idx)
+	{
+		if (++GameConfig.NINHybridEXI >= MAX_ON_OFF) GameConfig.NINHybridEXI = INHERIT;
+	}
+
+	//! Settings: NIN Large Disc Cache
+	else if (currentGCmode == GC_MODE_NINTENDONT && ret == ++Idx)
+	{
+		if (++GameConfig.NINLargeCache >= MAX_ON_OFF) GameConfig.NINLargeCache = INHERIT;
 	}
 
 	//! Settings: NIN USB-HID Controller

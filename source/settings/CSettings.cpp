@@ -219,7 +219,7 @@ void CSettings::SetDefault()
 	DMLScreenshot = OFF;
 	DMLJPNPatch = OFF;
 	DMLDebug = OFF;
-	NINDeflicker = OFF;
+	NINDeflicker = NIN_DEFLICKER_GAME;
 	NINPal50Patch = OFF;
 	NINWiiUWide = widescreen;
 	NINVideoScale = 0;
@@ -231,6 +231,9 @@ void CSettings::SetDefault()
 	NINBBA = OFF;
 	NINBBAProfile = 0;
 	NINWiiUGamepadSlot = 0;
+	NINHybridEXI = OFF;
+	NINSlotBEmu = OFF;
+	NINLargeCache = OFF;
 	NINMCEmulation = ON;
 	NINMCSize = 2;
 	NINAutoboot = ON;
@@ -515,6 +518,9 @@ bool CSettings::Save()
 	fprintf(file, "NINBBA = %d\n", NINBBA);
 	fprintf(file, "NINBBAProfile = %d\n", NINBBAProfile);
 	fprintf(file, "NINWiiUGamepadSlot = %d\n", NINWiiUGamepadSlot);
+	fprintf(file, "NINHybridEXI = %d\n", NINHybridEXI);
+	fprintf(file, "NINSlotBEmu = %d\n", NINSlotBEmu);
+	fprintf(file, "NINLargeCache = %d\n", NINLargeCache);
 	fprintf(file, "NINMCEmulation = %d\n", NINMCEmulation);
 	fprintf(file, "NINMCSize = %d\n", NINMCSize);
 	fprintf(file, "NINAutoboot = %d\n", NINAutoboot);
@@ -1121,7 +1127,8 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "NINDeflicker") == 0)
 	{
-		NINDeflicker = atoi(value);
+		int v = atoi(value);
+		NINDeflicker = v >= 0 && v < NIN_DEFLICKER_MAX ? v : NIN_DEFLICKER_GAME;
 		return true;
 	}
 	else if (strcmp(name, "NINPal50Patch") == 0)
@@ -1172,6 +1179,21 @@ bool CSettings::SetSetting(char *name, char *value)
 	else if (strcmp(name, "NINBBAProfile") == 0)
 	{
 		NINBBAProfile = atoi(value);
+		return true;
+	}
+	else if (strcmp(name, "NINHybridEXI") == 0)
+	{
+		NINHybridEXI = atoi(value) ? ON : OFF;
+		return true;
+	}
+	else if (strcmp(name, "NINSlotBEmu") == 0)
+	{
+		NINSlotBEmu = atoi(value) ? ON : OFF;
+		return true;
+	}
+	else if (strcmp(name, "NINLargeCache") == 0)
+	{
+		NINLargeCache = atoi(value) ? ON : OFF;
 		return true;
 	}
 	else if (strcmp(name, "NINWiiUGamepadSlot") == 0)

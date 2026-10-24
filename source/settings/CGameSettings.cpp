@@ -233,6 +233,9 @@ bool CGameSettings::Save()
 		fprintf(f, "NINBBA:%d; ", GameList[i].NINBBA);
 		fprintf(f, "NINBBAProfile:%d; ", GameList[i].NINBBAProfile);
 		fprintf(f, "NINWiiUGamepadSlot:%d; ", GameList[i].NINWiiUGamepadSlot);
+		fprintf(f, "NINHybridEXI:%d; ", GameList[i].NINHybridEXI);
+		fprintf(f, "NINSlotBEmu:%d; ", GameList[i].NINSlotBEmu);
+		fprintf(f, "NINLargeCache:%d; ", GameList[i].NINLargeCache);
 		fprintf(f, "NINMCEmulation:%d; ", GameList[i].NINMCEmulation);
 		fprintf(f, "NINMCSize:%d; ", GameList[i].NINMCSize);
 		fprintf(f, "NINUSBHID:%d; ", GameList[i].NINUSBHID);
@@ -454,7 +457,8 @@ bool CGameSettings::SetSetting(GameCFG & game, const char *name, const char *val
 	}
 	else if(strcmp(name, "NINDeflicker") == 0)
 	{
-		game.NINDeflicker = atoi(value);
+		int v = atoi(value);
+		game.NINDeflicker = v >= INHERIT && v < NIN_DEFLICKER_MAX ? v : INHERIT;
 		return true;
 	}
 	else if(strcmp(name, "NINPal50Patch") == 0)
@@ -505,6 +509,24 @@ bool CGameSettings::SetSetting(GameCFG & game, const char *name, const char *val
 	else if (strcmp(name, "NINBBAProfile") == 0)
 	{
 		game.NINBBAProfile = atoi(value);
+		return true;
+	}
+	else if (strcmp(name, "NINHybridEXI") == 0)
+	{
+		int v = atoi(value);
+		game.NINHybridEXI = v == INHERIT ? v : v ? ON : OFF;
+		return true;
+	}
+	else if (strcmp(name, "NINSlotBEmu") == 0)
+	{
+		int v = atoi(value);
+		game.NINSlotBEmu = v == INHERIT ? v : v ? ON : OFF;
+		return true;
+	}
+	else if (strcmp(name, "NINLargeCache") == 0)
+	{
+		int v = atoi(value);
+		game.NINLargeCache = v == INHERIT ? v : v ? ON : OFF;
 		return true;
 	}
 	else if (strcmp(name, "NINWiiUGamepadSlot") == 0)
@@ -758,6 +780,9 @@ void CGameSettings::SetDefault(GameCFG &game)
 	game.NINBBA = INHERIT;
 	game.NINBBAProfile = INHERIT;
 	game.NINWiiUGamepadSlot = INHERIT;
+	game.NINHybridEXI = INHERIT;
+	game.NINSlotBEmu = INHERIT;
+	game.NINLargeCache = INHERIT;
 	game.NINMCEmulation = INHERIT;
 	game.NINMCSize = INHERIT;
 	game.NINUSBHID = INHERIT;

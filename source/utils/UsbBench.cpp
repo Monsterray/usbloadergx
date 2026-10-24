@@ -41,6 +41,7 @@
 #include <string.h>
 #include <malloc.h>
 #include <sys/stat.h>
+#include <dirent.h>
 #include <unistd.h>
 #include "UsbBench.h"
 #include "Controls/DeviceHandler.hpp"
@@ -300,6 +301,50 @@ static void SettingsSave(void)
 	Writes("after the settings saves");
 }
 
+//! What GX's game scan (Wbfs_Fat::GetHeadersCount()) sees in <usb>:/wbfs, two
+//! levels down, read only: for a drive whose games the scan does not find
+static void ListWbfs(void)
+{
+	PartitionHandle *usb = DeviceHandler::GetUSBPartitionCount() > 0 ? DeviceHandler::Instance()->GetUSBHandleFromPartition(0) : NULL;
+	const char *mount = usb ? usb->MountName(DeviceHandler::PartitionToPortPartition(0)) : "";
+	char base[64];
+	snprintf(base, sizeof(base), "%s:/wbfs", mount);
+	DIR *dir = mount[0] ? opendir(base) : NULL;
+	if (!dir)
+	{
+		Log("  %s: cannot open", base);
+		return;
+	}
+	int lines = 0;
+	struct dirent *d;
+	while ((d = readdir(dir)) != NULL && lines < 40)
+	{
+		if (d->d_name[0] == '.')
+			continue;
+		char path[320];
+		snprintf(path, sizeof(path), "%s/%s", base, d->d_name);
+		struct stat st;
+		bool isDir = stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+		Log("  %s%s", d->d_name, isDir ? "/" : "");
+		++lines;
+		DIR *sub = isDir ? opendir(path) : NULL;
+		struct dirent *e;
+		while (sub && (e = readdir(sub)) != NULL && lines < 40)
+		{
+			if (e->d_name[0] == '.')
+				continue;
+			char file[600];
+			snprintf(file, sizeof(file), "%s/%s", path, e->d_name);
+			Log("    %s, %lld bytes", e->d_name, stat(file, &st) == 0 ? (long long)st.st_size : -1LL);
+			++lines;
+		}
+		if (sub)
+			closedir(sub);
+	}
+	closedir(dir);
+	Log("  (%d lines listed)", lines);
+}
+
 //! (e) What a USB Wii game's launch asks of the cIOS before its apploader runs
 //! (GameBooter::SetupDisc() and BootPartition()), then partition reads through
 //! the DIP. Nothing is booted.
@@ -311,7 +356,9 @@ static void LaunchReads(void)
 			game = gameList[i];
 	if (!game)
 	{
-		Log("launch: SKIPPED, no Wii game on USB");
+		Log("launch: SKIPPED, no Wii game on USB (Settings: partition %d, MultiplePartitions %d, SDMode %d)",
+			Settings.partition, Settings.MultiplePartitions, Settings.SDMode);
+		ListWbfs();
 		return;
 	}
 	Log("launch: %.6s \"%.40s\" on partition %d (%s)", game->id, game->title, gameList.GetPartitionNumber(game->id),

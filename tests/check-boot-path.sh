@@ -54,5 +54,20 @@ opens=$(grep -rl --include='*.c' --include='*.cpp' 'TEX_init()' "$SRC" | grep -v
 awk '/StartUpProcess::Run/ { run = NR } /TEX_init\(\)/ { init = NR } END { exit !(run && init > run) }' "$SRC/main.cpp" \
 	|| fail "main.cpp opens the MEM1 texture pool before start-up has run"
 
+# 6. Set_Stub() checks the return title through NandTitles, which reads the NAND, and
+#    ExitApp() closes ISFS. Called after ExitApp(), the check failed and the return
+#    stub kept its built-in title (00010001-UNEO) instead of the one GX chose.
+stub_before_exit() { # <file> <function>: the first Set_Stub( comes before the first ExitApp();
+	awk -v fn="$2" '$0 ~ ("^[A-Za-z].*[ :]" fn "[(]") { on = 1 }
+		on && /Set_Stub\(/ && !s { s = NR }
+		on && /ExitApp\(\);/ && !e { e = NR }
+		on && /^}/ { exit }
+		END { exit !(s && e && s < e) }' "$1"
+}
+stub_before_exit "$SRC/homebrewboot/BootHomebrew.cpp" RunAppbooter \
+	|| fail "RunAppbooter() sets the return stub after ExitApp() has closed ISFS"
+stub_before_exit "$SRC/usbloader/GameBooter.cpp" BootDevolution \
+	|| fail "BootDevolution() sets the return stub after ExitApp() has closed ISFS"
+
 [ "$status" -eq 0 ] && echo "OK: disc boot path guards are in place"
 exit "$status"

@@ -147,9 +147,14 @@ static int RunAppbooter()
 	char bootLog[sizeof(Settings.ConfigPath) + 16];
 	snprintf(bootLog, sizeof(bootLog), "%sboot.log", Settings.ConfigPath);
 	gprintf_tee(bootLog);
+	//! The stub gets its title before ExitApp(): Set_Stub() checks the title through
+	//! NandTitles, which reads the NAND, and ExitApp() closes ISFS. Set after it, the
+	//! check always failed and the stub kept its built-in title, 00010001-UNEO.
 	u64 stubTarget = returnTo(false);
-	gprintf("App booter: image %u bytes, arguments %u bytes (%u), return stub -> %016llx\n",
-			homebrewsize, argsSize, (unsigned)Arguments.size(), stubTarget);
+	loadStub();
+	s32 stubSet = Set_Stub(stubTarget);
+	gprintf("App booter: image %u bytes, arguments %u bytes (%u), return stub -> %016llx (%d)\n",
+			homebrewsize, argsSize, (unsigned)Arguments.size(), stubTarget, (int)stubSet);
 
 	ExitApp();
 
@@ -170,9 +175,6 @@ static int RunAppbooter()
 			IosLoader::ReloadIosKeepingRights(Settings.EntryIOS);
 		gprintf("Reloaded to IOS%d\n", IOS_GetVersion());
 	}
-
-	loadStub();
-	Set_Stub(stubTarget);
 
 	gprintf("Exiting USB Loader GX...\n\n");
 

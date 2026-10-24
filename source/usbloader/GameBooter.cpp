@@ -1295,18 +1295,20 @@ int GameBooter::BootDevolution(struct discHdr *gameHdr)
 	// flush disc ID and Devolution config out to memory
 	DCFlushRange(lowmem, 64);
 
+	//! Before ExitApp(): Set_Stub() checks the title through the NAND, and ExitApp()
+	//! closes ISFS, so after it the check failed and the stub kept its built-in title
+	if (returnToChoice)
+	{
+		loadStub();
+		Set_Stub(returnToChoice);
+	}
+
 	ExitApp();
 	IosLoader::ReloadIosKeepingRights(58); // reload IOS 58 with AHBPROT rights
 
 	gprintf("DEVO: Loading game: %s\n", disc1);
 	gprintf("DEVO: Memory Card: %s\n\n", DEVO_memCard);
 	gprintf("%.72s", (const char *)loader_bin + 4);
-
-	if (returnToChoice)
-	{
-		loadStub();
-		Set_Stub(returnToChoice);
-	}
 
 	u32 cpu_isr;
 	SYS_ResetSystem(SYS_SHUTDOWN, 0, 0);

@@ -78,7 +78,11 @@ def wait_for_hbc(tool, limit_s):
         seen_gx = seen_gx or state in ("gx", "none")
         if state == "hbc" and seen_gx and time.monotonic() - start > 30:
             return True
-        time.sleep(10)
+        if state == "hbc" and not seen_gx and time.monotonic() - start > 120:
+            print("GX was never seen: HBC answered throughout (did it start, or leave within 2 s?)", flush=True)
+            return True
+        # Quick polls at first: a start-up that fails leaves for HBC within seconds
+        time.sleep(2 if time.monotonic() - start < 120 else 10)
     return False
 
 

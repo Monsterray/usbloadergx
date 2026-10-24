@@ -144,6 +144,15 @@ static int RunAppbooter()
 
 	ExitApp();
 
+	//! GX's heap is dead from here: nothing below allocates from it. The image goes to
+	//! EXECUTE_ADDR now, before the IOS reload, where it sat through the reload for years.
+	//! While it waited in its heap block (anywhere in MEM2, up to 0x9332xxxx) through the
+	//! reload instead, a Nintendont boot stayed on a black screen on the bench Wii; Dolphin,
+	//! whose IOS reload is emulated, booted fine.
+	memmove(EXECUTE_ADDR, homebrewbuffer, homebrewsize);
+	DCFlushRange(EXECUTE_ADDR, homebrewsize);
+	ICInvalidateRange(EXECUTE_ADDR, homebrewsize);
+
 	// Reload IOS 58 if available, else reload Entry IOS
 	if (IOS_GetVersion() != 58)
 	{
@@ -160,12 +169,6 @@ static int RunAppbooter()
 
 	SYS_ResetSystem(SYS_SHUTDOWN, 0, 0);
 	u32 level = IRQ_Disable();
-
-	//! From here on nothing allocates or frees, and the heap blocks under these
-	//! addresses are dead. The image's own block may overlap EXECUTE_ADDR.
-	memmove(EXECUTE_ADDR, homebrewbuffer, homebrewsize);
-	DCFlushRange(EXECUTE_ADDR, homebrewsize);
-	ICInvalidateRange(EXECUTE_ADDR, homebrewsize);
 
 	if (args)
 	{

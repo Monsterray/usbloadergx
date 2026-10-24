@@ -55,7 +55,9 @@
 #include "usbloader/GameList.h"
 #include "usbloader/usbstorage2.h"
 #include "usbloader/wdvd.h"
+#include "GUI/gui.h"
 #include "gecko.h"
+#include "menu.h"
 #include "sys.h"
 
 #define REVIEW_CONFIG "sd:/apps/usbloader_gx_review/"
@@ -70,6 +72,47 @@ static volatile u64 stepStart = 0;
 static const char *volatile stepName = NULL;
 static lwp_t watchThread = LWP_THREAD_NULL;
 
+//! The TV: the last lines of the log in a panel over GX's background, so a long
+//! wait (a 17 s write, a hung DI read) never looks like a frozen Wii. The GUI
+//! thread keeps drawing while the main thread waits in IOS; GuiText::SetText()
+//! takes the element's lock, so the bench and its watch thread can both write.
+#define SCREEN_LINES 14
+static GuiImage *screenPanel = NULL;
+static GuiText *screenText[SCREEN_LINES];
+static char screenRing[SCREEN_LINES][100];
+static volatile bool screenOn = false;
+
+static void ScreenOpen(void)
+{
+	HaltGui();
+	screenPanel = new GuiImage(600, SCREEN_LINES * 26 + 24, (GXColor){0, 0, 0, 210});
+	screenPanel->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
+	screenPanel->SetPosition(20, 40);
+	mainWindow->Append(screenPanel);
+	for (int i = 0; i < SCREEN_LINES; ++i)
+	{
+		screenRing[i][0] = 0;
+		screenText[i] = new GuiText("", 18, (GXColor){255, 255, 255, 255});
+		screenText[i]->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
+		screenText[i]->SetPosition(32, 52 + i * 26);
+		screenText[i]->SetMaxWidth(576, DOTTED);
+		mainWindow->Append(screenText[i]);
+	}
+	ResumeGui();
+	screenOn = true;
+}
+
+static void ScreenLine(const char *line)
+{
+	if (!screenOn)
+		return;
+	for (int i = 0; i < SCREEN_LINES - 1; ++i)
+		memcpy(screenRing[i], screenRing[i + 1], sizeof(screenRing[i]));
+	snprintf(screenRing[SCREEN_LINES - 1], sizeof(screenRing[0]), "%.99s", line);
+	for (int i = 0; i < SCREEN_LINES; ++i)
+		screenText[i]->SetText(screenRing[i]);
+}
+
 static void Log(const char *fmt, ...)
 {
 	char line[256];
@@ -78,6 +121,7 @@ static void Log(const char *fmt, ...)
 	vsnprintf(line, sizeof(line), fmt, va);
 	va_end(va);
 	gprintf("usbbench: %s\n", line);
+	ScreenLine(line);
 
 	char path[sizeof(Settings.ConfigPath) + 16];
 	snprintf(path, sizeof(path), "%susbbench.log", Settings.ConfigPath);
@@ -113,7 +157,8 @@ static void *Watch(void *)
 		u32 limit = stepLimit;
 		if (start && ticks_to_secs(diff_ticks(start, gettime())) >= limit)
 		{
-			Log("TIMEOUT: %s still running after %u s; back to HBC", stepName ? stepName : "?", limit);
+			Log("TIMEOUT: %s still running after %u s; back to HBC in 5 s", stepName ? stepName : "?", limit);
+			usleep(5 * 1000 * 1000);
 			//! _now: no exit clean-up, which writes the USB cache back and hung on
 			//! a cIOS whose writes took 17 s each
 			hbc_agent_fatal_now(0x55534242, "usbbench: %s over %u s", stepName ? stepName : "?", limit);
@@ -235,7 +280,7 @@ static void SectorWrite(void)
 
 	for (int i = 1; i <= 3; ++i)
 	{
-		Step("FSInfo write");
+		Step("FSInfo write: 1 sector, UMS_WRITE_SECTORS");
 		t = gettime();
 		bool written = io->writeSectors(fsinfo, 1, sector);
 		Log("single-sector write %d (FSInfo, same bytes, no skip): %s in %s", i, written ? "ok" : "FAILED",
@@ -492,7 +537,7 @@ static void LaunchReads(void)
 		if (ret < 0)
 			return;
 
-		Step("set fragment list");
+		Step("set fragment list: WDVD_SetFragList, then a 32-byte disc ID read");
 		DeviceHandler::Instance()->UnMountSD();
 		t = gettime();
 		ret = set_frag_list(game->id, false);
@@ -523,7 +568,7 @@ static void LaunchReads(void)
 			return;
 
 		//! As set_frag_list() sends it, and the same disc ID check after
-		Step("set fragment list");
+		Step("set fragment list: WDVD_SetFragList, then a 32-byte disc ID read");
 		DeviceHandler::Instance()->UnMountSD();
 		t = gettime();
 		ret = WDVD_SetFragList(WBFS_DEVICE_USB, list, sizeof(Fragment) * (list->num + 1));
@@ -565,7 +610,7 @@ static void LaunchReads(void)
 	u8 *buf = (u8 *)memalign(32, chunk);
 	if (buf)
 	{
-		Step("sequential reads");
+		Step("sequential reads: 32 x WDVD_Read of 1 MiB through the DIP");
 		u32 failed = 0;
 		t = gettime();
 		for (u32 off = 0; off < total; off += chunk)
@@ -575,7 +620,7 @@ static void LaunchReads(void)
 			us ? (u32)((u64)total * 1000000 / 1024 / us) : 0);
 
 		//! The same offsets every run: a fixed LCG over the first 256 MiB, 32 KiB aligned
-		Step("random reads");
+		Step("random reads: 128 x WDVD_Read of 32 KiB through the DIP");
 		u32 seed = 0x55534242, maxUs = 0;
 		failed = 0;
 		t = gettime();
@@ -788,6 +833,7 @@ void UsbBench_Run(void)
 	PartitionHandle *usb = DeviceHandler::GetUSBPartitionCount() > 0 ? DeviceHandler::Instance()->GetUSBHandleFromPartition(0) : NULL;
 	int part = DeviceHandler::PartitionToPortPartition(0);
 
+	ScreenOpen();
 	Log("USB Loader GX cIOS bench, mode %s, USB writes %s, exit unmount %s, step limit %u s",
 		dumpMode ? "dump" : launchMode ? "launch" : "io", writesAllowed ? "ALLOWED" : "refused (read-only)",
 		skip ? "skips unchanged sectors (default)" : "writes everything (no skip)", limitS);
@@ -796,7 +842,8 @@ void UsbBench_Run(void)
 	//! The refusal is in usbstorage2.c, the cIOS driver; IOS58's libogc driver has none
 	if (!writesAllowed && IOS_GetVersion() < 200)
 	{
-		Log("not on a cIOS, so writes cannot be refused: back to HBC with no clean-up");
+		Log("not on a cIOS, so writes cannot be refused: back to HBC in 5 s, no clean-up");
+		usleep(5 * 1000 * 1000);
 		hbc_agent_fatal_now(0x55534242, "usbbench: IOS %d, read-only needs a cIOS", IOS_GetVersion());
 	}
 	Log("USB partitions: %d; partition 0: %s, mounted as %s:, LBA %u, %u sectors", DeviceHandler::GetUSBPartitionCount(),
@@ -824,7 +871,9 @@ void UsbBench_Run(void)
 
 	//! (b) The exit: its unmount is timed in exit.log, as on every exit
 	USBStorage2_BenchNoSkip(!skip);
-	Log("exit: back to HBC; exit.log times the unmount");
+	Log("exit: back to HBC in 5 s; exit.log times the unmount");
+	usleep(5 * 1000 * 1000); // the result stays on the TV a moment
+	screenOn = false;        // the exit takes the GUI down
 	//! The watch stays on: an unmount past the limit leaves exit.log at that step
 	Step("exit");
 	Sys_BackToLoader();

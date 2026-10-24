@@ -139,6 +139,21 @@ int StartUpProcess::ParseArguments(int argc, char *argv[])
 			Settings.USBPort = LIMIT(atoi(ptr + strlen("-usbport=")), 0, 2);
 		}
 
+		//! The config folder, for a launch whose argv[0] carries no path: wiiload (hbc.py
+		//! send) passes only the file's name. Settings load after this, in Execute().
+		ptr = strcasestr(argv[i], "-config=");
+		if (ptr)
+		{
+			const char *dir = ptr + strlen("-config=");
+			size_t len = strlen(dir);
+			if ((strncmp(dir, "sd:/", 4) == 0 || strncmp(dir, "usb1:/", 6) == 0) && !strstr(dir, "..") &&
+				len + 2 <= sizeof(Settings.ConfigPath))
+			{
+				snprintf(Settings.ConfigPath, sizeof(Settings.ConfigPath), "%s%s", dir, dir[len - 1] == '/' ? "" : "/");
+				gprintf("Loader path: %s (-config)\n", Settings.ConfigPath);
+			}
+		}
+
 		if (strncmp(Settings.ConfigPath, "sd", 2) == 0)
 		{
 			ptr = strcasestr(argv[i], "-sdmode=");

@@ -31,6 +31,9 @@
  *                   (2026-10-24), which no guard or agent can leave; the Wii needed a
  *                   power cycle each time. Without it the launch stops after
  *                   WDVD_OpenPartition.
+ *   -benchmem1=1    launch mode: the WDVD_Read buffers come from MEM1 (GX's texture
+ *                   pool), as a real launch's apploader reads go to MEM1; by default
+ *                   they are memalign(32) blocks, which GX's heap puts in MEM2
  *   -benchone=B     launch mode: one WDVD_Read of B bytes (32 to 1 MiB, a multiple
  *                   of 32) at partition offset 0 instead of the read benchmarks
  *   -benchboot=S    the same for GX's start-up, from main() to the menu
@@ -65,6 +68,7 @@
 #include "usbloader/GameList.h"
 #include "usbloader/usbstorage2.h"
 #include "usbloader/wdvd.h"
+#include "memory/mem2.h"
 #include "GUI/gui.h"
 #include "gecko.h"
 #include "menu.h"
@@ -72,7 +76,7 @@
 
 #define REVIEW_CONFIG "sd:/apps/usbloader_gx_review/"
 
-static bool launchMode = false, dumpMode = false, writesAllowed = false, diReads = false;
+static bool launchMode = false, dumpMode = false, writesAllowed = false, diReads = false, mem1Reads = false;
 static int skipArg = -1;
 static u32 limitS = 600, bootS = 180, readKiB = 1024, oneRead = 0;
 static volatile u32 stepLimit = 600;
@@ -219,6 +223,8 @@ void UsbBench_Init(int argc, char *argv[])
 			writesAllowed = true;
 		else if (strcmp(argv[i], "-benchdiread=1") == 0)
 			diReads = true;
+		else if (strcmp(argv[i], "-benchmem1=1") == 0)
+			mem1Reads = true;
 		else if (strncmp(argv[i], "-benchskip=", 11) == 0)
 			skipArg = atoi(argv[i] + 11) ? 1 : 0;
 		else if (strncmp(argv[i], "-benchlimit=", 12) == 0 && atoi(argv[i] + 12) > 0)
@@ -538,6 +544,25 @@ static bool FindWbfsFile(char *path, size_t size)
 	return found;
 }
 
+//! A DI read buffer: MEM1 from GX's texture pool with -benchmem1=1, else MEM2.
+//! The pool is for textures because boot paths overwrite it after AppCleanUp()
+//! closes it; a buffer taken and freed while the menu runs is safe there.
+static u8 *ReadBuffer(u32 size)
+{
+	u8 *p = (u8 *)(mem1Reads ? TEX_alloc(size) : memalign(32, size));
+	u32 a = (u32)p;
+	bool mem1 = a >= 0x80000000 && a < 0x81800000;
+	if (p && mem1Reads && !mem1)
+	{
+		Log("read buffer: no %u bytes free in MEM1 (got 0x%08x); not reading", size, a);
+		free(p);
+		return NULL;
+	}
+	if (p)
+		Log("read buffer: %u bytes at 0x%08x (%s)", size, a, mem1 ? "MEM1" : "MEM2");
+	return p;
+}
+
 //! (e) What a USB Wii game's launch asks of the cIOS before its apploader runs
 //! (GameBooter::SetupDisc() and BootPartition()), then partition reads through
 //! the DIP. Nothing is booted.
@@ -643,7 +668,7 @@ static void LaunchReads(void)
 	{
 		//! -benchone=BYTES: one WDVD_Read at partition offset 0 and nothing more, so a
 		//! hang names its size (every read size hung IOS on 2026-10-24)
-		u8 *one = (u8 *)memalign(32, oneRead);
+		u8 *one = ReadBuffer(oneRead);
 		if (one)
 		{
 			snprintf(what, sizeof(what), "one WDVD_Read of %u bytes at partition offset 0 through the DIP", oneRead);
@@ -660,7 +685,7 @@ static void LaunchReads(void)
 	}
 
 	const u32 chunk = readKiB * 1024, total = 32 * 1024 * 1024;
-	u8 *buf = (u8 *)memalign(32, chunk);
+	u8 *buf = ReadBuffer(chunk);
 	if (buf)
 	{
 		snprintf(what, sizeof(what), "sequential reads: %u x WDVD_Read of %u KiB through the DIP", total / chunk, readKiB);

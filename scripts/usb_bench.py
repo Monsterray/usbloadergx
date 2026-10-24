@@ -1,4 +1,4 @@
-"""usb_bench.py --mode io|launch|dump [--allow-writes] [--skip 0|1] [--limit S] [--boot S] [--read KIB] [--one BYTES] [--allow-di-reads]
+"""usb_bench.py --mode io|launch|dump [--allow-writes] [--skip 0|1] [--limit S] [--boot S] [--read KIB] [--one BYTES] [--allow-di-reads] [--mem1]
                 [--dol PATH] [--wait S] [--dry-run]
 -- time USB Loader GX's USB work on the bench Wii's cIOS 249.
 
@@ -140,6 +140,8 @@ def main():
                    help="launch mode: KiB per sequential WDVD_Read (default 1024)")
     p.add_argument("--allow-di-reads", action="store_true",
                    help="launch mode: read the partition through the DIP (has hung IOS: needs someone at the Wii)")
+    p.add_argument("--mem1", action="store_true",
+                   help="launch mode: read into MEM1, as a real launch's apploader does (default MEM2)")
     p.add_argument("--one", type=int, help="launch mode: one WDVD_Read of BYTES (32..1048576, x32) instead")
     p.add_argument("--dol", type=pathlib.Path, default=REPO / ".dev" / "usbbench" / "boot.dol")
     p.add_argument("--wait", type=int, default=1800, help="seconds to wait for HBC to come back")
@@ -157,6 +159,8 @@ def main():
         args.append(f"-benchboot={o.boot}")
     if o.read:
         args.append(f"-benchread={o.read}")
+    if o.mem1:
+        args.append("-benchmem1=1")
     if o.allow_di_reads:
         args.append("-benchdiread=1")
     if o.one:

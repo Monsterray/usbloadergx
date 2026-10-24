@@ -8,6 +8,8 @@
 #   scripts/diag.sh autoinput    # test build with -DAUTOINPUT -> .dev/autoinput/boot.dol and boot.elf
 #                                # (EXTRA_CFLAGS="-DDEBUG_NETWORK" adds defines to it)
 #                                # (reads sd:/autoinput.txt; see source/utils/AutoInput.cpp)
+#   scripts/diag.sh exittest     # tests/dolphin/exittest.c -> .dev/exittest/boot.dol: a homebrew app
+#                                # that waits 4 s and calls exit(0), for the return stub
 #
 # Output goes to stdout; redirect it to a file to keep it.
 set -euo pipefail
@@ -58,11 +60,19 @@ case "$MODE" in
 		OUT_MOUNT=(-v "$MOUNT_ROOT/.dev/autoinput:/out")
 		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make -j"$(nproc)" CFLAGS="$CF" > /out/build.log 2>&1; rc=$?; cp boot.dol boot.elf /out/ 2>/dev/null; grep -E "warning:|error:" /out/build.log | sort -u; exit $rc'
 		;;
+	exittest)
+		mkdir -p "$ROOT/.dev/exittest"
+		printf '%s\n' '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' '<app version="1">' \
+			'  <name>exittest</name>' '  <coder>usbloadergx tests</coder>' '  <version>1</version>' \
+			'  <short_description>exit(0) after 4 seconds</short_description>' '</app>' > "$ROOT/.dev/exittest/meta.xml"
+		OUT_MOUNT=(-v "$MOUNT_ROOT/.dev/exittest:/out")
+		SCRIPT='cd /tmp && "$DEVKITPPC/bin/powerpc-eabi-gcc" -O2 -Wall -Wextra -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float -I"$DEVKITPRO/libogc/include" /src/tests/dolphin/exittest.c -L"$DEVKITPRO/libogc/lib/wii" -lfat -logc -lm -o exittest.elf && elf2dol exittest.elf /out/boot.dol && echo "built .dev/exittest/boot.dol"'
+		;;
 	*)
-		echo "Usage: $0 [warnings|gc-sections|autoinput]" >&2
+		echo "Usage: $0 [warnings|gc-sections|autoinput|exittest]" >&2
 		exit 1
 		;;
 esac
 
 "${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" "$MOUNT_ROOT" >/dev/null
-"${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" "${OUT_MOUNT[@]}" -e CF="$CF" -e LF="${LF:-}" "$IMAGE" bash -c "$SCRIPT"
+"${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" "${OUT_MOUNT[@]}" -e CF="${CF:-}" -e LF="${LF:-}" "$IMAGE" bash -c "$SCRIPT"

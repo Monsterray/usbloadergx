@@ -37,6 +37,7 @@
 #include "utils/ShowError.h"
 #include "utils/tools.h"
 #include "utils/PasswordCheck.h"
+#include "utils/AutoInput.h"
 #include "xml/GameTDB.hpp"
 #include "gecko.h"
 #include "menus.h"
@@ -1268,6 +1269,20 @@ int GameBrowseMenu::MainLoop()
 		// `hbc.py key h`: the HOME overlay, as if HOME had been pressed
 		WindowExitPrompt();
 	}
+#ifdef AUTOINPUT
+	else if (int exitTo = AutoInput_TakeExit())
+	{
+		gprintf("\tautoinput exit %d\n", exitTo);
+		if (exitTo == AUTOINPUT_EXIT_HBC)
+			Sys_LoadHBC();
+		else if (exitTo == AUTOINPUT_EXIT_MENU)
+			Sys_LoadMenu();
+		else if (exitTo == AUTOINPUT_EXIT_LOADER)
+			Sys_BackToLoader();
+		else
+			WindowExitPrompt();
+	}
+#endif
 	else if (homeBtn->GetState() == STATE_CLICKED)
 	{
 		gprintf("\thomeBtn clicked\n");

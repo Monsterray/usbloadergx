@@ -20,6 +20,12 @@
  *                            Wii running GX (Dolphin has some 45 MB free)
  *   60000 memreport          MEM_Report() now, with the browser and its covers
  *                            still up ("mem autoinput <ms>: ...")
+ *   70000 exit hbc           leave GX the way an exit menu does, from the game
+ *                            browser's main loop: hbc (Sys_LoadHBC), menu
+ *                            (Sys_LoadMenu), loader (Sys_BackToLoader, the return
+ *                            stub) or prompt (WindowExitPrompt, GX's HOME menu).
+ *                            The HOME overlay reads the controllers itself, so
+ *                            scripted presses cannot choose its Exit items.
  *
  * Buttons: A B X Y Z START UP DOWN LEFT RIGHT L R. Everything goes to channel
  * 0, merged with whatever a real controller sends. Each event is logged with
@@ -42,7 +48,7 @@
 
 namespace
 {
-enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO, EV_MEMHOG, EV_MEMREPORT };
+enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO, EV_MEMHOG, EV_MEMREPORT, EV_EXIT };
 
 struct Event
 {
@@ -66,6 +72,9 @@ bool pointing = false;
 int pointX = 0, pointY = 0;
 int stickX = 0, stickY = 0;
 u32 stickUntil = 0;
+//! Set here in the GUI thread, taken by the browser's main loop: an exit has to
+//! run in the main thread
+volatile int pendingExit = AUTOINPUT_EXIT_NONE;
 
 u32 ButtonBits(const char *name)
 {
@@ -131,6 +140,14 @@ void Load()
 		else if (strcasecmp(cmd, "downloadto") == 0 && sscanf(line, "%*u %*s %255s %255s", url, path) == 2)
 		{
 			e.kind = EV_DOWNLOADTO; e.url = url; e.path = path;
+		}
+		else if (strcasecmp(cmd, "exit") == 0 && sscanf(line, "%*u %*s %15s", arg) == 1 &&
+				 (a = strcasecmp(arg, "hbc") == 0 ? AUTOINPUT_EXIT_HBC
+					: strcasecmp(arg, "menu") == 0 ? AUTOINPUT_EXIT_MENU
+					: strcasecmp(arg, "loader") == 0 ? AUTOINPUT_EXIT_LOADER
+					: strcasecmp(arg, "prompt") == 0 ? AUTOINPUT_EXIT_PROMPT : AUTOINPUT_EXIT_NONE) != AUTOINPUT_EXIT_NONE)
+		{
+			e.kind = EV_EXIT; e.x = a;
 		}
 		else
 		{
@@ -232,6 +249,10 @@ void AutoInput_Apply(void)
 						freeBefore, MEM2_freesize());
 				break;
 			}
+			case EV_EXIT:
+				pendingExit = e.x;
+				gprintf("autoinput %u: exit %d requested\n", ms, e.x);
+				break;
 		}
 	}
 
@@ -255,6 +276,13 @@ void AutoInput_Apply(void)
 		t.wpad.ir.y = pointY;
 		t.wpad.ir.angle = 0.0f;
 	}
+}
+
+int AutoInput_TakeExit(void)
+{
+	int ret = pendingExit;
+	pendingExit = AUTOINPUT_EXIT_NONE;
+	return ret;
 }
 
 #endif

@@ -50,17 +50,30 @@ void gprintf(const char *format, ...)
 	if((len = vsnprintf(stringBuf, sizeof(stringBuf), format, va)) > 0)
 	{
 		#ifdef DEBUG_TO_FILE
+		//! Lines from before the SD card is mounted wait here for the first one that
+		//! reaches the file
+		static char earlyBuf[16384];
+		static u32 earlyLen = 0;
 		FILE *debugF = fopen("sd:/debug.txt", "a");
-		if(!debugF)
-			debugF = fopen("sd:/debug.txt", "w");
 		if(debugF)
 		{
+			if (earlyLen)
+				fwrite(earlyBuf, 1, earlyLen, debugF);
+			earlyLen = 0;
 			fwrite(stringBuf, 1, strlen(stringBuf), debugF);
 			fclose(debugF);
 		}
-		#else
-		fwrite(stringBuf, 1, len < (int)sizeof(stringBuf) ? len : (int)sizeof(stringBuf) - 1, stdout);
+		else
+		{
+			u32 n = strlen(stringBuf);
+			if (n > sizeof(earlyBuf) - earlyLen)
+				n = sizeof(earlyBuf) - earlyLen;
+			memcpy(earlyBuf + earlyLen, stringBuf, n);
+			earlyLen += n;
+		}
 		#endif
+		//! Also with DEBUG_TO_FILE: the hbc agent's kept log reads stdout
+		fwrite(stringBuf, 1, len < (int)sizeof(stringBuf) ? len : (int)sizeof(stringBuf) - 1, stdout);
 
 		if (teePath[0])
 		{

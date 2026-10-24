@@ -53,6 +53,7 @@
 #include "utils/StringTools.h"
 #include "homebrewboot/BootHomebrew.h"
 #include "GameBooter.hpp"
+#include "version.h"
 #include "NandEmu.h"
 #include "SavePath.h"
 #include "sys.h"
@@ -279,6 +280,12 @@ int GameBooter::BootGame(struct discHdr *gameHdr, const s8 useOcarina)
 	ocarinaAnswer = useOcarina;
 	struct discHdr gameHeader;
 	memcpy(&gameHeader, gameHdr, sizeof(struct discHdr));
+
+	//! The boot's own log on the card, kept through a hang (gprintf_tee in gecko.c)
+	char bootLog[sizeof(Settings.ConfigPath) + 16];
+	snprintf(bootLog, sizeof(bootLog), "%sboot.log", Settings.ConfigPath);
+	gprintf_tee(bootLog);
+	gprintf("USB Loader GX %s\n", LOADER_VERSION);
 
 	gprintf("Boot Game: %s (%.6s)\n", gameHeader.title, gameHeader.id);
 

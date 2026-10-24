@@ -17,6 +17,26 @@
 /* init-globals */
 static bool geckoinit = false;
 
+//! While a game or an app boots, every line is copied to this file as well: the hbc
+//! agent's kept log ends at AppCleanUp(), and a power cycle after a hang loses it.
+//! Opened per line, so a hang loses nothing written before it.
+static char teePath[128];
+
+void gprintf_tee(const char *path)
+{
+	//! The same file again (a game boot that ends in the app booter) keeps what it has
+	if (path && strcmp(path, teePath) == 0)
+		return;
+	teePath[0] = '\0';
+	if (!path)
+		return;
+	FILE *f = fopen(path, "w");
+	if (!f)
+		return;
+	fclose(f);
+	snprintf(teePath, sizeof(teePath), "%s", path);
+}
+
 //! Everything goes through stdout: the USB Gecko is the device under it
 //! (USBGeckoOutput), and the hbc agent puts its own in front, which keeps the
 //! end of it for `hbc.py lastlog` and sends it to the PC with "Log to PC".
@@ -41,6 +61,16 @@ void gprintf(const char *format, ...)
 		#else
 		fwrite(stringBuf, 1, len < (int)sizeof(stringBuf) ? len : (int)sizeof(stringBuf) - 1, stdout);
 		#endif
+
+		if (teePath[0])
+		{
+			FILE *tee = fopen(teePath, "a");
+			if (tee)
+			{
+				fwrite(stringBuf, 1, len < (int)sizeof(stringBuf) ? len : (int)sizeof(stringBuf) - 1, tee);
+				fclose(tee);
+			}
+		}
 		
 		#ifdef WIFI_GECKO
 		wifi_printf(stringBuf);

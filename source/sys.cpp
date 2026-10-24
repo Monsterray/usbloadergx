@@ -21,6 +21,7 @@
 #include "utils/ResourceManager.h"
 #include "usbloader/playlog.h"
 #include "usbloader/wbfs.h"
+#include "usbloader/usbstorage2.h"
 #include "GameCube/GCGames.h"
 #include "themes/CTheme.h"
 #include "SoundOperations/SoundHandler.hpp"
@@ -131,6 +132,15 @@ static void UnmountUSB(void)
 		snprintf(step, sizeof(step), "unmounting USB partition %d", i);
 		ExitStep(step);
 		DeviceHandler::Instance()->UnMountUSB(i);
+#ifdef USB_BENCH
+		//! The cIOS bench build: the drive's writes so far, the unmount's included
+		u32 calls, sectors, failed, ms, maxUs;
+		USBStorage2_BenchWrites(&calls, &sectors, &failed, &ms, &maxUs);
+		char writes[100];
+		snprintf(writes, sizeof(writes), "USB writes so far: %u calls, %u sectors, %u failed, %u ms, longest %u us",
+				 calls, sectors, failed, ms, maxUs);
+		ExitStep(writes);
+#endif
 	}
 	ExitStep("USB interface shutdown");
 	DeviceHandler::Instance()->UnMountAllUSB();
@@ -218,6 +228,7 @@ void ExitApp(void)
 	ExitStep("magic patches");
 	MagicPatches(0);
 	ExitStep("unmounting SD, then the next program");
+	gprintf_tee(NULL); // boot.log lives on the card
 	DeviceHandler::DestroyInstance();
 }
 

@@ -142,6 +142,15 @@ static int RunAppbooter()
 			return -1;
 	}
 
+	//! Logged while the card is still mounted (boot.log, gprintf_tee): an app that
+	//! returns through the stub lands on this title
+	char bootLog[sizeof(Settings.ConfigPath) + 16];
+	snprintf(bootLog, sizeof(bootLog), "%sboot.log", Settings.ConfigPath);
+	gprintf_tee(bootLog);
+	u64 stubTarget = returnTo(false);
+	gprintf("App booter: image %u bytes, arguments %u bytes (%u), return stub -> %016llx\n",
+			homebrewsize, argsSize, (unsigned)Arguments.size(), stubTarget);
+
 	ExitApp();
 
 	//! GX's heap is dead from here: nothing below allocates from it. The image goes to
@@ -163,7 +172,7 @@ static int RunAppbooter()
 	}
 
 	loadStub();
-	Set_Stub(returnTo(false));
+	Set_Stub(stubTarget);
 
 	gprintf("Exiting USB Loader GX...\n\n");
 

@@ -74,6 +74,17 @@ void HbcAgent_Init(void)
 	// screen for this long is a hang. HaltGui() pauses the frames while the
 	// main thread works, so this leaves room for its slowest step.
 	cfg.hang_s = 120;
+#ifdef USB_BENCH
+	// The cIOS bench build runs unattended on the shared bench Wii, as WiiStation's
+	// lab mode does (WiiStation Gamecube/hbc_home.c): no listener, so no other
+	// workstation's queue takes GX for an idle HBC and `hbc.py run` closes it
+	// mid-run; a crash goes back to HBC after 10 s; and the agent's exit never
+	// writes the USB cache back (that write-back hung, through a cIOS whose
+	// writes took 17 s and landed as junk, on 2026-10-24).
+	cfg.no_network = true;
+	cfg.crash_reload_s = 10;
+	cfg.no_safety |= HBC_AGENT_NO_FLUSH;
+#endif
 
 	s32 ret = hbc_agent_init(&cfg);
 	gprintf("hbc agent: %d\n", ret);

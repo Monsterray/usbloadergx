@@ -1,140 +1,181 @@
-"""usb_bench.py [--mode io|launch|dump] [--allow-writes] [--skip 0|1] [--limit S] [--dol PATH] [--wait S] [--dry-run]
+"""usb_bench.py --mode io|launch|dump [--allow-writes] [--skip 0|1] [--limit S] [--boot S]
+                [--dol PATH] [--wait S] [--dry-run]
 -- time USB Loader GX's USB work on the bench Wii's cIOS 249.
 
-Runs the bench build (`bash scripts/build.sh bench` -> .dev/usbbench/boot.dol,
-source/utils/UsbBench.cpp) with `hbc.py send boot.dol -- -ios=249 -bench=MODE`,
-waits for GX's agent to answer and then for HBC to answer again (GX sends no
-netlog, so `run` would wait out its timeout), keeps GX's output (`hbc.py
-lastlog`), then fetches the two small logs it leaves in the review
-build's folder (sd:/apps/usbloader_gx_review/, scripts/wii_install.py):
+Sends the bench build (`bash scripts/build.sh bench` -> .dev/usbbench/boot.dol,
+source/utils/UsbBench.cpp) with `-ios=249 -bench=MODE`, waits until HBC answers
+again, then keeps GX's output (`hbc.py lastlog`, `crash`) and the two small logs
+it leaves in the review build's folder on SD (sd:/apps/usbloader_gx_review/):
 usbbench.log (the measurements) and exit.log (the exit, its unmount timed).
-Everything is kept in .runs/usb_bench/<time>-<mode>/.
+Everything goes to .runs/usb_bench/<time>-<mode>/.
 
-GX exits to HBC by itself at the end, so the job leaves the Wii in HBC. It
-writes to the review folder on SD, installs nothing and never touches a cIOS.
-It writes nothing to the USB drive unless --allow-writes is given: the build
-refuses every USB write by default, since the d2x fork's debug cIOS was found
-(2026-10-24) to land writes as junk on the bench drive. With --allow-writes,
-io mode rewrites one FSInfo sector with its own bytes and saves
-<usb>:/usbbench/GXGlobal.cfg. --mode dump only reads: FAT1 against FAT2, the
-FSInfo, root directory and usbbench sectors, for what earlier writes left.
+  io      game list load, one FSInfo sector rewritten 3x, GXGlobal.cfg saved to USB 2x, exit
+  launch  game list load, then a USB Wii game's launch up to its apploader: fragment list,
+          DIP USB mode, disc and partition open, partition reads through the DIP; exit
+  dump    reads only: boot/FSInfo sectors, FAT1 against FAT2, root directory, usbbench folder
 
-On the shared bench Wii, run it only as a queue job:
+Safety, as WiiStation's bench scripts do it (scripts/wii_targets.py, Gamecube/hbc_home.c,
+Gamecube/boot_guard.c in C:/projects/WiiStation):
+  - Runs only as a wii-bench queue job, and never against a production-style Wii.
+  - Every hbc.py call has a timeout, so a wedged Wii never holds the queue lease.
+  - Read-only by default: the build refuses every USB write in usbstorage2.c, before IOS
+    sees it, unless --allow-writes. The d2x fork's debug cIOS landed writes as junk on the
+    bench drive (2026-10-24: a root-directory sector became a USB command block). On IOS58,
+    whose driver has no refusal, the build goes back to HBC before measuring.
+  - GX's agent runs without a listener, so no other queue takes it for an idle HBC; a crash
+    returns to HBC after 10 s; the agent's exit never writes the USB cache back.
+  - A guard from main(): start-up past --boot seconds (default 180; a prompt nobody answers),
+    or any later step past --limit (default 600), returns to HBC with no clean-up.
+  - No abbreviated flags: a typo is an error, never another option.
+It installs nothing, never touches a cIOS, and writes on SD only the two logs and GX's own
+review-folder files (settings, caches).
 
-    C:/Python312/python.exe C:/tools/wii-bench/wiibench.py add --wii dev --timeout 3600 \\
-        --cwd C:/projects/usbloadergx --name "GX USB bench io" -- \\
-        C:/Python312/python.exe scripts/usb_bench.py --mode io
+    C:/Python312/python.exe C:/tools/wii-bench/wiibench.py add --wii dev --timeout 1800 \\
+        --cwd C:/projects/usbloadergx-bench --name "GX USB bench dump (read-only)" -- \\
+        C:/Python312/python.exe scripts/usb_bench.py --mode dump
 
-Needs WII_BENCH_IP (or HBC_WII), and HBC_TOOL (default C:/projects/hbc-reborn/tools/hbc.py).
-Exit status 0 when both logs came back and the bench reached its exit.
+HBC_TOOL overrides the hbc.py path (default C:/projects/hbc-reborn/tools/hbc.py).
+Exit status 0 when both logs came back and the bench reached its exit; 2 when HBC did not
+come back (STUCK: someone has to bring the Wii back).
 """
+import argparse
 import datetime
 import os
 import pathlib
+import socket
 import subprocess
 import sys
 import time
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 REVIEW = "sd:/apps/usbloader_gx_review/"
+HBC_TOOL = os.environ.get("HBC_TOOL", "C:/projects/hbc-reborn/tools/hbc.py")
+# Production-style Wiis with real data on them (WiiStation scripts/wii_targets.py)
+PROTECTED_WIIS = ("192.168.8.200", "192.168.8.243")
 
 
-def opt(a, name, default):
-    return a[a.index(name) + 1] if name in a else default
-
-
-def hbc(tool, *args, timeout=None, log=None):
-    cmd = [sys.executable, tool, *args]
-    print("$ hbc.py " + " ".join(args), flush=True)
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                         encoding="utf-8", errors="replace")
-    out = []
-    for line in p.stdout:
-        print(line, end="", flush=True)
-        out.append(line)
-    rc = p.wait(timeout=timeout)
-    if log:
-        log.write_text("".join(out), encoding="utf-8")
-    return rc, "".join(out)
-
-
-def version(tool):
-    """What answers on 4299: "1.10.9" (HBC), "... agent" (GX's agent), or None."""
+def bench_wii():
+    """The bench Wii's address inside a wii-bench queue job; refuses to run outside one,
+    and refuses a production-style Wii, whatever the environment says."""
+    if not os.environ.get("WII_BENCH_JOB_START"):
+        sys.exit("usb_bench.py: run it as a wii-bench queue job, not directly (nothing was sent)")
+    wii = (os.environ.get("WII_BENCH_IP") or "").strip()
+    if not wii:
+        sys.exit("usb_bench.py: no WII_BENCH_IP in this job")
     try:
-        p = subprocess.run([sys.executable, tool, "version"], capture_output=True, text=True, timeout=20)
+        packed = socket.inet_aton(wii)
+    except OSError:
+        sys.exit(f"usb_bench.py: {wii} is not an IPv4 address")
+    if any(packed == socket.inet_aton(p) for p in PROTECTED_WIIS):
+        sys.exit(f"usb_bench.py: refused, {wii} is a production-style Wii (real data)")
+    return wii
+
+
+def hbc(wii, *args, timeout=120, log=None):
+    """One hbc.py call, printed; rc 124 after a timeout, never a hang."""
+    print("$ hbc.py " + " ".join(map(str, args)), flush=True)
+    try:
+        r = subprocess.run([sys.executable, HBC_TOOL, "--wii", wii, *map(str, args)],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace",
+                           timeout=timeout)
+        rc, out = r.returncode, r.stdout + r.stderr
     except subprocess.TimeoutExpired:
-        return None
-    return p.stdout.strip() if p.returncode == 0 and p.stdout.strip() else None
+        rc, out = 124, f"timed out after {timeout} s\n"
+    print(out, end="" if out.endswith("\n") else "\n", flush=True)
+    if log:
+        log.write_text(out, encoding="utf-8")
+    return rc, out
 
 
-def wait_for_hbc(tool, limit_s):
-    """After the send: GX's agent answers while it runs, nothing answers during its
-    IOS reloads and exit, then HBC answers again. True once HBC is back."""
+def answer(wii):
+    """Who answers on TCP 4299: 'hbc' (HBC's menu), 'agent' (an app's agent), or 'none'."""
+    try:
+        r = subprocess.run([sys.executable, HBC_TOOL, "--wii", wii, "version"],
+                           capture_output=True, text=True, timeout=20)
+    except subprocess.TimeoutExpired:
+        return "none"
+    v = r.stdout.strip()
+    if r.returncode or not v:
+        return "none"
+    return "agent" if v.endswith("agent") else "hbc"
+
+
+def wait_for_hbc(wii, limit_s):
+    """After the send: nothing answers while GX runs (its agent has no listener in this build),
+    then HBC answers again. True once HBC is back after GX was seen gone."""
     start = time.monotonic()
-    seen_gx = False
+    gone = False
     last = ""
     while time.monotonic() - start < limit_s:
-        v = version(tool)
-        state = "gx" if v and v.endswith("agent") else "hbc" if v else "none"
+        state = answer(wii)
+        t = time.monotonic() - start
         if state != last:
-            print(f"[{time.monotonic() - start:6.0f} s] {state}: {v or 'no answer'}", flush=True)
+            print(f"[{t:6.0f} s] {state}", flush=True)
             last = state
-        seen_gx = seen_gx or state in ("gx", "none")
-        if state == "hbc" and seen_gx and time.monotonic() - start > 30:
+        gone = gone or state in ("none", "agent")
+        if state == "hbc" and gone:
             return True
-        if state == "hbc" and not seen_gx and time.monotonic() - start > 120:
-            print("GX was never seen: HBC answered throughout (did it start, or leave within 2 s?)", flush=True)
+        if state == "hbc" and t > 120:
+            print("GX was never seen: HBC answered throughout (did it start, or leave within 2 s?)",
+                  flush=True)
             return True
         # Quick polls at first: a start-up that fails leaves for HBC within seconds
-        time.sleep(2 if time.monotonic() - start < 120 else 10)
+        time.sleep(2 if t < 120 else 10)
     return False
 
 
 def main():
-    a = sys.argv[1:]
-    if "-h" in a or "--help" in a:
-        print(__doc__)
-        return 0
-    mode = opt(a, "--mode", "io")
-    if mode not in ("io", "launch", "dump"):
-        sys.exit("--mode is io, launch or dump")
-    dol = pathlib.Path(opt(a, "--dol", REPO / ".dev" / "usbbench" / "boot.dol"))
-    tool = os.environ.get("HBC_TOOL", "C:/projects/hbc-reborn/tools/hbc.py")
-    args = ["-ios=249", "-bench=" + mode]
-    if "--allow-writes" in a:
-        args.append("-benchwrites=1")
-    if "--skip" in a:
-        args.append("-benchskip=" + opt(a, "--skip", "0"))
-    if "--limit" in a:
-        args.append("-benchlimit=" + opt(a, "--limit", "600"))
-    out = REPO / ".runs" / "usb_bench" / (datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + mode)
+    p = argparse.ArgumentParser(description=__doc__, allow_abbrev=False,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--mode", choices=("io", "launch", "dump"), required=True)
+    p.add_argument("--allow-writes", action="store_true",
+                   help="let GX write to the USB drive (refused by default)")
+    p.add_argument("--skip", choices=("0", "1"), help="the exit's unmount skips unchanged sectors")
+    p.add_argument("--limit", type=int, help="seconds for any one bench step (default 600)")
+    p.add_argument("--boot", type=int, help="seconds for GX's start-up (default 180)")
+    p.add_argument("--dol", type=pathlib.Path, default=REPO / ".dev" / "usbbench" / "boot.dol")
+    p.add_argument("--wait", type=int, default=1800, help="seconds to wait for HBC to come back")
+    p.add_argument("--dry-run", action="store_true", help="check and print, send nothing")
+    o = p.parse_args()
 
-    if not dol.exists():
-        sys.exit(f"no such .dol: {dol} (run: bash scripts/build.sh bench)")
-    print(f"bench build {dol} ({dol.stat().st_size} bytes), args {' '.join(args)}, logs -> {out}", flush=True)
-    if "--dry-run" in a:
+    args = ["-ios=249", "-bench=" + o.mode]
+    if o.allow_writes:
+        args.append("-benchwrites=1")
+    if o.skip is not None:
+        args.append("-benchskip=" + o.skip)
+    if o.limit:
+        args.append(f"-benchlimit={o.limit}")
+    if o.boot:
+        args.append(f"-benchboot={o.boot}")
+    out = REPO / ".runs" / "usb_bench" / (datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + o.mode)
+
+    if not o.dol.is_file():
+        sys.exit(f"no such .dol: {o.dol} (run: bash scripts/build.sh bench)")
+    print(f"bench build {o.dol} ({o.dol.stat().st_size} bytes), args {' '.join(args)}, "
+          f"USB writes {'ALLOWED' if o.allow_writes else 'refused'}, logs -> {out}", flush=True)
+    if o.dry_run:
         print("dry run: nothing sent")
         return 0
-    if not (os.environ.get("WII_BENCH_IP") or os.environ.get("HBC_WII")):
-        sys.exit("WII_BENCH_IP or HBC_WII must name the Wii (run it as a bench queue job)")
+    wii = bench_wii()
     out.mkdir(parents=True, exist_ok=True)
 
-    hbc(tool, "version")
+    if answer(wii) != "hbc":
+        sys.exit("HBC is not what answers on the Wii: not sending anything")
     # A run that stops early must not leave the last run's logs to be read as its own
     for name in ("usbbench.log", "exit.log"):
-        hbc(tool, "rm", REVIEW + name)
-    send_rc, _ = hbc(tool, "send", str(dol), "--", *args)
-    if send_rc != 0:
+        hbc(wii, "rm", REVIEW + name, timeout=60)
+    rc, _ = hbc(wii, "send", o.dol, "--", *args, timeout=180)
+    if rc != 0:
         sys.exit("HBC did not start the bench build")
-    back = wait_for_hbc(tool, int(opt(a, "--wait", "3000")))
-    if not back:
-        print("STUCK: HBC did not answer again in time; the Wii needs someone to bring it back", flush=True)
-        return 1
-    hbc(tool, "lastlog", log=out / "lastlog.txt")
-    hbc(tool, "crash", log=out / "crash.txt")
+    if not wait_for_hbc(wii, o.wait):
+        print(f"STUCK: HBC did not answer again in {o.wait} s; the Wii needs someone to bring it back",
+              flush=True)
+        return 2
+    hbc(wii, "lastlog", timeout=60, log=out / "lastlog.txt")
+    hbc(wii, "crash", timeout=60, log=out / "crash.txt")
     ok = True
     for name in ("usbbench.log", "exit.log"):
-        rc, _ = hbc(tool, "get", REVIEW + name, str(out / name))
+        rc, _ = hbc(wii, "get", REVIEW + name, out / name, timeout=120)
         if rc != 0 or not (out / name).exists():
             ok = False
             continue

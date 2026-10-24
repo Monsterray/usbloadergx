@@ -23,6 +23,9 @@
  *                   writes land as junk (d2x fork, 2026-10-24) must not touch it
  *   -benchlimit=S   a step still running after S seconds (default 600) ends
  *                   the run through hbc_agent_fatal_now(), back to HBC
+ *   -benchboot=S    the same for GX's start-up, from main() to the menu
+ *                   (default 180): an IOS reload, a USB mount or a prompt
+ *                   nobody answers (WiiStation's boot guard, Gamecube/boot_guard.c)
  *
  * Each line goes to gprintf() (the hbc netlog) and to <config>/usbbench.log,
  * reopened per line; the exit's own steps go to exit.log as always.
@@ -56,7 +59,8 @@
 
 static bool launchMode = false, dumpMode = false, writesAllowed = false;
 static int skipArg = -1;
-static u32 limitS = 600;
+static u32 limitS = 600, bootS = 180;
+static volatile u32 stepLimit = 600;
 static bool logOpen = false;
 
 static volatile u64 stepStart = 0;
@@ -103,20 +107,23 @@ static void *Watch(void *)
 	{
 		usleep(1000 * 1000);
 		u64 start = stepStart;
-		if (start && ticks_to_secs(diff_ticks(start, gettime())) >= limitS)
+		u32 limit = stepLimit;
+		if (start && ticks_to_secs(diff_ticks(start, gettime())) >= limit)
 		{
-			Log("TIMEOUT: %s still running after %u s; back to HBC", stepName ? stepName : "?", limitS);
+			Log("TIMEOUT: %s still running after %u s; back to HBC", stepName ? stepName : "?", limit);
 			//! _now: no exit clean-up, which writes the USB cache back and hung on
 			//! a cIOS whose writes took 17 s each
-			hbc_agent_fatal_now(0x55534242, "usbbench: %s over %u s", stepName ? stepName : "?", limitS);
+			hbc_agent_fatal_now(0x55534242, "usbbench: %s over %u s", stepName ? stepName : "?", limit);
 		}
 	}
 	return NULL;
 }
 
-static void Step(const char *name)
+static void Step(const char *name, u32 limit = 0)
 {
+	stepStart = 0;
 	stepName = name;
+	stepLimit = limit ? limit : limitS;
 	stepStart = name ? gettime() : 0;
 }
 
@@ -144,8 +151,15 @@ void UsbBench_Init(int argc, char *argv[])
 			skipArg = atoi(argv[i] + 11) ? 1 : 0;
 		else if (strncmp(argv[i], "-benchlimit=", 12) == 0 && atoi(argv[i] + 12) > 0)
 			limitS = atoi(argv[i] + 12);
+		else if (strncmp(argv[i], "-benchboot=", 11) == 0 && atoi(argv[i] + 11) > 0)
+			bootS = atoi(argv[i] + 11);
 	}
 	USBStorage2_BenchReadOnly(!writesAllowed);
+	//! The guard from here: GX's start-up has no watchdog until the agent's, and a
+	//! hang in it (an IOS reload, a USB mount, a prompt) left the Wii for someone
+	//! to take back. hbc_agent_fatal_now() works before hbc_agent_init().
+	Step("GX start-up (IOS reload, USB mount, menu)", bootS);
+	LWP_CreateThread(&watchThread, Watch, NULL, NULL, 16 * 1024, LWP_PRIO_HIGHEST);
 	//! A wiiload start passes only the file's name: use the review build's folder
 	//! (scripts/wii_install.py), never an installed release's.
 	if (argc < 1 || !argv || !argv[0] || !strchr(argv[0], ':'))
@@ -585,7 +599,7 @@ void UsbBench_Run(void)
 		usb ? usb->GetSecCount(part) : 0);
 	Writes("at start");
 
-	LWP_CreateThread(&watchThread, Watch, NULL, NULL, 16 * 1024, LWP_PRIO_HIGHEST);
+	Step(NULL);
 
 	if (dumpMode)
 		Dump();

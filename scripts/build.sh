@@ -6,6 +6,8 @@
 #   scripts/build.sh              # docker build -o . .  -> usbloader_gx.zip (boot.dol + boot.elf)
 #   scripts/build.sh make ARGS    # run make ARGS in the image with the repo mounted (e.g. "make clean")
 #   scripts/build.sh shell        # interactive shell in the image, repo mounted at /w
+#   scripts/build.sh bench        # cIOS bench build, -DUSB_BENCH -> .dev/usbbench/boot.dol and boot.elf
+#                                 # (source/utils/UsbBench.cpp; run it with scripts/usb_bench.py)
 #
 # Docker is used natively when present. On Windows (Git Bash) with no native docker, the
 # WSL distro named in WSL_DISTRO (default Ubuntu-24.04) must have Docker Engine installed.
@@ -50,12 +52,23 @@ case "${1:-zip}" in
 		toolchain
 		"${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/w" -w /w "$IMAGE" make "$@"
 		;;
+	bench)
+		# Built from a copy inside the container, as diag.sh autoinput does, so these
+		# objects never mix with a normal build; only the .dol, .elf and log come out.
+		# The Makefile's CFLAGS/LDFLAGS are recursive, so $(MACHDEP)/$(INCLUDE) still expand.
+		toolchain
+		mkdir -p "$ROOT/.dev/usbbench"
+		CF='-ggdb -Os -Wall -Wno-multichar -Wno-unused-parameter -Wextra -Wformat-security $(MACHDEP) $(INCLUDE) -D_GNU_SOURCE -DNDEBUG -DWOLFSSL_USER_SETTINGS -DUSB_BENCH'
+		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./.runs --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make -j"$(nproc)" CFLAGS="$CF" > /out/build.log 2>&1; rc=$?; cp boot.dol boot.elf /out/ 2>/dev/null; grep -E "warning:|error:" /out/build.log | sort -u; exit $rc'
+		"${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" -v "$MOUNT_ROOT/.dev/usbbench:/out" -e CF="$CF" "$IMAGE" bash -c "$SCRIPT"
+		echo "Output: $ROOT/.dev/usbbench/boot.dol"
+		;;
 	shell)
 		toolchain
 		"${DOCKER[@]}" run --rm -it -v "$MOUNT_ROOT:/w" -w /w "$IMAGE" bash
 		;;
 	*)
-		echo "Usage: $0 [zip|make ARGS...|shell]" >&2
+		echo "Usage: $0 [zip|make ARGS...|shell|bench]" >&2
 		exit 1
 		;;
 esac

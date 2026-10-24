@@ -1,4 +1,4 @@
-"""usb_bench.py --mode io|launch|dump [--allow-writes] [--skip 0|1] [--limit S] [--boot S] [--read KIB]
+"""usb_bench.py --mode io|launch|dump [--allow-writes] [--skip 0|1] [--limit S] [--boot S] [--read KIB] [--one BYTES]
                 [--dol PATH] [--wait S] [--dry-run]
 -- time USB Loader GX's USB work on the bench Wii's cIOS 249.
 
@@ -135,6 +135,7 @@ def main():
     p.add_argument("--boot", type=int, help="seconds for GX's start-up (default 180)")
     p.add_argument("--read", type=int, choices=(32, 64, 128, 256, 512, 1024),
                    help="launch mode: KiB per sequential WDVD_Read (default 1024)")
+    p.add_argument("--one", type=int, help="launch mode: one WDVD_Read of BYTES (32..1048576, x32) instead")
     p.add_argument("--dol", type=pathlib.Path, default=REPO / ".dev" / "usbbench" / "boot.dol")
     p.add_argument("--wait", type=int, default=1800, help="seconds to wait for HBC to come back")
     p.add_argument("--dry-run", action="store_true", help="check and print, send nothing")
@@ -151,6 +152,10 @@ def main():
         args.append(f"-benchboot={o.boot}")
     if o.read:
         args.append(f"-benchread={o.read}")
+    if o.one:
+        if not (32 <= o.one <= 1048576 and o.one % 32 == 0):
+            sys.exit("--one is 32 to 1048576 bytes, a multiple of 32")
+        args.append(f"-benchone={o.one}")
     out = REPO / ".runs" / "usb_bench" / (datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + o.mode)
 
     if not o.dol.is_file():

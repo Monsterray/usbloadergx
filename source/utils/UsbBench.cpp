@@ -25,6 +25,8 @@
  *                   the run through hbc_agent_fatal_now(), back to HBC
  *   -benchread=K    launch mode: the sequential WDVD_Read size in KiB, 32 to 1024
  *                   (default 1024); 32 MiB are read either way
+ *   -benchone=B     launch mode: one WDVD_Read of B bytes (32 to 1 MiB, a multiple
+ *                   of 32) at partition offset 0 instead of the read benchmarks
  *   -benchboot=S    the same for GX's start-up, from main() to the menu
  *                   (default 180): an IOS reload, a USB mount or a prompt
  *                   nobody answers (WiiStation's boot guard, Gamecube/boot_guard.c)
@@ -66,7 +68,7 @@
 
 static bool launchMode = false, dumpMode = false, writesAllowed = false;
 static int skipArg = -1;
-static u32 limitS = 600, bootS = 180, readKiB = 1024;
+static u32 limitS = 600, bootS = 180, readKiB = 1024, oneRead = 0;
 static volatile u32 stepLimit = 600;
 static bool logOpen = false;
 
@@ -209,6 +211,9 @@ void UsbBench_Init(int argc, char *argv[])
 		else if (strncmp(argv[i], "-benchread=", 11) == 0 && atoi(argv[i] + 11) >= 32 && atoi(argv[i] + 11) <= 1024 &&
 				 atoi(argv[i] + 11) % 32 == 0)
 			readKiB = atoi(argv[i] + 11);
+		else if (strncmp(argv[i], "-benchone=", 10) == 0 && atoi(argv[i] + 10) >= 32 && atoi(argv[i] + 10) <= 1048576 &&
+				 atoi(argv[i] + 10) % 32 == 0)
+			oneRead = atoi(argv[i] + 10);
 		else if (strncmp(argv[i], "-benchboot=", 11) == 0 && atoi(argv[i] + 11) > 0)
 			bootS = atoi(argv[i] + 11);
 	}
@@ -611,8 +616,28 @@ static void LaunchReads(void)
 	if (ret < 0)
 		return;
 
-	const u32 chunk = readKiB * 1024, total = 32 * 1024 * 1024;
 	char what[100];
+	if (oneRead)
+	{
+		//! -benchone=BYTES: one WDVD_Read at partition offset 0 and nothing more, so a
+		//! hang names its size (every read size hung IOS on 2026-10-24)
+		u8 *one = (u8 *)memalign(32, oneRead);
+		if (one)
+		{
+			snprintf(what, sizeof(what), "one WDVD_Read of %u bytes at partition offset 0 through the DIP", oneRead);
+			Step(what);
+			t = gettime();
+			ret = WDVD_Read(one, oneRead, 0);
+			Log("one partition read of %u bytes: %d in %s; first bytes %02x%02x%02x%02x", oneRead, ret,
+				Ms(UsSince(t)), one[0], one[1], one[2], one[3]);
+			free(one);
+		}
+		WDVD_ClosePartition();
+		Step(NULL);
+		return;
+	}
+
+	const u32 chunk = readKiB * 1024, total = 32 * 1024 * 1024;
 	u8 *buf = (u8 *)memalign(32, chunk);
 	if (buf)
 	{

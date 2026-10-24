@@ -595,9 +595,9 @@ int ApplicationDownload()
 	return 1;
 }
 
-// The latest release of the Nintendont fork this loader is paired with: assets boot.dol,
-// icon.png and meta.xml, published by the fork's workflow for each v* tag
-#define NINTENDONT_URL "https://github.com/Monsterray/Nintendont/releases/latest/download/"
+// The Nintendont fork this loader is paired with. Its prod branch carries each release's
+// built loader/loader.dol; master mirrors upstream and has no fork builds.
+#define NINTENDONT_URL "https://raw.githubusercontent.com/Monsterray/Nintendont/prod/"
 
 int UpdateNintendont()
 {
@@ -612,7 +612,7 @@ int UpdateNintendont()
 	StartProgress(tr("Updating Nintendont"), tr("Downloading file..."), "loader.dol", true, true);
 
 	// The boot.dol there stays until a complete one replaces it
-	int ret = DownloadToFile(NINTENDONT_URL "boot.dol", NINUpdatePath, true);
+	int ret = DownloadToFile(NINTENDONT_URL "loader/loader.dol", NINUpdatePath, true);
 	if (ret > 0)
 	{
 		// loader.dol has priority over boot.dol; boot.bak is what this updater used to leave
@@ -625,14 +625,14 @@ int UpdateNintendont()
 		if (!CheckFile(NINUpdatePath))
 		{
 			ShowProgress(tr("Updating Nintendont"), tr("Downloading file..."), "icon.png", 0, 1, true, true);
-			DownloadToFile(NINTENDONT_URL "icon.png", NINUpdatePath, true);
+			DownloadToFile(NINTENDONT_URL "nintendont/icon.png", NINUpdatePath, true);
 		}
 		// Download meta.xml if it doesn't exist (Nintendont will edit meta.xml when it's launched)
 		snprintf(NINUpdatePath, sizeof(NINUpdatePath), "%smeta.xml", Settings.NINLoaderPath);
 		if (!CheckFile(NINUpdatePath))
 		{
 			ShowProgress(tr("Updating Nintendont"), tr("Downloading file..."), "meta.xml", 0, 1, true, true);
-			DownloadToFile(NINTENDONT_URL "meta.xml", NINUpdatePath, true);
+			DownloadToFile(NINTENDONT_URL "nintendont/meta.xml", NINUpdatePath, true);
 		}
 	}
 

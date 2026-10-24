@@ -127,6 +127,11 @@ static void Step(const char *name, u32 limit = 0)
 	stepStart = 0;
 	stepName = name;
 	stepLimit = limit ? limit : limitS;
+	//! On the card before the step runs: a hang only a power cycle ends (IOS itself
+	//! stuck, which no guard can leave: the first 1 MiB DI read on 2026-10-24)
+	//! still names its step
+	if (name)
+		Log("> %s", name);
 	stepStart = name ? gettime() : 0;
 }
 

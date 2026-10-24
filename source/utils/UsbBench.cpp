@@ -50,6 +50,8 @@
 #include "settings/SettingsEnums.h"
 #include "usbloader/disc.h"
 #include "usbloader/frag.h"
+#include "libs/libfat/fatfile_frag.h"
+#include "libs/libwbfs/libwbfs.h"
 #include "usbloader/GameList.h"
 #include "usbloader/usbstorage2.h"
 #include "usbloader/wdvd.h"
@@ -345,6 +347,122 @@ static void ListWbfs(void)
 	Log("  (%d lines listed)", lines);
 }
 
+
+//! A .wbfs file GX's scan does not name (wbfs/<Title>/<ID6>.wbfs): its
+//! fragment list built the way get_frag_list_for_file() builds one, from reads
+//! only. libfat maps the file's clusters; the WBFS header and block table come
+//! from the file itself, opened read-only; frag_remap() joins the two.
+static FragList *FileFragList(const char *path, u8 *id)
+{
+	FILE *f = fopen(path, "rb");
+	if (!f)
+		return NULL;
+	u8 head[512];
+	FragList *fa = NULL, *fw = NULL, *list = NULL;
+	u16 *wlba = NULL;
+	if (fread(head, 1, sizeof(head), f) != sizeof(head) || memcmp(head, "WBFS", 4) != 0)
+	{
+		Log("  %s: no WBFS header", path);
+		fclose(f);
+		return NULL;
+	}
+	u32 hdSz = 1u << head[8], wbfsSz = 1u << head[9];
+	u32 perDisc = (143432u * 2) >> (head[9] - 15); // n_wbfs_sec_per_disc, as libwbfs sets it
+	u32 nlb = wbfsSz / 512;
+	wlba = (u16 *)malloc(perDisc * 2);
+	u8 disc[0x100];
+	if (hdSz < 512 || wbfsSz < 0x8000 || !wlba || fseek(f, hdSz, SEEK_SET) != 0 ||
+		fread(disc, 1, sizeof(disc), f) != sizeof(disc) || fread(wlba, 2, perDisc, f) != perDisc)
+	{
+		Log("  %s: WBFS disc table unreadable (hd %u, wbfs %u)", path, hdSz, wbfsSz);
+		goto out;
+	}
+	fclose(f);
+	f = NULL;
+	memcpy(id, disc, 6);
+
+	fa = (FragList *)malloc(sizeof(FragList));
+	fw = (FragList *)malloc(sizeof(FragList));
+	list = (FragList *)memalign(32, (sizeof(FragList) + 31) & ~31);
+	if (!fa || !fw || !list)
+		goto fail;
+	frag_init(fa, MAX_FRAG);
+	if (_FAT_get_fragments(path, &frag_append, fa) != 0)
+	{
+		Log("  %s: libfat gave no fragments", path);
+		goto fail;
+	}
+	{
+		frag_init(fw, MAX_FRAG);
+		u32 last = 0;
+		for (u32 i = 0; i < perDisc; ++i)
+		{
+			u32 w = wlba[i]; // big-endian on disc, as the Wii reads it
+			if (!w)
+				continue;
+			if (frag_append(fw, i * nlb, w * nlb, nlb))
+				goto fail;
+			last = i;
+		}
+		if (last < perDisc / 2)
+			last = perDisc / 2;
+		frag_append(fw, last * nlb, 0, 0); // the size, as wbfs_get_fragments() sets it
+	}
+	frag_init(list, MAX_FRAG);
+	if (frag_remap(list, fw, fa) != 0)
+	{
+		Log("  %s: frag_remap failed", path);
+		goto fail;
+	}
+	Log("  %s: WBFS sector %u bytes, %u file fragments, %u disc fragments", path, wbfsSz, fa->num, list->num);
+	goto out;
+fail:
+	free(list);
+	list = NULL;
+out:
+	if (f)
+		fclose(f);
+	free(wlba);
+	free(fa);
+	free(fw);
+	return list;
+}
+
+//! The first <usb>:/wbfs/*/<ID6>.wbfs, for a drive whose layout GX's scan skips
+static bool FindWbfsFile(char *path, size_t size)
+{
+	PartitionHandle *usb = DeviceHandler::GetUSBPartitionCount() > 0 ? DeviceHandler::Instance()->GetUSBHandleFromPartition(0) : NULL;
+	const char *mount = usb ? usb->MountName(DeviceHandler::PartitionToPortPartition(0)) : "";
+	char base[64];
+	snprintf(base, sizeof(base), "%s:/wbfs", mount);
+	DIR *dir = mount[0] ? opendir(base) : NULL;
+	bool found = false;
+	struct dirent *d;
+	while (dir && !found && (d = readdir(dir)) != NULL)
+	{
+		if (d->d_name[0] == '.')
+			continue;
+		char sub[320];
+		snprintf(sub, sizeof(sub), "%s/%s", base, d->d_name);
+		DIR *in = opendir(sub);
+		struct dirent *e;
+		while (in && !found && (e = readdir(in)) != NULL)
+		{
+			const char *dot = strrchr(e->d_name, '.');
+			if (dot && dot - e->d_name == 6 && strcasecmp(dot, ".wbfs") == 0)
+			{
+				snprintf(path, size, "%s/%.11s", sub, e->d_name); // <ID6>.wbfs
+				found = true;
+			}
+		}
+		if (in)
+			closedir(in);
+	}
+	if (dir)
+		closedir(dir);
+	return found;
+}
+
 //! (e) What a USB Wii game's launch asks of the cIOS before its apploader runs
 //! (GameBooter::SetupDisc() and BootPartition()), then partition reads through
 //! the DIP. Nothing is booted.
@@ -354,32 +472,67 @@ static void LaunchReads(void)
 	for (int i = 0; i < gameList.size() && !game; ++i)
 		if (gameList[i] && gameList[i]->type == TYPE_GAME_WII_IMG)
 			game = gameList[i];
-	if (!game)
+	u64 t;
+	u32 us;
+	int ret;
+	if (game)
 	{
-		Log("launch: SKIPPED, no Wii game on USB (Settings: partition %d, MultiplePartitions %d, SDMode %d)",
-			Settings.partition, Settings.MultiplePartitions, Settings.SDMode);
-		ListWbfs();
-		return;
+		Log("launch: %.6s \"%.40s\" on partition %d (%s)", game->id, game->title, gameList.GetPartitionNumber(game->id),
+			DeviceHandler::GetFSName(USB1 + gameList.GetPartitionNumber(game->id)));
+
+		Step("fragment list");
+		t = gettime();
+		ret = get_frag_list(game->id);
+		Log("fragment list built: %d in %s", ret, Ms(UsSince(t)));
+		if (ret < 0)
+			return;
+
+		Step("set fragment list");
+		DeviceHandler::Instance()->UnMountSD();
+		t = gettime();
+		ret = set_frag_list(game->id, false);
+		us = UsSince(t);
+		DeviceHandler::Instance()->MountSD();
+		Log("fragment list sent to the DIP: %d in %s", ret, Ms(us));
+		if (ret < 0)
+			return;
 	}
-	Log("launch: %.6s \"%.40s\" on partition %d (%s)", game->id, game->title, gameList.GetPartitionNumber(game->id),
-		DeviceHandler::GetFSName(USB1 + gameList.GetPartitionNumber(game->id)));
+	else
+	{
+		//! GX's scan skips wbfs/<Title>/<ID6>.wbfs: build the same list from the file
+		Log("launch: GX's scan found no Wii game (partition %d, MultiplePartitions %d); the files:",
+			Settings.partition, Settings.MultiplePartitions);
+		ListWbfs();
+		char path[400];
+		u8 id[8] = {0};
+		if (!FindWbfsFile(path, sizeof(path)))
+		{
+			Log("launch: SKIPPED, no <usb>:/wbfs/*/<ID6>.wbfs");
+			return;
+		}
+		Step("fragment list");
+		t = gettime();
+		FragList *list = FileFragList(path, id);
+		Log("fragment list built from %s (%.6s): %s in %s", path, id, list ? "ok" : "FAILED", Ms(UsSince(t)));
+		if (!list)
+			return;
 
-	Step("fragment list");
-	u64 t = gettime();
-	int ret = get_frag_list(game->id);
-	Log("fragment list built: %d in %s", ret, Ms(UsSince(t)));
-	if (ret < 0)
-		return;
-
-	Step("set fragment list");
-	DeviceHandler::Instance()->UnMountSD();
-	t = gettime();
-	ret = set_frag_list(game->id, false);
-	u32 us = UsSince(t);
-	DeviceHandler::Instance()->MountSD();
-	Log("fragment list sent to the DIP: %d in %s", ret, Ms(us));
-	if (ret < 0)
-		return;
+		//! As set_frag_list() sends it, and the same disc ID check after
+		Step("set fragment list");
+		DeviceHandler::Instance()->UnMountSD();
+		t = gettime();
+		ret = WDVD_SetFragList(WBFS_DEVICE_USB, list, sizeof(Fragment) * (list->num + 1));
+		char discid[32] ATTRIBUTE_ALIGN(32);
+		memset(discid, 0, sizeof(discid));
+		if (ret == 0)
+			ret = WDVD_UnencryptedRead(discid, 32, 0) < 0 ? -4 : strncasecmp((char *)id, discid, 6) != 0 ? -3 : 0;
+		us = UsSince(t);
+		DeviceHandler::Instance()->MountSD();
+		free(list);
+		Log("fragment list sent to the DIP: %d (disc ID read back %.6s) in %s", ret, discid, Ms(us));
+		if (ret < 0)
+			return;
+	}
 
 	Step("Disc_Open");
 	t = gettime();

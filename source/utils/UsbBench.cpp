@@ -23,6 +23,8 @@
  *                   writes land as junk (d2x fork, 2026-10-24) must not touch it
  *   -benchlimit=S   a step still running after S seconds (default 600) ends
  *                   the run through hbc_agent_fatal_now(), back to HBC
+ *   -benchread=K    launch mode: the sequential WDVD_Read size in KiB, 32 to 1024
+ *                   (default 1024); 32 MiB are read either way
  *   -benchboot=S    the same for GX's start-up, from main() to the menu
  *                   (default 180): an IOS reload, a USB mount or a prompt
  *                   nobody answers (WiiStation's boot guard, Gamecube/boot_guard.c)
@@ -64,7 +66,7 @@
 
 static bool launchMode = false, dumpMode = false, writesAllowed = false;
 static int skipArg = -1;
-static u32 limitS = 600, bootS = 180;
+static u32 limitS = 600, bootS = 180, readKiB = 1024;
 static volatile u32 stepLimit = 600;
 static bool logOpen = false;
 
@@ -204,6 +206,9 @@ void UsbBench_Init(int argc, char *argv[])
 			skipArg = atoi(argv[i] + 11) ? 1 : 0;
 		else if (strncmp(argv[i], "-benchlimit=", 12) == 0 && atoi(argv[i] + 12) > 0)
 			limitS = atoi(argv[i] + 12);
+		else if (strncmp(argv[i], "-benchread=", 11) == 0 && atoi(argv[i] + 11) >= 32 && atoi(argv[i] + 11) <= 1024 &&
+				 atoi(argv[i] + 11) % 32 == 0)
+			readKiB = atoi(argv[i] + 11);
 		else if (strncmp(argv[i], "-benchboot=", 11) == 0 && atoi(argv[i] + 11) > 0)
 			bootS = atoi(argv[i] + 11);
 	}
@@ -606,17 +611,19 @@ static void LaunchReads(void)
 	if (ret < 0)
 		return;
 
-	const u32 chunk = 1024 * 1024, total = 32 * chunk;
+	const u32 chunk = readKiB * 1024, total = 32 * 1024 * 1024;
+	char what[100];
 	u8 *buf = (u8 *)memalign(32, chunk);
 	if (buf)
 	{
-		Step("sequential reads: 32 x WDVD_Read of 1 MiB through the DIP");
+		snprintf(what, sizeof(what), "sequential reads: %u x WDVD_Read of %u KiB through the DIP", total / chunk, readKiB);
+		Step(what);
 		u32 failed = 0;
 		t = gettime();
 		for (u32 off = 0; off < total; off += chunk)
 			failed += WDVD_Read(buf, chunk, off) < 0;
 		us = UsSince(t);
-		Log("partition read, 32 x 1 MiB from offset 0: %u failed, %s, %u KiB/s", failed, Ms(us),
+		Log("partition read, %u x %u KiB from offset 0: %u failed, %s, %u KiB/s", total / chunk, readKiB, failed, Ms(us),
 			us ? (u32)((u64)total * 1000000 / 1024 / us) : 0);
 
 		//! The same offsets every run: a fixed LCG over the first 256 MiB, 32 KiB aligned

@@ -23,9 +23,13 @@ void AutoInput_Apply(void);
 //! An "exit" event that came due, or AUTOINPUT_EXIT_NONE; taking it clears it.
 //! Call from the main thread.
 int AutoInput_TakeExit(void);
+//! A "do" event that came due ("boot GT01E1", "source homebrew", ...), or NULL.
+//! Copy it before the next call. Call from the main thread.
+const char *AutoInput_TakeAction(void);
 #else
 static inline void AutoInput_Apply(void) {}
 static inline int AutoInput_TakeExit(void) { return AUTOINPUT_EXIT_NONE; }
+static inline const char *AutoInput_TakeAction(void) { return 0; }
 #endif
 
 #endif

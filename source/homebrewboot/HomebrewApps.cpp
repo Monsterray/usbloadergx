@@ -96,7 +96,7 @@ std::string HomebrewApps::Folder(const struct discHdr *header)
 	return folder;
 }
 
-void HomebrewApps::Launch(const struct discHdr *header)
+void HomebrewApps::Launch(const struct discHdr *header, bool ask)
 {
 	if (!header || header->type != TYPE_GAME_HOMEBREW)
 		return;
@@ -105,27 +105,30 @@ void HomebrewApps::Launch(const struct discHdr *header)
 	HomebrewXML meta;
 	meta.LoadHomebrewXMLData((folder + "meta.xml").c_str());
 
-	GuiImageData *icon = new GuiImageData((folder + "icon.png").c_str());
-	if (!icon->GetImage())
+	if (ask)
 	{
+		GuiImageData *icon = new GuiImageData((folder + "icon.png").c_str());
+		if (!icon->GetImage())
+		{
+			delete icon;
+			icon = NULL;
+		}
+
+		struct stat st;
+		u64 filesize = stat(header->path, &st) == 0 ? st.st_size : 0;
+
+		HomebrewPrompt *prompt = new HomebrewPrompt(header->title, meta.GetCoder(), meta.GetVersion(),
+													meta.GetReleasedate(), meta.GetLongDescription(), icon, filesize);
+		mainWindow->SetState(STATE_DISABLED);
+		mainWindow->Append(prompt);
+		int choice = prompt->MainLoop();
+		delete prompt;
 		delete icon;
-		icon = NULL;
+		mainWindow->SetState(STATE_DEFAULT);
+
+		if (choice != 1)
+			return;
 	}
-
-	struct stat st;
-	u64 filesize = stat(header->path, &st) == 0 ? st.st_size : 0;
-
-	HomebrewPrompt *prompt = new HomebrewPrompt(header->title, meta.GetCoder(), meta.GetVersion(),
-												meta.GetReleasedate(), meta.GetLongDescription(), icon, filesize);
-	mainWindow->SetState(STATE_DISABLED);
-	mainWindow->Append(prompt);
-	int choice = prompt->MainLoop();
-	delete prompt;
-	delete icon;
-	mainWindow->SetState(STATE_DEFAULT);
-
-	if (choice != 1)
-		return;
 
 	u8 *buffer = NULL;
 	u32 size = 0;

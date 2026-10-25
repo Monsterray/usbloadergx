@@ -20,8 +20,9 @@ class HomebrewApps
 		//! The app's folder, with a trailing '/'
 		static std::string Folder(const struct discHdr *header);
 		//! The homebrew prompt (name, author, description), then the app with its meta.xml
-		//! arguments. Returns only if the user cancels or loading fails.
-		static void Launch(const struct discHdr *header);
+		//! arguments. Returns only if the user cancels or loading fails. ask false skips
+		//! the prompt (AutoInput's "do boot").
+		static void Launch(const struct discHdr *header, bool ask = true);
 	private:
 		HomebrewApps() : loaded(false) {}
 		std::vector<struct discHdr> headers;

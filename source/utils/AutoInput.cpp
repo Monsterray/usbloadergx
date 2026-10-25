@@ -26,6 +26,14 @@
  *                            stub) or prompt (WindowExitPrompt, GX's HOME menu).
  *                            The HOME overlay reads the controllers itself, so
  *                            scripted presses cannot choose its Exit items.
+ *   80000 do source homebrew run in the browser's main loop, for hardware runs
+ *                            that cannot see the screen: source wii|gc|nand|
+ *                            emunand|homebrew|custom (the list the source button
+ *                            shows), list (log every entry: type, id, title),
+ *                            boot <ID> (start that entry of the current list as
+ *                            quick boot does; homebrew apps as the browser does),
+ *                            update nintendont|gametdb|cheats (the Update menu's
+ *                            functions; logs their result)
  *
  * Buttons: A B X Y Z START UP DOWN LEFT RIGHT L R. Everything goes to channel
  * 0, merged with whatever a real controller sends. Each event is logged with
@@ -48,7 +56,7 @@
 
 namespace
 {
-enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO, EV_MEMHOG, EV_MEMREPORT, EV_EXIT };
+enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO, EV_MEMHOG, EV_MEMREPORT, EV_EXIT, EV_DO };
 
 struct Event
 {
@@ -75,6 +83,11 @@ u32 stickUntil = 0;
 //! Set here in the GUI thread, taken by the browser's main loop: an exit has to
 //! run in the main thread
 volatile int pendingExit = AUTOINPUT_EXIT_NONE;
+//! The same hand-over for "do" events: filled here, then the flag set; the main
+//! thread copies it, then clears the flag. A later "do" waits for the flag.
+char pendingAction[128];
+volatile bool actionPending = false;
+char takenAction[128];
 
 u32 ButtonBits(const char *name)
 {
@@ -149,6 +162,10 @@ void Load()
 		{
 			e.kind = EV_EXIT; e.x = a;
 		}
+		else if (strcasecmp(cmd, "do") == 0 && sscanf(line, "%*u %*s %255[^\r\n]", url) == 1)
+		{
+			e.kind = EV_DO; e.url = url;
+		}
 		else
 		{
 			gprintf("autoinput: cannot read line: %s", line);
@@ -177,6 +194,9 @@ void AutoInput_Apply(void)
 
 	while (nextEvent < events.size() && events[nextEvent].ms <= ms)
 	{
+		// The main thread has not taken the last "do" yet: this one waits
+		if (events[nextEvent].kind == EV_DO && actionPending)
+			break;
 		const Event &e = events[nextEvent++];
 		switch (e.kind)
 		{
@@ -253,6 +273,11 @@ void AutoInput_Apply(void)
 				pendingExit = e.x;
 				gprintf("autoinput %u: exit %d requested\n", ms, e.x);
 				break;
+			case EV_DO:
+				snprintf(pendingAction, sizeof(pendingAction), "%s", e.url.c_str());
+				actionPending = true;
+				gprintf("autoinput %u: do %s\n", ms, pendingAction);
+				break;
 		}
 	}
 
@@ -283,6 +308,15 @@ int AutoInput_TakeExit(void)
 	int ret = pendingExit;
 	pendingExit = AUTOINPUT_EXIT_NONE;
 	return ret;
+}
+
+const char *AutoInput_TakeAction(void)
+{
+	if (!actionPending)
+		return NULL;
+	snprintf(takenAction, sizeof(takenAction), "%s", pendingAction);
+	actionPending = false;
+	return takenAction;
 }
 
 #endif

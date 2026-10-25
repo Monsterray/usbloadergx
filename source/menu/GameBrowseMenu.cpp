@@ -1282,6 +1282,11 @@ int GameBrowseMenu::MainLoop()
 		else
 			WindowExitPrompt();
 	}
+	else if (const char *action = AutoInput_TakeAction())
+	{
+		gprintf("\tautoinput do %s\n", action);
+		AutoInputAction(action);
+	}
 #endif
 	else if (homeBtn->GetState() == STATE_CLICKED)
 	{
@@ -2030,6 +2035,90 @@ void GameBrowseMenu::UpdateGameInfoText(struct discHdr *header)
 	}
 	ResumeGui();
 }
+
+#ifdef AUTOINPUT
+//! An AutoInput "do" event (AutoInput.cpp): what a hardware run cannot click blind
+void GameBrowseMenu::AutoInputAction(const char *action)
+{
+	char cmd[16] = "", arg[64] = "";
+	sscanf(action, "%15s %63s", cmd, arg);
+
+	if (strcasecmp(cmd, "source") == 0)
+	{
+		static const struct { const char *name; int type; } sources[] = {
+			{ "custom", DISP_CUSTOM }, { "wii", DISP_WII }, { "nand", DISP_NAND },
+			{ "emunand", DISP_EMUNAND }, { "gc", DISP_GC }, { "homebrew", DISP_HOMEBREW },
+		};
+		for (const auto &s : sources)
+		{
+			if (strcasecmp(arg, s.name) != 0)
+				continue;
+			Settings.GameDisplayType = s.type;
+			if (s.type == DISP_HOMEBREW)
+				HomebrewApps::Instance()->Reload();
+			else if (s.type == DISP_WII || (s.type == DISP_CUSTOM && (Settings.LoaderMode & MODE_WIIGAMES)))
+				ReloadWiiGames(true);
+			GameTitles.LoadTitlesFromGameTDB(Settings.titlestxt_path);
+			gameList.FilterList();
+			ReloadBrowser();
+			gprintf("autoinput source %s: %d entries\n", s.name, gameList.size());
+			return;
+		}
+		gprintf("autoinput source: unknown %s\n", arg);
+	}
+	else if (strcasecmp(cmd, "list") == 0)
+	{
+		gprintf("autoinput list: %d entries\n", gameList.size());
+		for (int i = 0; i < gameList.size(); ++i)
+			gprintf("  %2d type %d %.6s %s\n", i, gameList[i]->type, (const char *)gameList[i]->id,
+					GameTitles.GetTitle(gameList[i]));
+	}
+	else if (strcasecmp(cmd, "boot") == 0)
+	{
+		struct discHdr *header = NULL;
+		for (int i = 0; i < gameList.size() && !header; ++i)
+			if (strncasecmp((const char *)gameList[i]->id, arg, 6) == 0)
+				header = gameList[i];
+		if (!header)
+		{
+			gprintf("autoinput boot: %s is not in the current list\n", arg);
+			return;
+		}
+		gprintf("autoinput boot: %.6s type %d %s\n", (const char *)header->id, header->type, GameTitles.GetTitle(header));
+		if (header->type == TYPE_GAME_HOMEBREW)
+		{
+			SetState(STATE_DISABLED);
+			HomebrewApps::Launch(header, false);
+			SetState(STATE_DEFAULT);
+			gprintf("autoinput boot: returned to the browser\n");
+			return;
+		}
+		// What OpenClickedGame() does with quick boot on
+		SetState(STATE_DISABLED);
+		GameWindow::BootGame(header);
+		SetState(STATE_DEFAULT);
+		gprintf("autoinput boot: returned to the browser\n");
+	}
+	else if (strcasecmp(cmd, "update") == 0)
+	{
+		if (strcasecmp(arg, "nintendont") == 0)
+			gprintf("autoinput update nintendont: %d\n", UpdateNintendont());
+		else if (strcasecmp(arg, "gametdb") == 0)
+			gprintf("autoinput update gametdb: %d\n", UpdateGameTDB());
+		else if (strcasecmp(arg, "cheats") == 0)
+		{
+			CheatUpdateResult result = {};
+			int ret = UpdateCheats(result);
+			gprintf("autoinput update cheats: %d, games %d updated %d missing %d failed %d\n", ret, result.games,
+					result.updated, result.missing, result.failed);
+		}
+		else
+			gprintf("autoinput update: unknown %s\n", arg);
+	}
+	else
+		gprintf("autoinput do: unknown %s\n", action);
+}
+#endif
 
 int GameBrowseMenu::OpenClickedGame(struct discHdr *header)
 {

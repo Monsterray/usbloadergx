@@ -161,6 +161,7 @@ def main():
                    help="launch mode: show a d2x trace build's DIP trace on the TV (trace builds only)")
     p.add_argument("--dip-trace-quiet", action="store_true",
                    help="launch mode: register the DIP trace but do not show it (fault isolation)")
+    p.add_argument("--one-offset", help="with --one: partition offset of the read, bytes (0x... allowed)")
     p.add_argument("--one", type=int, help="launch mode: one WDVD_Read of BYTES (32..1048576, x32) instead")
     p.add_argument("--dol", type=pathlib.Path, default=REPO / ".dev" / "usbbench" / "boot.dol")
     p.add_argument("--wait", type=int, default=1800, help="seconds to wait for HBC to come back")
@@ -194,6 +195,8 @@ def main():
         if not (32 <= o.one <= 1048576 and o.one % 32 == 0):
             sys.exit("--one is 32 to 1048576 bytes, a multiple of 32")
         args.append(f"-benchone={o.one}")
+        if o.one_offset:
+            args.append(f"-benchoneoff={o.one_offset}")
     out = REPO / ".runs" / "usb_bench" / (datetime.datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + o.mode)
 
     if not o.dol.is_file():

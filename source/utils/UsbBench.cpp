@@ -87,6 +87,7 @@ static bool launchMode = false, dumpMode = false, writesAllowed = false, diReads
 static bool dipTraceAsked = false, dipTraceQuiet = false;
 static int skipArg = -1;
 static u32 limitS = 600, bootS = 180, readKiB = 1024, oneRead = 0, driveSectors = 0;
+static u64 oneOffset = 0;
 static volatile u32 stepLimit = 600;
 static bool logOpen = false;
 
@@ -154,25 +155,29 @@ static volatile bool dipTraceOn = false;
 
 static void DipTraceLine(char *out, size_t size, const u32 *r)
 {
+	//! Short names, so both args show in full on the TV. Z: a gap the WBFS image
+	//! does not store, zero-filled (sector, count); X: a fragment read failed
+	//! (cmd 2 out of range, 3 USB read failed; sector, count). trace.h in d2x-cios.
 	const char *what;
 	switch (r[1] >> 24)
 	{
-		case 'C': what = "DIP command in"; break;
-		case 'c': what = "DIP command out"; break;
-		case 'I': what = "DIP ioctl in"; break;
-		case 'i': what = "DIP ioctl out"; break;
-		case 'D': what = "DI handler call"; break;
-		case 'd': what = "DI handler back"; break;
-		case 'O': what = "DI ioctl call"; break;
-		case 'o': what = "DI ioctl back"; break;
-		case 'R': what = "emulated read in"; break;
-		case 'r': what = "emulated read out"; break;
+		case 'C': what = "cmd in"; break;
+		case 'c': what = "cmd out"; break;
+		case 'I': what = "ioctl in"; break;
+		case 'i': what = "ioctl out"; break;
+		case 'D': what = "DI call"; break;
+		case 'd': what = "DI back"; break;
+		case 'O': what = "DI ioctl"; break;
+		case 'o': what = "DI ioc bk"; break;
+		case 'R': what = "emu rd"; break;
+		case 'r': what = "emu rd bk"; break;
+		case 'Z': what = "ZERO GAP"; break;
+		case 'X': what = "FRAG FAIL"; break;
 		default: what = "?"; break;
 	}
 	char where = (char)(r[1] >> 24);
-	snprintf(out, size, "  dip %10u.%03u ms %c %-17s cmd %02x mode %04x %08x %08x", r[0] / 1898,
-			 (r[0] % 1898) * 1000 / 1898, where >= 32 && where < 127 ? where : '?', what, (r[1] >> 16) & 0xFF,
-			 r[1] & 0xFFFF, r[2], r[3]);
+	snprintf(out, size, "%u.%03u %c %-9s %02x %04x %08x %08x", r[0] / 1898, (r[0] % 1898) * 1000 / 1898,
+			 where >= 32 && where < 127 ? where : '?', what, (r[1] >> 16) & 0xFF, r[1] & 0xFFFF, r[2], r[3]);
 }
 
 static void *DipTraceShow(void *)
@@ -384,6 +389,8 @@ void UsbBench_Init(int argc, char *argv[])
 		else if (strncmp(argv[i], "-benchone=", 10) == 0 && atoi(argv[i] + 10) >= 32 && atoi(argv[i] + 10) <= 1048576 &&
 				 atoi(argv[i] + 10) % 32 == 0)
 			oneRead = atoi(argv[i] + 10);
+		else if (strncmp(argv[i], "-benchoneoff=", 13) == 0)
+			oneOffset = strtoull(argv[i] + 13, NULL, 0) & ~3ULL; // WDVD_Read takes offset >> 2
 		else if (strncmp(argv[i], "-benchboot=", 11) == 0 && atoi(argv[i] + 11) > 0)
 			bootS = atoi(argv[i] + 11);
 	}
@@ -714,6 +721,52 @@ static u8 *ReadBuffer(u32 size)
 	return p;
 }
 
+//! Which 2 MiB WBFS blocks the image stores, read from its own table, as disc
+//! byte ranges: a DI read of a cluster outside them is a gap the DIP zero-fills.
+//! File reads only.
+static void LogWbfsMap(const char *path)
+{
+	FILE *f = fopen(path, "rb");
+	u8 head[512];
+	if (!f || fread(head, 1, sizeof(head), f) != sizeof(head) || memcmp(head, "WBFS", 4) != 0)
+	{
+		Log("WBFS map: %s unreadable", path);
+		if (f)
+			fclose(f);
+		return;
+	}
+	u32 hdSz = 1u << head[8], wbfsSz = 1u << head[9];
+	u32 perDisc = (143432u * 2) >> (head[9] - 15);
+	u16 *wlba = (u16 *)malloc(perDisc * 2);
+	if (!wlba || fseek(f, hdSz + 0x100, SEEK_SET) != 0 || fread(wlba, 2, perDisc, f) != perDisc)
+	{
+		Log("WBFS map: %s: no block table", path);
+		free(wlba);
+		fclose(f);
+		return;
+	}
+	fclose(f);
+	u32 stored = 0, ranges = 0;
+	for (u32 i = 0; i < perDisc;)
+	{
+		if (!wlba[i])
+		{
+			++i;
+			continue;
+		}
+		u32 j = i;
+		while (j + 1 < perDisc && wlba[j + 1])
+			++j;
+		stored += j - i + 1;
+		if (++ranges <= 12)
+			Log("WBFS map: blocks %u-%u stored: disc 0x%09llx-0x%09llx", i, j, (u64)i * wbfsSz,
+				(u64)(j + 1) * wbfsSz - 1);
+		i = j + 1;
+	}
+	Log("WBFS map: %u of %u blocks of %u KiB stored, in %u ranges", stored, perDisc, wbfsSz / 1024, ranges);
+	free(wlba);
+}
+
 //! (e) What a USB Wii game's launch asks of the cIOS before its apploader runs
 //! (GameBooter::SetupDisc() and BootPartition()), then partition reads through
 //! the DIP. Nothing is booted.
@@ -731,6 +784,8 @@ static void LaunchReads(void)
 	{
 		Log("launch: %.6s \"%.40s\" on partition %d (%s)", game->id, game->title, gameList.GetPartitionNumber(game->id),
 			DeviceHandler::GetFSName(USB1 + gameList.GetPartitionNumber(game->id)));
+		if (strcasestr(game->path, ".wbfs"))
+			LogWbfsMap(game->path);
 
 		Step("fragment list");
 		t = gettime();
@@ -762,6 +817,7 @@ static void LaunchReads(void)
 			Log("launch: SKIPPED, no <usb>:/wbfs/*/<ID6>.wbfs");
 			return;
 		}
+		LogWbfsMap(path);
 		Step("fragment list");
 		t = gettime();
 		FragList *list = FileFragList(path, id);
@@ -824,10 +880,11 @@ static void LaunchReads(void)
 		u8 *one = ReadBuffer(oneRead);
 		if (one)
 		{
-			snprintf(what, sizeof(what), "one WDVD_Read of %u bytes at partition offset 0 through the DIP", oneRead);
+			snprintf(what, sizeof(what), "one WDVD_Read of %u bytes at partition offset 0x%llx through the DIP",
+					 oneRead, oneOffset);
 			Step(what);
 			t = gettime();
-			ret = WDVD_Read(one, oneRead, 0);
+			ret = WDVD_Read(one, oneRead, oneOffset);
 			Log("one partition read of %u bytes: %d in %s; first bytes %02x%02x%02x%02x", oneRead, ret,
 				Ms(UsSince(t)), one[0], one[1], one[2], one[3]);
 			free(one);

@@ -54,12 +54,16 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 REVIEW = "sd:/apps/usbloader_gx_review/"
 HBC_TOOL = os.environ.get("HBC_TOOL", "C:/projects/hbc-reborn/tools/hbc.py")
 # Production-style Wiis with real data on them (WiiStation scripts/wii_targets.py)
-PROTECTED_WIIS = ("192.168.8.200", "192.168.8.243")
+PRODUCTION_WII = "192.168.8.200"
+LRWII = "192.168.8.243"
+PROTECTED_WIIS = (PRODUCTION_WII, LRWII)
 
 
-def bench_wii():
+def bench_wii(allowed=None):
     """The bench Wii's address inside a wii-bench queue job; refuses to run outside one,
-    and refuses a production-style Wii, whatever the environment says."""
+    and refuses a production-style Wii, whatever the environment says. --allow-wii names
+    the living-room Wii for one run, when the user has said so (2026-10-24: "treat lrwii
+    like a dev wii"); the everyday production Wii is never allowed."""
     if not os.environ.get("WII_BENCH_JOB_START"):
         sys.exit("usb_bench.py: run it as a wii-bench queue job, not directly (nothing was sent)")
     wii = (os.environ.get("WII_BENCH_IP") or "").strip()
@@ -69,8 +73,17 @@ def bench_wii():
         packed = socket.inet_aton(wii)
     except OSError:
         sys.exit(f"usb_bench.py: {wii} is not an IPv4 address")
+    if packed == socket.inet_aton(PRODUCTION_WII):
+        sys.exit(f"usb_bench.py: refused, {wii} is the production Wii (real data)")
     if any(packed == socket.inet_aton(p) for p in PROTECTED_WIIS):
-        sys.exit(f"usb_bench.py: refused, {wii} is a production-style Wii (real data)")
+        try:
+            named = allowed and socket.inet_aton(allowed) == packed
+        except OSError:
+            named = False
+        if not named:
+            sys.exit(f"usb_bench.py: refused, {wii} is a production-style Wii (real data); "
+                     f"--allow-wii {wii} only when the user has said so")
+        print(f"usb_bench.py: {wii} allowed for this run by --allow-wii", flush=True)
     return wii
 
 
@@ -147,6 +160,8 @@ def main():
     p.add_argument("--one", type=int, help="launch mode: one WDVD_Read of BYTES (32..1048576, x32) instead")
     p.add_argument("--dol", type=pathlib.Path, default=REPO / ".dev" / "usbbench" / "boot.dol")
     p.add_argument("--wait", type=int, default=1800, help="seconds to wait for HBC to come back")
+    p.add_argument("--allow-wii", metavar="ADDR",
+                   help="run on this production-style Wii (only the living-room one), when the user said so")
     p.add_argument("--dry-run", action="store_true", help="check and print, send nothing")
     o = p.parse_args()
 
@@ -180,7 +195,7 @@ def main():
     if o.dry_run:
         print("dry run: nothing sent")
         return 0
-    wii = bench_wii()
+    wii = bench_wii(o.allow_wii)
     out.mkdir(parents=True, exist_ok=True)
 
     if answer(wii) != "hbc":

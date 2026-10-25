@@ -196,8 +196,9 @@ void AutoInput_Apply(void)
 
 	while (nextEvent < events.size() && events[nextEvent].ms <= ms)
 	{
-		// The main thread has not taken the last "do" yet: this one waits
-		if (events[nextEvent].kind == EV_DO && actionPending)
+		// The main thread has not taken the last "do" yet: a "do" or an "exit" waits,
+		// since the browser looks for an exit first
+		if ((events[nextEvent].kind == EV_DO || events[nextEvent].kind == EV_EXIT) && actionPending)
 			break;
 		const Event &e = events[nextEvent++];
 		switch (e.kind)

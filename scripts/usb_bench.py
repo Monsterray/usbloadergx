@@ -1,4 +1,4 @@
-"""usb_bench.py --mode io|launch|dump [--allow-writes] [--skip 0|1] [--limit S] [--boot S] [--read KIB] [--one BYTES] [--allow-di-reads] [--mem1]
+"""usb_bench.py --mode io|launch|dump [--allow-writes --drive-sectors N] [--skip 0|1] [--limit S] [--boot S] [--read KIB] [--one BYTES] [--allow-di-reads] [--mem1]
                 [--dol PATH] [--wait S] [--dry-run]
 -- time USB Loader GX's USB work on the bench Wii's cIOS 249.
 
@@ -133,6 +133,8 @@ def main():
     p.add_argument("--mode", choices=("io", "launch", "dump"), required=True)
     p.add_argument("--allow-writes", action="store_true",
                    help="let GX write to the USB drive (refused by default)")
+    p.add_argument("--drive-sectors", type=int,
+                   help="with --allow-writes: USB partition 0's sector count; any other drive is not written to")
     p.add_argument("--skip", choices=("0", "1"), help="the exit's unmount skips unchanged sectors")
     p.add_argument("--limit", type=int, help="seconds for any one bench step (default 600)")
     p.add_argument("--boot", type=int, help="seconds for GX's start-up (default 180)")
@@ -150,7 +152,9 @@ def main():
 
     args = ["-ios=249", "-bench=" + o.mode]
     if o.allow_writes:
-        args.append("-benchwrites=1")
+        if not o.drive_sectors:
+            sys.exit("--allow-writes needs --drive-sectors N (the scratch drive's partition 0, from a --mode dump run)")
+        args += ["-benchwrites=1", f"-benchdrive={o.drive_sectors}"]
     if o.skip is not None:
         args.append("-benchskip=" + o.skip)
     if o.limit:

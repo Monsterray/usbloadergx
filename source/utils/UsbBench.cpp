@@ -18,6 +18,9 @@
  *                   against FAT2 sector by sector, the root directory and the
  *                   usbbench folder, each flagged when it holds a Bulk-Only
  *                   command block ("USBC") or zeros; then the exit
+ *   -benchdrive=N   with -benchwrites=1: the writes are allowed only when USB partition
+ *                   0 has exactly N sectors (the scratch drive's), so another drive
+ *                   plugged in by mistake is never written to
  *   -benchwrites=1  lets GX write to the drive. Without it every USB write is
  *                   refused in usbstorage2.c before IOS sees it: a cIOS whose
  *                   writes land as junk (d2x fork, 2026-10-24) must not touch it
@@ -79,7 +82,7 @@
 
 static bool launchMode = false, dumpMode = false, writesAllowed = false, diReads = false, mem1Reads = false;
 static int skipArg = -1;
-static u32 limitS = 600, bootS = 180, readKiB = 1024, oneRead = 0;
+static u32 limitS = 600, bootS = 180, readKiB = 1024, oneRead = 0, driveSectors = 0;
 static volatile u32 stepLimit = 600;
 static bool logOpen = false;
 
@@ -224,6 +227,8 @@ void UsbBench_Init(int argc, char *argv[])
 			writesAllowed = true;
 		else if (strcmp(argv[i], "-benchdiread=1") == 0)
 			diReads = true;
+		else if (strncmp(argv[i], "-benchdrive=", 12) == 0)
+			driveSectors = strtoul(argv[i] + 12, NULL, 10);
 		else if (strcmp(argv[i], "-benchmem1=1") == 0)
 			mem1Reads = true;
 		else if (strncmp(argv[i], "-benchskip=", 11) == 0)
@@ -239,7 +244,8 @@ void UsbBench_Init(int argc, char *argv[])
 		else if (strncmp(argv[i], "-benchboot=", 11) == 0 && atoi(argv[i] + 11) > 0)
 			bootS = atoi(argv[i] + 11);
 	}
-	USBStorage2_BenchReadOnly(!writesAllowed);
+	//! Read-only until UsbBench_Run() has seen the drive is the one named
+	USBStorage2_BenchReadOnly(true);
 	//! The guard from here: GX's start-up has no watchdog until the agent's, and a
 	//! hang in it (an IOS reload, a USB mount, a prompt) left the Wii for someone
 	//! to take back. hbc_agent_fatal_now() works before hbc_agent_init().
@@ -930,6 +936,20 @@ void UsbBench_Run(void)
 	Log("USB partitions: %d; partition 0: %s, mounted as %s:, LBA %u, %u sectors", DeviceHandler::GetUSBPartitionCount(),
 		usb ? usb->GetFSName(part) : "none", usb ? usb->MountName(part) : "-", usb ? usb->GetLBAStart(part) : 0,
 		usb ? usb->GetSecCount(part) : 0);
+	if (writesAllowed)
+	{
+		u32 have = usb ? usb->GetSecCount(part) : 0;
+		if (driveSectors && have == driveSectors)
+		{
+			USBStorage2_BenchReadOnly(false);
+			Log("USB writes ALLOWED: partition 0 has %u sectors, the drive named", have);
+		}
+		else
+		{
+			writesAllowed = false;
+			Log("USB writes REFUSED: partition 0 has %u sectors, the run named %u", have, driveSectors);
+		}
+	}
 	Writes("at start");
 
 	Step(NULL);

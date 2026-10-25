@@ -1290,7 +1290,9 @@ int GameBrowseMenu::MainLoop()
 	else if (const char *action = AutoInput_TakeAction())
 	{
 		gprintf("\tautoinput do %s\n", action);
-		AutoInputAction(action);
+		int res = AutoInputAction(action);
+		if (res != MENU_NONE)
+			return res;
 	}
 #endif
 	else if (homeBtn->GetState() == STATE_CLICKED)
@@ -2043,7 +2045,7 @@ void GameBrowseMenu::UpdateGameInfoText(struct discHdr *header)
 
 #ifdef AUTOINPUT
 //! An AutoInput "do" event (AutoInput.cpp): what a hardware run cannot click blind
-void GameBrowseMenu::AutoInputAction(const char *action)
+int GameBrowseMenu::AutoInputAction(const char *action)
 {
 	char cmd[16] = "", arg[64] = "";
 	sscanf(action, "%15s %63s", cmd, arg);
@@ -2067,7 +2069,7 @@ void GameBrowseMenu::AutoInputAction(const char *action)
 			gameList.FilterList();
 			ReloadBrowser();
 			gprintf("autoinput source %s: %d entries\n", s.name, gameList.size());
-			return;
+			return MENU_NONE;
 		}
 		gprintf("autoinput source: unknown %s\n", arg);
 	}
@@ -2087,7 +2089,7 @@ void GameBrowseMenu::AutoInputAction(const char *action)
 		if (!header)
 		{
 			gprintf("autoinput boot: %s is not in the current list\n", arg);
-			return;
+			return MENU_NONE;
 		}
 		gprintf("autoinput boot: %.6s type %d %s\n", (const char *)header->id, header->type, GameTitles.GetTitle(header));
 		if (header->type == TYPE_GAME_HOMEBREW)
@@ -2096,7 +2098,7 @@ void GameBrowseMenu::AutoInputAction(const char *action)
 			HomebrewApps::Launch(header, false);
 			SetState(STATE_DEFAULT);
 			gprintf("autoinput boot: returned to the browser\n");
-			return;
+			return MENU_NONE;
 		}
 		// What OpenClickedGame() does with quick boot on
 		SetState(STATE_DISABLED);
@@ -2134,8 +2136,17 @@ void GameBrowseMenu::AutoInputAction(const char *action)
 		else
 			gprintf("autoinput update: unknown %s\n", arg);
 	}
+	else if (strcasecmp(cmd, "install") == 0)
+	{
+		// The Install button with the game list already loaded
+		int res = MenuInstall();
+		WDVD_StopMotor();
+		gprintf("autoinput install: menu %d\n", res);
+		return res;
+	}
 	else
 		gprintf("autoinput do: unknown %s\n", action);
+	return MENU_NONE;
 }
 #endif
 

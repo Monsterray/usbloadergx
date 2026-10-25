@@ -18,7 +18,7 @@ class GameBrowseMenu : public GuiWindow
 		bool ReloadWiiGames(bool cached);
 		int OpenClickedGame(struct discHdr *header);
 #ifdef AUTOINPUT
-		void AutoInputAction(const char *action);
+		int AutoInputAction(const char *action);
 #endif
 		int GetSelectedGame() { return (gameBrowser ? gameBrowser->GetSelectedOption() : -1); }
 		void UpdateGameInfoText(struct discHdr *header);

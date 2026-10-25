@@ -35,7 +35,12 @@
  *                            update nintendont|gametdb|cheats (the Update menu's
  *                            functions; logs their result), download <url> (as
  *                            "download" but in the main thread: on a Wii a slow one
- *                            in the GUI thread trips the hbc agent's 120 s hang check)
+ *                            in the GUI thread trips the hbc agent's 120 s hang check),
+ *                            install (the Install button: MenuInstall())
+ *   85000 answer 1 10        the next 10 WindowPrompt()s choose their first button
+ *                            once shown (the last one if they have fewer); each is
+ *                            logged with its title and text. Lets the real flows
+ *                            (install, updates) run through their questions.
  *
  * Buttons: A B X Y Z START UP DOWN LEFT RIGHT L R. Everything goes to channel
  * 0, merged with whatever a real controller sends. Each event is logged with
@@ -58,7 +63,7 @@
 
 namespace
 {
-enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO, EV_MEMHOG, EV_MEMREPORT, EV_EXIT, EV_DO };
+enum Kind { EV_PRESS, EV_POINT, EV_UNPOINT, EV_STICK, EV_DOWNLOAD, EV_DOWNLOADTO, EV_MEMHOG, EV_MEMREPORT, EV_EXIT, EV_DO, EV_ANSWER };
 
 struct Event
 {
@@ -90,6 +95,8 @@ volatile int pendingExit = AUTOINPUT_EXIT_NONE;
 char pendingAction[128];
 volatile bool actionPending = false;
 char takenAction[128];
+//! "answer": the button the next prompts choose, and how many prompts are left
+volatile int answerButton = 0, answersLeft = 0;
 
 u32 ButtonBits(const char *name)
 {
@@ -167,6 +174,10 @@ void Load()
 		else if (strcasecmp(cmd, "do") == 0 && sscanf(line, "%*u %*s %255[^\r\n]", url) == 1)
 		{
 			e.kind = EV_DO; e.url = url;
+		}
+		else if (strcasecmp(cmd, "answer") == 0 && sscanf(line, "%*u %*s %d %d", &a, &b) == 2 && a >= 1 && b >= 0)
+		{
+			e.kind = EV_ANSWER; e.x = a; e.y = b;
 		}
 		else
 		{
@@ -281,6 +292,11 @@ void AutoInput_Apply(void)
 				actionPending = true;
 				gprintf("autoinput %u: do %s\n", ms, pendingAction);
 				break;
+			case EV_ANSWER:
+				answerButton = e.x;
+				answersLeft = e.y;
+				gprintf("autoinput %u: answer button %d on the next %d prompts\n", ms, e.x, e.y);
+				break;
 		}
 	}
 
@@ -311,6 +327,18 @@ int AutoInput_TakeExit(void)
 	int ret = pendingExit;
 	pendingExit = AUTOINPUT_EXIT_NONE;
 	return ret;
+}
+
+int AutoInput_PromptAnswer(int buttons, const char *title, const char *msg)
+{
+	if (answersLeft <= 0 || buttons <= 0)
+		return -1;
+	answersLeft = answersLeft - 1;
+	int button = answerButton > buttons ? buttons : answerButton;
+	gprintf("autoinput answer: button %d of %d on \"%s\" (%s)\n", button, buttons, title ? title : "",
+			msg ? msg : "");
+	// WindowPrompt numbers its buttons 1, 2, ... and the last one 0
+	return button != buttons ? button : 0;
 }
 
 const char *AutoInput_TakeAction(void)

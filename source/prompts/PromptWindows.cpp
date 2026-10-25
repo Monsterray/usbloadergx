@@ -47,6 +47,7 @@
 #include "gecko.h"
 #include "lstub.h"
 #include "SoundOperations/MusicPlayer.h"
+#include "utils/AutoInput.h"
 
 
 static const char * DMLVersions[] =
@@ -661,6 +662,8 @@ int WindowPrompt(const char *title, const char *msg, const char *btn1Label, cons
 	mainWindow->Append(Window);
 	ResumeGui();
 
+	const int buttons = (btn1Label != NULL) + (btn2Label != NULL) + (btn3Label != NULL) + (btn4Label != NULL);
+	int frames = 0;
 	while (choice == -1)
 	{
 		VIDEO_WaitVSync();
@@ -674,6 +677,9 @@ int WindowPrompt(const char *title, const char *msg, const char *btn1Label, cons
 			Sys_Reboot();
 
 		choice = Window->GetChoice();
+		// A scripted answer (AUTOINPUT builds), once the prompt has been up for half a second
+		if (choice == -1 && ++frames >= 30)
+			choice = AutoInput_PromptAnswer(buttons, title, msg);
 
 		if (count > 0) count--;
 		if (count == 0) choice = 1;

@@ -26,10 +26,14 @@ int AutoInput_TakeExit(void);
 //! A "do" event that came due ("boot GT01E1", "source homebrew", ...), or NULL.
 //! Copy it before the next call. Call from the main thread.
 const char *AutoInput_TakeAction(void);
+//! An "answer" event's choice for a prompt with this many buttons, in
+//! WindowPrompt()'s numbering, or -1 to let the user choose.
+int AutoInput_PromptAnswer(int buttons, const char *title, const char *msg);
 #else
 static inline void AutoInput_Apply(void) {}
 static inline int AutoInput_TakeExit(void) { return AUTOINPUT_EXIT_NONE; }
 static inline const char *AutoInput_TakeAction(void) { return 0; }
+static inline int AutoInput_PromptAnswer(int, const char *, const char *) { return -1; }
 #endif
 
 #endif

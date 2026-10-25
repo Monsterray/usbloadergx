@@ -211,6 +211,8 @@ def main():
 
     if answer(wii) != "hbc":
         sys.exit("HBC is not what answers on the Wii: not sending anything")
+    # The HBC version goes in the record: HBC 1.10.23+ had a GPU hang of its own on dev
+    hbc(wii, "version", timeout=20, log=out / "hbc_version.txt")
     # A run that stops early must not leave the last run's logs to be read as its own
     for name in ("usbbench.log", "exit.log"):
         hbc(wii, "rm", REVIEW + name, timeout=60)

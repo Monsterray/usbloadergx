@@ -8,6 +8,8 @@
 #   scripts/build.sh shell        # interactive shell in the image, repo mounted at /w
 #   scripts/build.sh bench        # cIOS bench build, -DUSB_BENCH -> .dev/usbbench/boot.dol and boot.elf
 #                                 # (source/utils/UsbBench.cpp; run it with scripts/usb_bench.py)
+#                                 # HBCAGENT_SRC=<hbc-reborn checkout> links the agent built from
+#                                 # it instead of the image's pinned one (bench builds only)
 #
 # Docker is used natively when present. On Windows (Git Bash) with no native docker, the
 # WSL distro named in WSL_DISTRO (default Ubuntu-24.04) must have Docker Engine installed.
@@ -60,8 +62,23 @@ case "${1:-zip}" in
 		mkdir -p "$ROOT/.dev/usbbench"
 		CF='-ggdb -Os -Wall -Wno-multichar -Wno-unused-parameter -Wextra -Wformat-security $(MACHDEP) $(INCLUDE) -D_GNU_SOURCE -DNDEBUG -DWOLFSSL_USER_SETTINGS -DUSB_BENCH'
 		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./.runs --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make -j"$(nproc)" CFLAGS="$CF" > /out/build.log 2>&1; rc=$?; cp boot.dol boot.elf /out/ 2>/dev/null; grep -E "warning:|error:" /out/build.log | sort -u; exit $rc'
-		"${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" -v "$MOUNT_ROOT/.dev/usbbench:/out" -e CF="$CF" "$IMAGE" bash -c "$SCRIPT"
-		echo "Output: $ROOT/.dev/usbbench/boot.dol"
+		AGENT_MOUNT=()
+		AGENT=''
+		if [ -n "${HBCAGENT_SRC:-}" ]; then
+			# An hbc-reborn checkout: its agent replaces the image's pinned one in this
+			# throwaway container only, as deps/build.sh builds and installs it.
+			A="$(cd "$HBCAGENT_SRC" && pwd)"
+			[ -f "$A/sdk/hbc_agent/Makefile" ] || { echo "HBCAGENT_SRC: no sdk/hbc_agent in $A" >&2; exit 1; }
+			if [ "${DOCKER[0]}" != docker ]; then
+				A="$(printf '%s' "$A" | sed -E 's|^/([a-zA-Z])/|/mnt/\L\1/|')"
+			fi
+			AGENT_MOUNT=(-v "$A:/agent:ro")
+			AGENT='mkdir -p /tmp/agent && tar -C /agent -cf - sdk channel/channelapp/source channel/channelapp/config.h | tar -C /tmp/agent -xf - && make -C /tmp/agent/sdk/hbc_agent -B -j"$(nproc)" DEVKITPRO="$DEVKITPRO" DEVKITPPC="$DEVKITPPC" >/out/agent.log 2>&1 || { tail -20 /out/agent.log; exit 1; }; P=$DEVKITPRO/portlibs/usbloadergx; cp /tmp/agent/sdk/hbc_agent/libhbcagent.a $P/lib/ && cp /tmp/agent/sdk/hbc_agent.h /tmp/agent/sdk/hbc_netlog.h $P/include/ && grep -m1 "CHANNEL_VERSION_STR" /tmp/agent/channel/channelapp/config.h > /out/agent.txt; '
+		else
+			rm -f "$ROOT/.dev/usbbench/agent.txt"
+		fi
+		"${DOCKER[@]}" run --rm -v "$MOUNT_ROOT:/src:ro" "${AGENT_MOUNT[@]}" -v "$MOUNT_ROOT/.dev/usbbench:/out" -e CF="$CF" "$IMAGE" bash -c "$AGENT$SCRIPT"
+		echo "Output: $ROOT/.dev/usbbench/boot.dol${HBCAGENT_SRC:+ (agent from $HBCAGENT_SRC)}"
 		;;
 	shell)
 		toolchain

@@ -69,6 +69,7 @@
 #include "usbloader/usbstorage2.h"
 #include "usbloader/wdvd.h"
 #include "memory/mem2.h"
+#include "libs/libruntimeiospatch/runtimeiospatch.h"
 #include "GUI/gui.h"
 #include "gecko.h"
 #include "menu.h"
@@ -916,8 +917,9 @@ void UsbBench_Run(void)
 	Log("USB Loader GX cIOS bench, mode %s, USB writes %s, exit unmount %s, step limit %u s",
 		dumpMode ? "dump" : launchMode ? "launch" : "io", writesAllowed ? "ALLOWED" : "refused (read-only)",
 		skip ? "skips unchanged sectors (default)" : "writes everything (no skip)", limitS);
-	Log("IOS %d r%d (loader IOS setting %d)%s", IOS_GetVersion(), IOS_GetRevision(), Settings.LoaderIOS,
-		IOS_GetVersion() == 249 ? "" : " -- NOT cIOS 249");
+	//! AHB access: the agent's last way out of a wedged IOS (HW_RESETS) needs it
+	Log("IOS %d r%d (loader IOS setting %d)%s, AHB access %s", IOS_GetVersion(), IOS_GetRevision(),
+		Settings.LoaderIOS, IOS_GetVersion() == 249 ? "" : " -- NOT cIOS 249", AHBPROT_DISABLED ? "yes" : "no");
 	//! The refusal is in usbstorage2.c, the cIOS driver; IOS58's libogc driver has none
 	if (!writesAllowed && IOS_GetVersion() < 200)
 	{

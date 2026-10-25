@@ -2147,7 +2147,14 @@ int GameBrowseMenu::AutoInputAction(const char *action)
 	}
 	else if (strcasecmp(cmd, "install") == 0)
 	{
-		// The Install button with the game list already loaded
+		// The Install button with the game list already loaded. With no disc its
+		// "Insert Disc" waits for a press nobody makes in a scripted run
+		u32 cover = 0;
+		if (WDVD_GetCoverStatus(&cover) < 0 || !(cover & 0x2))
+		{
+			gprintf("autoinput install: no disc in the drive (cover status %08x)\n", cover);
+			return MENU_NONE;
+		}
 		int res = MenuInstall();
 		WDVD_StopMotor();
 		gprintf("autoinput install: menu %d\n", res);

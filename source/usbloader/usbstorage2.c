@@ -35,6 +35,7 @@
 #include "usbstorage2.h"
 #include "memory/mem2.h"
 #include "gecko.h"
+#include "system/IoGuard.h"
 
 
 /* IOCTL commands */
@@ -169,6 +170,16 @@ s32 USBStorage2_GetCapacity(u32 port, u32 *_sector_size)
 	return IPC_ENOENT;
 }
 
+//! One sector request to the cIOS, timed by IoGuard: a request that never returns
+//! (an old d2x's write with no status) ends GX instead of freezing the Wii
+static s32 UmsRequest(u32 cmd, u32 sector, u32 secs, void *ptr, u32 size)
+{
+	int token = IoGuard_Begin(cmd == USB_IOCTL_UMS_WRITE_SECTORS ? IOGUARD_USB_WRITE : IOGUARD_USB_READ, sector, secs, size);
+	s32 ret = IOS_IoctlvFormat(hid, fd, cmd, "ii:d", sector, secs, ptr, size);
+	IoGuard_End(token);
+	return ret;
+}
+
 s32 USBStorage2_ReadSectors(u32 port, u32 sector, u32 numSectors, void *buffer)
 {
 	u8 *buf = (u8 *) buffer;
@@ -192,7 +203,7 @@ s32 USBStorage2_ReadSectors(u32 port, u32 sector, u32 numSectors, void *buffer)
 		// Do not read more than MAX_BUFFER_SECTORS sectors at once and create a mem overflow!
 		if (!isMEM2Buffer(buffer))
 		{
-			ret = IOS_IoctlvFormat(hid, fd, USB_IOCTL_UMS_READ_SECTORS, "ii:d", sector, read_secs, mem2_ptr, read_size);
+			ret = UmsRequest(USB_IOCTL_UMS_READ_SECTORS, sector, read_secs, mem2_ptr, read_size);
 			if(ret < 0)
 				return ret;
 
@@ -201,7 +212,7 @@ s32 USBStorage2_ReadSectors(u32 port, u32 sector, u32 numSectors, void *buffer)
 		else
 		{
 			/* Read data */
-			ret = IOS_IoctlvFormat(hid, fd, USB_IOCTL_UMS_READ_SECTORS, "ii:d", sector, read_secs, buf, read_size);
+			ret = UmsRequest(USB_IOCTL_UMS_READ_SECTORS, sector, read_secs, buf, read_size);
 			if(ret < 0)
 				return ret;
 		}
@@ -242,7 +253,7 @@ s32 USBStorage2_WriteSectors(u32 port, u32 sector, u32 numSectors, const void *b
 	if (skipUnchangedWrites && mem2_ptr && numSectors <= MAX_BUFFER_SECTORS)
 	{
 		u32 size = numSectors * hdd_sector_size[port];
-		if (IOS_IoctlvFormat(hid, fd, USB_IOCTL_UMS_READ_SECTORS, "ii:d", sector, numSectors, mem2_ptr, size) >= 0 &&
+		if (UmsRequest(USB_IOCTL_UMS_READ_SECTORS, sector, numSectors, mem2_ptr, size) >= 0 &&
 			memcmp(mem2_ptr, buffer, size) == 0)
 			return 0;
 	}
@@ -260,14 +271,14 @@ s32 USBStorage2_WriteSectors(u32 port, u32 sector, u32 numSectors, const void *b
 			// Do not read more than MAX_BUFFER_SECTORS sectors at once and create a mem overflow!
 			memcpy(mem2_ptr, buf, write_size);
 
-			ret = IOS_IoctlvFormat(hid, fd, USB_IOCTL_UMS_WRITE_SECTORS, "ii:d", sector, write_secs, mem2_ptr, write_size);
+			ret = UmsRequest(USB_IOCTL_UMS_WRITE_SECTORS, sector, write_secs, mem2_ptr, write_size);
 			if(ret < 0)
 				return ret;
 		}
 		else
 		{
 			/* Write data */
-			ret = IOS_IoctlvFormat(hid, fd, USB_IOCTL_UMS_WRITE_SECTORS, "ii:d", sector, write_secs, buf, write_size);
+			ret = UmsRequest(USB_IOCTL_UMS_WRITE_SECTORS, sector, write_secs, (void *) buf, write_size);
 			if(ret < 0)
 				return ret;
 		}

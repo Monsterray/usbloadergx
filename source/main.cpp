@@ -24,6 +24,7 @@
 #include "wad/nandtitle.h"
 #include "StartUpProcess.h"
 #include "sys.h"
+#include "system/IoGuard.h"
 
 extern "C"
 {
@@ -44,6 +45,8 @@ int main(int argc, char *argv[])
 	InitGecko();
 	// redirect stdout and stderr to gecko
 	USBGeckoOutput();
+	// a USB or disc request that never returns ends GX instead of freezing the Wii
+	IoGuard_Start();
 	MEM_Report("start");
 
 	setlocale(LC_ALL, "en_US.UTF-8");

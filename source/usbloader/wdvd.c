@@ -4,6 +4,7 @@
 #include <ogcsys.h>
 #include "gecko.h"
 #include "wbfs.h"
+#include "system/IoGuard.h"
 
 /* Constants */
 #define IOCTL_DI_READID		0x70
@@ -269,7 +270,9 @@ s32 WDVD_UnencryptedRead(void *buf, u32 len, u64 offset)
 	inbuf[1] = len;
 	inbuf[2] = (u32)(offset >> 2);
 
+	int token = IoGuard_Begin(IOGUARD_DI_READ, (u32)(offset >> 11), len >> 11, len);
 	ret = IOS_Ioctl(_di_fd, IOCTL_DI_UNENCREAD, inbuf, sizeof(inbuf), buf, len);
+	IoGuard_End(token);
 	if (ret < 0)
 		return ret;
 
@@ -290,7 +293,9 @@ s32 WDVD_Read(void *buf, u32 len, u64 offset)
 	inbuf[1] = len;
 	inbuf[2] = (u32)(offset >> 2);
 
+	int token = IoGuard_Begin(IOGUARD_DI_READ, (u32)(offset >> 11), len >> 11, len);
 	ret = IOS_Ioctl(_di_fd, IOCTL_DI_READ, inbuf, sizeof(inbuf), buf, len);
+	IoGuard_End(token);
 	if (ret < 0)
 		return ret;
 

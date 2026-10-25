@@ -10,6 +10,7 @@
 #include "prompts/GCMultiDiscMenu.h"
 #include "themes/CTheme.h"
 #include "utils/tools.h"
+#include "system/IoGuard.h"
 #include "system/IosLoader.h"
 #include "cache/cache.hpp"
 #include "settings/GameTitles.h"
@@ -146,7 +147,12 @@ int MenuGCInstall()
 			installedGamePath[0] = 0;
 
 		// game is not yet installed so let's install it
+		IoGuard_ResetStats();
+		u64 installStart = gettime();
 		int ret = gcDumper.InstallGame(InstallPath, installGames[i], installedGamePath);
+		gprintf("Install of %.6s: %d in %u ms\n", (char *)gcDumper.GetDiscHeaders().at(installGames[i]).id, ret,
+				(u32) ticks_to_millisecs(diff_ticks(installStart, gettime())));
+		IoGuard_Report("install");
 		if(ret >= 0) {
 			//! success
 			installed_games++;
@@ -279,7 +285,11 @@ int MenuInstall()
 		{
 			StartProgress(tr( "Installing Game:" ), headerdisc.title, 0, true, true);
 			ProgressCancelEnable(true);
+			IoGuard_ResetStats();
+			u64 installStart = gettime();
 			ret = WBFS_AddGame();
+			gprintf("Install of %.6s: %d in %u ms\n", (char *)headerdisc.id, ret, (u32) ticks_to_millisecs(diff_ticks(installStart, gettime())));
+			IoGuard_Report("install");
 			ProgressCancelEnable(false);
 			ProgressStop();
 			wiilight(0);

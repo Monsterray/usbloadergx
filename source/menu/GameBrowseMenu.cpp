@@ -47,6 +47,7 @@
 #include <ogc/lwp_watchdog.h>
 #include "network/https.h"
 #include "memory/mem2.h"
+#include "system/IoGuard.h"
 #endif
 
 struct discHdr *dvdheader = NULL;
@@ -2135,6 +2136,14 @@ int GameBrowseMenu::AutoInputAction(const char *action)
 		}
 		else
 			gprintf("autoinput update: unknown %s\n", arg);
+	}
+	else if (strcasecmp(cmd, "stall") == 0)
+	{
+		// What the lrwii's dump did: a USB write that never returns. IoGuard ends GX
+		gprintf("autoinput stall: a USB write that never ends, from now\n");
+		IoGuard_Begin(IOGUARD_USB_WRITE, 12345, 1, 512);
+		while (true)
+			usleep(1000 * 1000);
 	}
 	else if (strcasecmp(cmd, "install") == 0)
 	{

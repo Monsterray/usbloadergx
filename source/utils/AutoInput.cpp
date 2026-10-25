@@ -36,7 +36,8 @@
  *                            functions; logs their result), download <url> (as
  *                            "download" but in the main thread: on a Wii a slow one
  *                            in the GUI thread trips the hbc agent's 120 s hang check),
- *                            install (the Install button: MenuInstall())
+ *                            install (the Install button: MenuInstall()), stall (a
+ *                            USB write that never returns, for IoGuard to end)
  *   85000 answer 1 10        the next 10 WindowPrompt()s choose their first button
  *                            once shown (the last one if they have fewer); each is
  *                            logged with its title and text. Lets the real flows

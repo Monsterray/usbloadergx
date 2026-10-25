@@ -109,14 +109,3 @@ bool HbcAgent_Home(void)
 		gprintf("hbc agent: HOME overlay: %d\n", ret);
 	return ret >= 0;
 }
-
-#ifdef HBCAGENT_FCHMOD_SHIM
-//! hbc-reborn 1.10.15+ (op A, `hbc.py attrib`) calls FatFs's f_chmod whenever it is built
-//! against libogc 3, but GX's FAT is its own libcustomfat (libfat 1.1.5), which has none.
-//! Test builds that link such an agent (scripts/diag.sh, HBCAGENT_SRC) define this: the
-//! agent finds no f_chmod call in FAT_setAttr and falls back. Not for a release.
-extern "C" int f_chmod(void *fs, const char *path, unsigned char attr, unsigned char mask)
-{
-	return 1;
-}
-#endif

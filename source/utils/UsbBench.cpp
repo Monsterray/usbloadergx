@@ -84,7 +84,7 @@
 #define REVIEW_CONFIG "sd:/apps/usbloader_gx_review/"
 
 static bool launchMode = false, dumpMode = false, writesAllowed = false, diReads = false, mem1Reads = false;
-static bool dipTraceAsked = false;
+static bool dipTraceAsked = false, dipTraceQuiet = false;
 static int skipArg = -1;
 static u32 limitS = 600, bootS = 180, readKiB = 1024, oneRead = 0, driveSectors = 0;
 static volatile u32 stepLimit = 600;
@@ -233,8 +233,18 @@ static void DipTraceStart(void)
 		for (int i = 0; i < SCREEN_LINES; ++i)
 			screenText[i]->SetText(i < keep ? screenRing[i] : "");
 	}
+	if (dipTraceQuiet)
+	{
+		//! -benchdiptrace=2: the records are only read back into the log, to tell a
+		//! fault in the display thread from the plugin writing outside the buffer
+		Log("DIP trace: registered only, not shown; buffer words 0-3 %08x %08x %08x %08x", dipTrace[0],
+			dipTrace[1], dipTrace[2], dipTrace[3]);
+		return;
+	}
 	dipTraceOn = true;
-	LWP_CreateThread(&dipTraceThread, DipTraceShow, NULL, NULL, 16 * 1024, 70);
+	//! 64 KiB: setting GUI text rasterizes glyphs with FreeType 2.14, which keeps a
+	//! 16 KiB pool on the caller's stack (70f311e3); 16 KiB of stack crashed here
+	LWP_CreateThread(&dipTraceThread, DipTraceShow, NULL, NULL, 65536, 70);
 }
 
 //! The last records into the card's log, once the DI calls have returned
@@ -360,6 +370,8 @@ void UsbBench_Init(int argc, char *argv[])
 			driveSectors = strtoul(argv[i] + 12, NULL, 10);
 		else if (strcmp(argv[i], "-benchdiptrace=1") == 0)
 			dipTraceAsked = true;
+		else if (strcmp(argv[i], "-benchdiptrace=2") == 0) // registered, not shown
+			dipTraceAsked = dipTraceQuiet = true;
 		else if (strcmp(argv[i], "-benchmem1=1") == 0)
 			mem1Reads = true;
 		else if (strncmp(argv[i], "-benchskip=", 11) == 0)
@@ -381,7 +393,8 @@ void UsbBench_Init(int argc, char *argv[])
 	//! hang in it (an IOS reload, a USB mount, a prompt) left the Wii for someone
 	//! to take back. hbc_agent_fatal_now() works before hbc_agent_init().
 	Step("GX start-up (IOS reload, USB mount, menu)", bootS);
-	LWP_CreateThread(&watchThread, Watch, NULL, NULL, 16 * 1024, LWP_PRIO_HIGHEST);
+	//! 64 KiB: its timeout line goes on the TV through GuiText (FreeType, 70f311e3)
+	LWP_CreateThread(&watchThread, Watch, NULL, NULL, 65536, LWP_PRIO_HIGHEST);
 	//! A wiiload start passes only the file's name: use the review build's folder
 	//! (scripts/wii_install.py), never an installed release's.
 	if (argc < 1 || !argv || !argv[0] || !strchr(argv[0], ':'))

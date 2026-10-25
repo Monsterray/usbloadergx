@@ -228,6 +228,7 @@ int MenuInstall()
 	ret = Disc_Open(true);
 	if (ret < 0)
 	{
+		gprintf("MenuInstall: Disc_Open() failed: %d (IOS %d)\n", ret, IOS_GetVersion());
 		WindowPrompt(tr( "Could Not Open Disc" ), 0, tr( "Back" ));
 		return MENU_DISCLIST;
 	}

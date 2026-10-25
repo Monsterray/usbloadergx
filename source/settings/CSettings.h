@@ -126,6 +126,10 @@ class CSettings
 		u8 LayoutVersion;
 		u8 BootIOS;
 		u8 LoaderIOS;
+		//! A -ios= boot argument replaced the config's LoaderIOS for this run only:
+		//! while LoaderIOS is still the argument's, Save() writes the config's back
+		u8 LoaderIOSFromArg = 0;
+		u8 LoaderIOSInConfig = 0;
 		u8 cios;
 		short AutoIOS;
 		short quickboot;

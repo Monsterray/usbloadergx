@@ -103,6 +103,10 @@ StartUpProcess::~StartUpProcess()
 	delete trigA;
 }
 
+//! -ios= from the boot arguments, or -1: Settings.Load() reads LoaderIOS from the
+//! config later, and the argument has to win over it
+static int argLoaderIOS = -1;
+
 int StartUpProcess::ParseArguments(int argc, char *argv[])
 {
 	int quickBoot = -1;
@@ -122,6 +126,7 @@ int StartUpProcess::ParseArguments(int argc, char *argv[])
 				Settings.LoaderIOS = 58;
 			else
 				Settings.LoaderIOS = LIMIT(atoi(ptr + strlen("-ios=")), 200, 255);
+			argLoaderIOS = Settings.LoaderIOS;
 		}
 
 		ptr = strcasestr(argv[i], "-bootios=");
@@ -381,6 +386,13 @@ int StartUpProcess::Execute(bool quickGameBoot, bool isBadBoot)
 
 	SetTextf("Loading config files\n");
 	gprintf("\tLoading config...%s\n", Settings.Load() ? "done" : "failed");
+	if (argLoaderIOS >= 0 && Settings.LoaderIOS != argLoaderIOS)
+	{
+		gprintf("\tLoader IOS %d from -ios= (the config has %d)\n", argLoaderIOS, Settings.LoaderIOS);
+		Settings.LoaderIOSInConfig = Settings.LoaderIOS;
+		Settings.LoaderIOSFromArg = argLoaderIOS;
+		Settings.LoaderIOS = argLoaderIOS;
+	}
 	gprintf("\tLoading language...%s\n", Settings.LoadLanguage(Settings.language_path, CONSOLE_DEFAULT) ? "done" : "failed");
 	gprintf("\tLoading game settings...%s\n", GameSettings.Load(Settings.ConfigPath) ? "done" : "failed");
 	gprintf("\tLoading game statistics...%s\n", GameStatistics.Load(Settings.ConfigPath) ? "done" : "failed");

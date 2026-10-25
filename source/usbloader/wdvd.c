@@ -19,6 +19,7 @@
 #define IOCTL_DI_STOPLASER	0xD2
 #define IOCTL_DI_OFFSET		0xD9
 #define IOCTL_DI_DISC_BCA	0xDA
+#define IOCTL_DI_REQERROR	0xE0
 #define IOCTL_DI_STOPMOTOR	0xE3
 #define IOCTL_DI_SETWBFSMODE	0xF4
 #define IOCTL_DI_GETWBFSMODE	0xF5 // odip
@@ -252,6 +253,28 @@ s32 WDVD_ClosePartition(void)
 	ret = IOS_Ioctl(_di_fd, IOCTL_DI_CLOSEPART, inbuf, sizeof(inbuf), NULL, 0);
 	if (ret < 0)
 		return ret;
+
+	return (ret == 1) ? 0 : -ret;
+}
+
+s32 WDVD_GetError(u32 *error)
+{
+	if (_di_fd < 0)
+		return _di_fd;
+
+	s32 ret;
+
+	memset(inbuf, 0, sizeof(inbuf));
+
+	/* The drive's error code for the last command (status in the top byte) */
+	inbuf[0] = IOCTL_DI_REQERROR << 24;
+
+	ret = IOS_Ioctl(_di_fd, IOCTL_DI_REQERROR, inbuf, sizeof(inbuf), outbuf, sizeof(outbuf));
+	if (ret < 0)
+		return ret;
+
+	if (error)
+		*error = outbuf[0];
 
 	return (ret == 1) ? 0 : -ret;
 }

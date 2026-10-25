@@ -367,7 +367,7 @@ bool CSettings::Save()
 	fprintf(file, "password = %s\n", EncryptedTxt);
 	fprintf(file, "GameSort = %d\n", GameSort);
 	fprintf(file, "PlayersFilter = %d\n", PlayersFilter);
-	fprintf(file, "LoaderIOS = %d\n", LoaderIOS);
+	fprintf(file, "LoaderIOS = %d\n", LoaderIOSFromArg && LoaderIOS == LoaderIOSFromArg ? LoaderIOSInConfig : LoaderIOS);
 	fprintf(file, "cios = %d\n", cios);
 	fprintf(file, "autoios = %d\n", AutoIOS);
 	fprintf(file, "keyset = %d\n", keyset);

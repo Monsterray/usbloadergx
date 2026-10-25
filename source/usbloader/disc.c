@@ -296,11 +296,21 @@ s32 Disc_Open(bool reset)
 	{
 		s32 ret = WDVD_Reset();
 		if (ret < 0)
+		{
+			gprintf("Disc_Open: WDVD_Reset() %d\n", ret);
 			return ret;
+		}
 	}
 
 	/* Read disc ID */
-	return WDVD_ReadDiskId(diskid);
+	s32 ret = WDVD_ReadDiskId(diskid);
+	if (ret < 0)
+	{
+		u32 error = 0;
+		s32 r = WDVD_GetError(&error);
+		gprintf("Disc_Open: WDVD_ReadDiskId() %d, drive error %08x (%d)\n", ret, error, r);
+	}
+	return ret;
 }
 
 s32 Disc_Wait(void)

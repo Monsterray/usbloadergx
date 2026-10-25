@@ -21,6 +21,7 @@ s32 WDVD_UnencryptedRead(void *, u32, u64);
 s32 WDVD_Read(void *, u32, u64);
 s32 WDVD_WaitForDisc(void);
 s32 WDVD_GetCoverStatus(u32 *);
+s32 WDVD_GetError(u32 *error);
 s32 WDVD_SetUSBMode(const u8 *, s32);
 s32 WDVD_Eject(void);
 s32 WDVD_Read_Disc_BCA(void *);

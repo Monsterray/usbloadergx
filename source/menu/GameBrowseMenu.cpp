@@ -43,6 +43,11 @@
 #include "menus.h"
 #include "wpad.h"
 #include "sys.h"
+#ifdef AUTOINPUT
+#include <ogc/lwp_watchdog.h>
+#include "network/https.h"
+#include "memory/mem2.h"
+#endif
 
 struct discHdr *dvdheader = NULL;
 bool allowUsedSpaceTxtUpdate = false;
@@ -2098,6 +2103,20 @@ void GameBrowseMenu::AutoInputAction(const char *action)
 		GameWindow::BootGame(header);
 		SetState(STATE_DEFAULT);
 		gprintf("autoinput boot: returned to the browser\n");
+	}
+	else if (strcasecmp(cmd, "download") == 0)
+	{
+		// The main thread, as the real downloads run: the GUI keeps drawing (and the
+		// hbc agent's hang watchdog keeps being fed) however long it takes
+		char url[128] = "";
+		sscanf(action, "%*s %127s", url);
+		struct download file = {};
+		u64 begin = gettime();
+		downloadfile(url, &file);
+		gprintf("autoinput download %s: %u bytes in %u ms: %.40s\n", url, (u32) file.size,
+				(u32) ticks_to_millisecs(diff_ticks(begin, gettime())), file.data ? file.data : "");
+		if (file.data)
+			MEM2_free(file.data);
 	}
 	else if (strcasecmp(cmd, "update") == 0)
 	{

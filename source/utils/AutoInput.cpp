@@ -33,7 +33,9 @@
  *                            boot <ID> (start that entry of the current list as
  *                            quick boot does; homebrew apps as the browser does),
  *                            update nintendont|gametdb|cheats (the Update menu's
- *                            functions; logs their result)
+ *                            functions; logs their result), download <url> (as
+ *                            "download" but in the main thread: on a Wii a slow one
+ *                            in the GUI thread trips the hbc agent's 120 s hang check)
  *
  * Buttons: A B X Y Z START UP DOWN LEFT RIGHT L R. Everything goes to channel
  * 0, merged with whatever a real controller sends. Each event is logged with

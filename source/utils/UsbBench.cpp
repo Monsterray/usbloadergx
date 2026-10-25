@@ -37,6 +37,9 @@
  *   -benchmem1=1    launch mode: the WDVD_Read buffers come from MEM1 (GX's texture
  *                   pool), as a real launch's apploader reads go to MEM1; by default
  *                   they are memalign(32) blocks, which GX's heap puts in MEM2
+ *   -benchdiptrace=1  launch mode: hand a d2x trace build's DIP plugin a trace
+ *                   buffer (ioctl 0xFC) and show its last records on the TV;
+ *                   only with a trace build, as a release cIOS passes 0xFC to DI
  *   -benchone=B     launch mode: one WDVD_Read of B bytes (32 to 1 MiB, a multiple
  *                   of 32) at partition offset 0 instead of the read benchmarks
  *   -benchboot=S    the same for GX's start-up, from main() to the menu
@@ -81,6 +84,7 @@
 #define REVIEW_CONFIG "sd:/apps/usbloader_gx_review/"
 
 static bool launchMode = false, dumpMode = false, writesAllowed = false, diReads = false, mem1Reads = false;
+static bool dipTraceAsked = false;
 static int skipArg = -1;
 static u32 limitS = 600, bootS = 180, readKiB = 1024, oneRead = 0, driveSectors = 0;
 static volatile u32 stepLimit = 600;
@@ -99,6 +103,9 @@ static GuiImage *screenPanel = NULL;
 static GuiText *screenText[SCREEN_LINES];
 static char screenRing[SCREEN_LINES][100];
 static volatile bool screenOn = false;
+//! Lines of the panel the log uses; a DIP trace takes the rest (DipTraceStart())
+static volatile int logLines = SCREEN_LINES;
+static void Log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 static void ScreenOpen(void)
 {
@@ -124,11 +131,133 @@ static void ScreenLine(const char *line)
 {
 	if (!screenOn)
 		return;
-	for (int i = 0; i < SCREEN_LINES - 1; ++i)
+	int n = logLines;
+	for (int i = 0; i < n - 1; ++i)
 		memcpy(screenRing[i], screenRing[i + 1], sizeof(screenRing[i]));
-	snprintf(screenRing[SCREEN_LINES - 1], sizeof(screenRing[0]), "%.99s", line);
-	for (int i = 0; i < SCREEN_LINES; ++i)
+	snprintf(screenRing[n - 1], sizeof(screenRing[0]), "%.99s", line);
+	for (int i = 0; i < n; ++i)
 		screenText[i]->SetText(screenRing[i]);
+}
+
+//! The d2x DIP plugin's trace (d2x-cios e30d15c, source/dip-plugin/trace.h; debug
+//! builds only): ioctl 0xFC on /dev/di hands the plugin a 512-byte buffer, which it
+//! fills with a ring of 31 records of 4 words after a 4-word header ('DIPT', the
+//! next index). A thread shows the last 8 records on the TV a few times a second,
+//! reading memory only, so it goes on while a DI call hangs IOS. A release cIOS
+//! passes the ioctl on to the DI module; the buffer then stays zero.
+#define DIP_TRACE_BYTES 512
+#define DIP_TRACE_RECORDS 31
+#define DIP_TRACE_SHOWN 8
+static u32 *dipTrace = NULL;
+static lwp_t dipTraceThread = LWP_THREAD_NULL;
+static volatile bool dipTraceOn = false;
+
+static void DipTraceLine(char *out, size_t size, const u32 *r)
+{
+	const char *what;
+	switch (r[1] >> 24)
+	{
+		case 'C': what = "DIP command in"; break;
+		case 'c': what = "DIP command out"; break;
+		case 'I': what = "DIP ioctl in"; break;
+		case 'i': what = "DIP ioctl out"; break;
+		case 'D': what = "DI handler call"; break;
+		case 'd': what = "DI handler back"; break;
+		case 'O': what = "DI ioctl call"; break;
+		case 'o': what = "DI ioctl back"; break;
+		case 'R': what = "emulated read in"; break;
+		case 'r': what = "emulated read out"; break;
+		default: what = "?"; break;
+	}
+	char where = (char)(r[1] >> 24);
+	snprintf(out, size, "  dip %10u.%03u ms %c %-17s cmd %02x mode %04x %08x %08x", r[0] / 1898,
+			 (r[0] % 1898) * 1000 / 1898, where >= 32 && where < 127 ? where : '?', what, (r[1] >> 16) & 0xFF,
+			 r[1] & 0xFFFF, r[2], r[3]);
+}
+
+static void *DipTraceShow(void *)
+{
+	static char lines[DIP_TRACE_SHOWN][100];
+	while (dipTraceOn)
+	{
+		DCInvalidateRange(dipTrace, DIP_TRACE_BYTES);
+		if (dipTrace[0] == 0x44495054) // 'DIPT'
+		{
+			u32 next = dipTrace[1];
+			for (int k = 0; k < DIP_TRACE_SHOWN; ++k)
+			{
+				// oldest of the eight first
+				u32 idx = (next + DIP_TRACE_RECORDS * 2 - DIP_TRACE_SHOWN + k) % DIP_TRACE_RECORDS;
+				DipTraceLine(lines[k], sizeof(lines[k]), dipTrace + 4 + idx * 4);
+				if (screenOn)
+					screenText[SCREEN_LINES - DIP_TRACE_SHOWN + k]->SetText(lines[k]);
+			}
+		}
+		usleep(150 * 1000);
+	}
+	return NULL;
+}
+
+//! Hands the plugin the trace buffer and gives the panel's bottom lines to it
+static void DipTraceStart(void)
+{
+	//! Asked for only: a release cIOS hands ioctl 0xFC to Nintendo's DI module,
+	//! which may wait on a dead drive like the reads that hung IOS
+	if (!dipTraceAsked)
+		return;
+	dipTrace = (u32 *)memalign(32, DIP_TRACE_BYTES);
+	if (!dipTrace)
+		return;
+	memset(dipTrace, 0, DIP_TRACE_BYTES);
+	DCFlushRange(dipTrace, DIP_TRACE_BYTES);
+	static char di[] ATTRIBUTE_ALIGN(32) = "/dev/di";
+	static u32 in[8] ATTRIBUTE_ALIGN(32), out[8] ATTRIBUTE_ALIGN(32);
+	s32 fd = IOS_Open(di, 0);
+	s32 ret = fd;
+	if (fd >= 0)
+	{
+		memset(in, 0, sizeof(in));
+		in[0] = 0xFCu << 24;
+		in[1] = MEM_VIRTUAL_TO_PHYSICAL(dipTrace);
+		ret = IOS_Ioctl(fd, 0xFC, in, sizeof(in), out, sizeof(out));
+		IOS_Close(fd);
+	}
+	Log("DIP trace: buffer 0x%08x, ioctl 0xFC %d (a release cIOS ignores it)", (u32)dipTrace, ret);
+	if (screenOn)
+	{
+		//! The log keeps the panel's top lines, its newest ones moved up
+		int keep = SCREEN_LINES - DIP_TRACE_SHOWN;
+		for (int i = 0; i < keep; ++i)
+			memcpy(screenRing[i], screenRing[SCREEN_LINES - keep + i], sizeof(screenRing[i]));
+		logLines = keep;
+		for (int i = 0; i < SCREEN_LINES; ++i)
+			screenText[i]->SetText(i < keep ? screenRing[i] : "");
+	}
+	dipTraceOn = true;
+	LWP_CreateThread(&dipTraceThread, DipTraceShow, NULL, NULL, 16 * 1024, 70);
+}
+
+//! The last records into the card's log, once the DI calls have returned
+static void DipTraceLog(void)
+{
+	if (!dipTrace)
+		return;
+	DCInvalidateRange(dipTrace, DIP_TRACE_BYTES);
+	if (dipTrace[0] != 0x44495054)
+	{
+		Log("DIP trace: no records (not a trace build of the cIOS)");
+		return;
+	}
+	char line[100];
+	u32 next = dipTrace[1];
+	for (int k = 0; k < DIP_TRACE_RECORDS; ++k)
+	{
+		const u32 *r = dipTrace + 4 + ((next + k) % DIP_TRACE_RECORDS) * 4;
+		if (!r[0] && !r[1])
+			continue;
+		DipTraceLine(line, sizeof(line), r);
+		Log("%s", line);
+	}
 }
 
 static void Log(const char *fmt, ...)
@@ -229,6 +358,8 @@ void UsbBench_Init(int argc, char *argv[])
 			diReads = true;
 		else if (strncmp(argv[i], "-benchdrive=", 12) == 0)
 			driveSectors = strtoul(argv[i] + 12, NULL, 10);
+		else if (strcmp(argv[i], "-benchdiptrace=1") == 0)
+			dipTraceAsked = true;
 		else if (strcmp(argv[i], "-benchmem1=1") == 0)
 			mem1Reads = true;
 		else if (strncmp(argv[i], "-benchskip=", 11) == 0)
@@ -582,6 +713,7 @@ static void LaunchReads(void)
 	u64 t;
 	u32 us;
 	int ret;
+	DipTraceStart();
 	if (game)
 	{
 		Log("launch: %.6s \"%.40s\" on partition %d (%s)", game->id, game->title, gameList.GetPartitionNumber(game->id),
@@ -668,6 +800,7 @@ static void LaunchReads(void)
 	{
 		Log("partition reads: SKIPPED. They hung IOS on this drive (needs a power cycle); -benchdiread=1 allows them");
 		WDVD_ClosePartition();
+		DipTraceLog();
 		Step(NULL);
 		return;
 	}
@@ -687,6 +820,7 @@ static void LaunchReads(void)
 			free(one);
 		}
 		WDVD_ClosePartition();
+		DipTraceLog();
 		Step(NULL);
 		return;
 	}
@@ -726,6 +860,7 @@ static void LaunchReads(void)
 		free(buf);
 	}
 	WDVD_ClosePartition();
+	DipTraceLog();
 	Step(NULL);
 }
 
@@ -975,6 +1110,9 @@ void UsbBench_Run(void)
 	Log("exit: back to HBC in 5 s; exit.log times the unmount");
 	usleep(5 * 1000 * 1000); // the result stays on the TV a moment
 	screenOn = false;        // the exit takes the GUI down
+	dipTraceOn = false;      // and IOS is reloaded under the trace buffer
+	if (dipTraceThread != LWP_THREAD_NULL)
+		LWP_JoinThread(dipTraceThread, NULL);
 	//! The watch stays on: an unmount past the limit leaves exit.log at that step
 	Step("exit");
 	Sys_BackToLoader();

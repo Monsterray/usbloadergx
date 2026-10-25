@@ -8,6 +8,9 @@
 #   scripts/diag.sh autoinput    # test build with -DAUTOINPUT -> .dev/autoinput/boot.dol and boot.elf
 #                                # (EXTRA_CFLAGS="-DDEBUG_NETWORK" adds defines to it)
 #                                # (reads sd:/autoinput.txt; see source/utils/AutoInput.cpp)
+#                                # (HBCAGENT_SRC=<hbc-reborn tree> links the agent built from it
+#                                # instead of the image's pinned one, for a newer agent before
+#                                # deps/build.sh pins it; .dev/autoinput/agent.txt names it)
 #   scripts/diag.sh exittest     # tests/dolphin/exittest.c -> .dev/exittest/boot.dol: a homebrew app
 #                                # that waits 4 s and calls exit(0), for the return stub
 #
@@ -58,7 +61,18 @@ case "$MODE" in
 		CF="$BASE_CFLAGS -DAUTOINPUT ${EXTRA_CFLAGS:-}"
 		mkdir -p "$ROOT/.dev/autoinput"
 		OUT_MOUNT=(-v "$MOUNT_ROOT/.dev/autoinput:/out")
-		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make -j"$(nproc)" CFLAGS="$CF" > /out/build.log 2>&1; rc=$?; cp boot.dol boot.elf /out/ 2>/dev/null; grep -E "warning:|error:" /out/build.log | sort -u; exit $rc'
+		SCRIPT='mkdir -p /w && tar -C /src -cf - --exclude=./.dev --exclude=./.runs --exclude=./build --exclude=./usbloader_gx --exclude=./usbloader_gx.zip . | tar -C /w -xmf - && cd /w && make -j"$(nproc)" CFLAGS="$CF" > /out/build.log 2>&1; rc=$?; cp boot.dol boot.elf /out/ 2>/dev/null; grep -E "warning:|error:" /out/build.log | sort -u; exit $rc'
+		rm -f "$ROOT/.dev/autoinput/agent.txt"
+		if [ -n "${HBCAGENT_SRC:-}" ]; then
+			# Built and installed as deps/build.sh does, in this throwaway container only
+			A="$(cd "$HBCAGENT_SRC" && pwd)"
+			[ -f "$A/sdk/hbc_agent/Makefile" ] || { echo "HBCAGENT_SRC: no sdk/hbc_agent in $A" >&2; exit 1; }
+			if [ "${DOCKER[0]}" != docker ]; then
+				A="$(printf '%s' "$A" | sed -E 's|^/([a-zA-Z])/|/mnt/\L\1/|')"
+			fi
+			OUT_MOUNT+=(-v "$A:/agent:ro")
+			SCRIPT='mkdir -p /tmp/agent && tar -C /agent -cf - . | tar -C /tmp/agent -xf - && make -C /tmp/agent/sdk/hbc_agent -B -j"$(nproc)" DEVKITPRO="$DEVKITPRO" DEVKITPPC="$DEVKITPPC" > /out/agent.log 2>&1 || { tail -20 /out/agent.log; exit 1; }; P=$DEVKITPRO/portlibs/usbloadergx; cp /tmp/agent/sdk/hbc_agent/libhbcagent.a $P/lib/ && cp /tmp/agent/sdk/hbc_agent.h /tmp/agent/sdk/hbc_netlog.h $P/include/ && { grep -m1 CHANNEL_VERSION_STR /tmp/agent/channel/channelapp/config.h || true; } > /out/agent.txt; '"$SCRIPT"
+		fi
 		;;
 	exittest)
 		mkdir -p "$ROOT/.dev/exittest"

@@ -74,6 +74,10 @@ void HbcAgent_Init(void)
 	// screen for this long is a hang. HaltGui() pauses the frames while the
 	// main thread works, so this leaves room for its slowest step.
 	cfg.hang_s = 120;
+#ifdef HBCAGENT_NO_IOS_CHECK
+	// Test builds only: an agent's way out (1.10.14+) straight to the stub, unchecked
+	cfg.no_safety |= HBC_AGENT_NO_IOS_CHECK;
+#endif
 
 	s32 ret = hbc_agent_init(&cfg);
 	gprintf("hbc agent: %d\n", ret);

@@ -2140,6 +2140,9 @@ int GameBrowseMenu::AutoInputAction(const char *action)
 	else if (strcasecmp(cmd, "stall") == 0)
 	{
 		// What the lrwii's dump did: a USB write that never returns. IoGuard ends GX
+		// The stub the agent's way out will find: its magic and the title word after it
+		const u32 *stub = (const u32 *)0x80001800;
+		gprintf("autoinput stall: stub %08x %08x %08x, title %08x%08x\n", stub[0], stub[1], stub[2], stub[4], stub[5]);
 		gprintf("autoinput stall: a USB write that never ends, from now\n");
 		IoGuard_Begin(IOGUARD_USB_WRITE, 12345, 1, 512);
 		while (true)

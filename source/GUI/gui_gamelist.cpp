@@ -33,7 +33,7 @@ GuiGameList::GuiGameList(int w, int h, int offset)
 {
 	width = w;
 	height = h;
-	pagesize = thInt("9 - game list browser page size");
+	pagesize = thIntR("9 - game list browser page size", 1, 30);
 	selectable = true;
 	listOffset = LIMIT(offset, 0, MAX(0, gameList.size()-pagesize));
 	selectedItem = 0;

@@ -103,5 +103,21 @@ awk '/GuiImageAsync::ThreadRemoveImage\(/ { infn = 1 }
 	infn && /for *\(/ { exit !locked }' "$SRC/GUI/gui_image_async.cpp" \
 	|| fail "GuiImageAsync::ThreadRemoveImage() searches the list without ListLock"
 
+# Theme values that size an allocation or a text buffer come out of a .them file.
+#    getThemeIntRange() returns the default for a value outside the range.
+grep -q 'thIntR("9 - game list browser page size"' "$SRC/GUI/gui_gamelist.cpp" \
+	|| fail "gui_gamelist.cpp sizes the button array with an unbounded theme value"
+grep -q 'thIntR("200 - settings option text max width"' "$SRC/GUI/gui_optionbrowser.cpp" \
+	&& grep -q 'thIntR("100 - settings option value max width"' "$SRC/GUI/gui_optionbrowser.cpp" \
+	|| fail "gui_optionbrowser.cpp sizes GuiText from an unbounded theme value"
+grep -q 'thIntR("310 - settings title text max width"' "$SRC/settings/menus/SettingsMenu.cpp" \
+	|| fail "SettingsMenu.cpp sizes GuiText from an unbounded theme value"
+grep -q 'thInt("9 - game list browser page size")' "$SRC/GUI/gui_gamelist.cpp" \
+	&& fail "gui_gamelist.cpp reads the page size with thInt again"
+
+# A .them of 0 bytes gives a 0-byte buffer, and buffer[filesize-1] wrote before it.
+grep -q 'filesize == 0' "$SRC/themes/ThemeMenu.cpp" \
+	|| fail "ThemeMenu::SetupMainButtons() does not skip an empty .them"
+
 [ "$status" -eq 0 ] && echo "OK: GUI bounds guards are in place"
 exit "$status"

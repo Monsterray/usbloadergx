@@ -9,6 +9,7 @@ extern "C" {
 #include <gctypes.h>
 
 int getThemeInt(const char *msgid);
+int getThemeIntRange(const char *msgid, int min, int max);
 float getThemeFloat(const char *msgid);
 int getThemeAlignment(const char *msgid);
 GXColor getThemeColor(const char *msgid);
@@ -17,6 +18,7 @@ void LoadNewTheme(void);
 void ThemeCleanUp(void);
 
 #define thInt(s) getThemeInt(s)
+#define thIntR(s, lo, hi) getThemeIntRange(s, lo, hi)
 #define thFloat(s) getThemeFloat(s)
 #define thAlign(s) getThemeAlignment(s)
 #define thColor(s) getThemeColor(s)

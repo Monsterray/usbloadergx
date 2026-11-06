@@ -35,8 +35,8 @@ GuiOptionBrowser::GuiOptionBrowser(int w, int h, OptionList * l, const char * cu
 	coL2 = 50;
 	listOffset = 0;
 	isStatic = staticValues;
-	optionTxtLen = thInt("200 - settings option text max width");
-	optionValLen = thInt("100 - settings option value max width");
+	optionTxtLen = thIntR("200 - settings option text max width", 1, 640);
+	optionValLen = thIntR("100 - settings option value max width", 1, 640);
 	optionsValPos = thInt("240 - settings option value pos x");
 
 	trigA = new GuiTrigger;

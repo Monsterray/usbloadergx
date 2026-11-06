@@ -323,6 +323,25 @@ int getThemeInt(const char *msgid)
 	return atoi(msgid);
 }
 
+//! A theme is a downloaded file, so a value that sizes an allocation has to stay in a range.
+//! A value outside min..max (or text that is not a number) gives the default, which is the
+//! number the key starts with, clamped to the same range.
+int getThemeIntRange(const char *msgid, int min, int max)
+{
+	int def = atoi(msgid);
+	if(def < min) def = min;
+	if(def > max) def = max;
+
+	MSG *msg = findMSG(hash_string(msgid));
+	if(msg && msg->msgstr)
+	{
+		int value = atoi(msg->msgstr);
+		if(value >= min && value <= max)
+			return value;
+	}
+	return def;
+}
+
 float getThemeFloat(const char *msgid)
 {
 	MSG *msg = findMSG(hash_string(msgid));

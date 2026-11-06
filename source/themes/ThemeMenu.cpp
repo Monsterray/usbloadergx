@@ -249,9 +249,14 @@ void ThemeMenu::SetupMainButtons()
 	{
 		u8 *buffer = NULL;
 		u32 filesize;
-		LoadFileToMem(ThemeDir.GetFilepath(i), &buffer, &filesize);
+		int loadret = LoadFileToMem(ThemeDir.GetFilepath(i), &buffer, &filesize);
 
-		if(!buffer) continue;
+		//! An empty .them gives a 0-byte buffer, and buffer[filesize-1] would write before it.
+		if(loadret < 0 || !buffer || filesize == 0)
+		{
+			free(buffer);
+			continue;
+		}
 
 		buffer[filesize-1] = '\0';
 

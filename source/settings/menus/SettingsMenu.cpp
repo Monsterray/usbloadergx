@@ -64,7 +64,7 @@ SettingsMenu::SettingsMenu(const char * title, OptionList * opts, int returnTo)
 	titleTxt = new GuiText(title, 28, thColor("r=0 g=0 b=0 a=255 - settings title text color"));
 	titleTxt->SetAlignment(thAlign("center - settings title text align hor"), thAlign("top - settings title text align ver"));
 	titleTxt->SetPosition(thInt("0 - settings title text pos x"), thInt("40 - settings title text pos y"));
-	titleTxt->SetMaxWidth(thInt("310 - settings title text max width"), SCROLL_HORIZONTAL);
+	titleTxt->SetMaxWidth(thIntR("310 - settings title text max width", 1, 640), SCROLL_HORIZONTAL);
 
 	Append(optionBrowser);
 	Append(titleTxt);

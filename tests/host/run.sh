@@ -10,6 +10,8 @@
 #   usage: tests/host/run.sh
 #   env:   CC          host C compiler (default: cc, then gcc)
 #          CXX         host C++ compiler for *_test.cpp (default: c++, then g++)
+#          XDG_CACHE_HOME  where the pugixml source for GameTDB's test is cached
+#                      (default ~/.cache); it is fetched with curl on the first run
 #          WSL_DISTRO  on Windows with no host compiler, run in this WSL distro
 #                      (default Ubuntu-24.04, the one scripts/build.sh uses)
 #
@@ -89,6 +91,31 @@ for t in "$HERE"/*_test.c; do
 	run_test "$CC" gnu11 "$t"
 done
 
+# pugixml for a test that says "host-needs: pugixml": the same pinned release
+# deps/build.sh builds for the Wii, fetched once into a cache and compiled once per
+# run (without the sanitizers' warnings: it is upstream code). Sets PUGI_FLAGS.
+PUGI_FLAGS=""
+need_pugixml() {
+	[ -n "$PUGI_FLAGS" ] && return 0
+	url="$(sed -n 's/^PUGIXML_URL=//p' "$ROOT/deps/build.sh" | tr -d '\r')"
+	sha="$(sed -n 's/^PUGIXML_SHA256=//p' "$ROOT/deps/build.sh" | tr -d '\r')"
+	cache="${XDG_CACHE_HOME:-$HOME/.cache}/usbloadergx-host-tests/$sha"
+	if [ ! -f "$cache/src/pugixml.cpp" ]; then
+		mkdir -p "$cache.tmp" &&
+			curl -fsSL --retry 3 -o "$cache.tmp/pugixml.tar.gz" "$url" &&
+			echo "$sha  $cache.tmp/pugixml.tar.gz" | sha256sum -c --quiet - &&
+			tar -xzf "$cache.tmp/pugixml.tar.gz" -C "$cache.tmp" --strip-components=1 &&
+			rm -rf "$cache" && mv "$cache.tmp" "$cache" || {
+				rm -rf "$cache.tmp"
+				echo "FAIL: cannot fetch pugixml from $url" >&2
+				return 1
+			}
+	fi
+	"$CXX" -std=gnu++17 -O1 -g -w -fsanitize=address,undefined -fno-sanitize-recover=all \
+		-c "$cache/src/pugixml.cpp" -o "$OUT/pugixml.o" || return 1
+	PUGI_FLAGS="-I $cache/src $OUT/pugixml.o"
+}
+
 for t in "$HERE"/*_test.cpp; do
 	[ -e "$t" ] || continue
 	if [ -z "$CXX" ]; then
@@ -97,7 +124,16 @@ for t in "$HERE"/*_test.cpp; do
 		continue
 	fi
 	# -funsigned-char: plain char is unsigned on the Wii's PowerPC, and the C++ sources rely on it.
-	run_test "$CXX" gnu++17 "$t" -funsigned-char
+	flags="-funsigned-char"
+	if grep -q 'host-needs: pugixml' "$t"; then
+		if ! need_pugixml; then
+			echo "FAIL: $(basename "$t"): no pugixml" >&2
+			status=1
+			continue
+		fi
+		flags="$flags $PUGI_FLAGS"
+	fi
+	run_test "$CXX" gnu++17 "$t" "$flags"
 done
 
 [ "$status" -eq 0 ] && echo "OK: host tests pass"

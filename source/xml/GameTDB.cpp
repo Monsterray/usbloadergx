@@ -76,6 +76,7 @@ void GameTDB::CloseFile()
 {
 	OffsetMap.clear();
 	std::vector<GameOffsets>().swap(OffsetMap);
+	GameIDCache[0] = '\0';
 
 	if (file)
 		fclose(file);
@@ -106,9 +107,7 @@ bool GameTDB::LoadGameOffsets(const char *path)
 	unsigned long long Version = 0;
 	unsigned int NodeCount = 0;
 
-	fread(&Version, 1, sizeof(Version), fp);
-
-	if (ExistingVersion != Version)
+	if (fread(&Version, 1, sizeof(Version), fp) != sizeof(Version) || ExistingVersion != Version)
 	{
 		fclose(fp);
 		bool result = ParseFile();
@@ -118,11 +117,9 @@ bool GameTDB::LoadGameOffsets(const char *path)
 		return result;
 	}
 
-	fread(&NodeCount, 1, sizeof(NodeCount), fp);
-
 	//! NodeCount comes out of the cache file, and one entry is 15 bytes. Anything
 	//! that could not have come from a wiitdb.xml means the cache is not usable.
-	if (NodeCount == 0 || NodeCount > MAX_OFFSET_ENTRIES)
+	if (fread(&NodeCount, 1, sizeof(NodeCount), fp) != sizeof(NodeCount) || NodeCount == 0 || NodeCount > MAX_OFFSET_ENTRIES)
 	{
 		fclose(fp);
 		bool result = ParseFile();
@@ -191,21 +188,26 @@ unsigned long long GameTDB::GetGameTDBVersion()
 	if (!file)
 		return 0;
 
-	char TmpText[1024];
+	//! One byte more than is read: fread does not terminate, and the end of the
+	//! version node can be the last byte read.
+	char TmpText[1024 + 1];
 
-	if (GetData(TmpText, 0, sizeof(TmpText)) < 0)
+	int read = GetData(TmpText, 0, sizeof(TmpText) - 1);
+	if (read <= 0)
 		return 0;
 
-	char *versionNode = NULL;
-	//! Try to find WiiTDB version node
-	if (!versionNode && (versionNode = strstr(TmpText, "<WiiTDB")) != NULL)
+	TmpText[read] = '\0';
+
+	//! Try to find WiiTDB version node. It can lie outside the first kilobyte.
+	char *versionNode = strstr(TmpText, "<WiiTDB");
+	if (!versionNode)
+		return 0;
+
+	char *versionNodeEnd = strstr(versionNode, "/>");
+	if (versionNodeEnd)
 	{
-		char *versionNodeEnd = strstr(versionNode, "/>");
-		if (versionNodeEnd)
-		{
-			versionNodeEnd += strlen("/>");
-			*versionNodeEnd = '\0';
-		}
+		versionNodeEnd += strlen("/>");
+		*versionNodeEnd = '\0';
 	}
 
 	pugi::xml_document xmlDoc;
@@ -221,7 +223,10 @@ int GameTDB::GetData(char *data, int offset, int size)
 	if (!file || !data)
 		return -1;
 
-	fseek(file, offset, SEEK_SET);
+	//! A node offset out of the cache on the card can be anything. A failed seek
+	//! would leave the position where it was and return other bytes as the node.
+	if (offset < 0 || fseek(file, offset, SEEK_SET) != 0)
+		return -1;
 
 	return fread(data, 1, size, file);
 }
@@ -499,6 +504,10 @@ bool GameTDB::ParseGameNode(const char *id)
 {
 	if (strncasecmp(GameIDCache, id, 6) == 0)
 		return true;
+
+	//! A failed parse leaves xmlDoc holding no valid node of the cached game, so
+	//! the cache must not claim it does.
+	GameIDCache[0] = '\0';
 
 	const char *data = LoadGameNode(id);
 	if (!data)

@@ -55,5 +55,11 @@ awk '/\/\/! Default Settings/ { on = 1 } on && /Settings\.Reset\(\)/ { exit }
 grep -E 'gprintf\("[^"]*OnScreenKeyboard\([^"]*%s' "$SRC/prompts/PromptWindows.cpp" >/dev/null \
 	&& fail "OnScreenKeyboard() logs the text it edits (the password) with %s"
 
+# 5. A quick boot by ID, a disc and the disc button never pass the game list's filter:
+#    GameBooter::BootGame() has to apply it itself, before anything boots.
+awk '/^int GameBooter::BootGame\(/ { on = 1 } on && /ParentalBlocked\(gameHdr\)/ { found = 1; exit }
+	on && /BootGCMode\(|Sys_LoadHBC\(/ { exit } END { exit !found }' "$SRC/usbloader/GameBooter.cpp" \
+	|| fail "GameBooter::BootGame() boots without the parental check (ParentalBlocked)"
+
 [ "$status" -eq 0 ] && echo "OK: parental reset gates are in place"
 exit "$status"

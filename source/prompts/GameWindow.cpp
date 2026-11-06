@@ -756,6 +756,13 @@ void GameWindow::BootGame(struct discHdr *header)
 {
 	wiilight(0);
 
+	//! The disc button and a disc's game window come here without the game list's filter
+	if (GameBooter::ParentalBlocked(header))
+	{
+		ShowError("%s", tr("This game is blocked by parental control."));
+		return;
+	}
+
 	GameCFG* game_cfg = GameSettings.GetGameCFG(header->id);
 
 	char IDfull[7];

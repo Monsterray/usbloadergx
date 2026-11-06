@@ -24,6 +24,7 @@ class GameBooter
 {
 	public:
 		static int BootGame(struct discHdr *gameHdr, const s8 useOcarina = -1);
+		static bool ParentalBlocked(const struct discHdr *gameHdr);
 		static int BootGCMode(struct discHdr *gameHdr);
 	private:
 		static void SetupAltDOL(u8 * gameID, u8 &alternatedol, u32 &alternatedoloffset);

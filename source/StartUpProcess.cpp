@@ -583,7 +583,8 @@ int StartUpProcess::QuickGameBoot(const char *gameID)
 			header = gameList[i];
 	}
 
-	if (!header)
+	//! A blocked game leaves as a missing one does: back to whatever started GX
+	if (!header || GameBooter::ParentalBlocked(header))
 		return -1;
 
 	GameStatistics.SetPlayCount(header->id, GameStatistics.GetPlayCount(header->id) + 1);
@@ -600,6 +601,13 @@ int StartUpProcess::AutobootDisc()
 		delete header;
 		header = NULL;
 		SetTextf("Error mounting disc\n");
+		sleep(3);
+		return FinalizeExecute();
+	}
+	else if (GameBooter::ParentalBlocked(header))
+	{
+		delete header;
+		SetTextf("This disc is blocked by parental control\n");
 		sleep(3);
 		return FinalizeExecute();
 	}

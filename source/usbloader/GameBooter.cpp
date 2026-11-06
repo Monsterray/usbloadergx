@@ -272,10 +272,54 @@ void GameBooter::ShutDownDevices(int gameUSBPort)
 		USB_Deinitialize();
 }
 
+//! The game list's parental filter (GameList::InternalFilterList) for every boot: a quick
+//! boot by ID, a disc and the disc button never pass through that list.
+bool GameBooter::ParentalBlocked(const struct discHdr *gameHdr)
+{
+	if (!gameHdr || Settings.godmode)
+		return false;
+
+	GameCFG *game_cfg = GameSettings.GetGameCFG(gameHdr->id);
+	if (game_cfg->Locked)
+		return true;
+
+	if (Settings.parentalcontrol == PARENTAL_LVL_ADULT)
+		return false;
+
+	if (game_cfg->parentalcontrol > Settings.parentalcontrol)
+		return true;
+
+	int rating = GameTitles.GetParentalRating((const char *)gameHdr->id);
+	//! A disc is not in the title cache, which holds only the games on the drive
+	if (rating < 0)
+	{
+		char id[7];
+		snprintf(id, sizeof(id), "%.6s", (const char *)gameHdr->id);
+		std::string path(Settings.titlestxt_path);
+		if (path.empty() || path.back() != '/')
+			path += '/';
+		path += "wiitdb.xml";
+
+		GameTDB XML_DB;
+		std::string value;
+		int board = -1;
+		if (XML_DB.OpenFile(path.c_str()) && (board = XML_DB.GetRating(id)) >= 0 && XML_DB.GetRatingValue(id, value))
+			rating = GameTDB::ConvertRating(value.c_str(), GameTDB::RatingToString(board), "PEGI");
+	}
+
+	return rating > Settings.parentalcontrol;
+}
+
 int GameBooter::BootGame(struct discHdr *gameHdr, const s8 useOcarina)
 {
 	if (!gameHdr)
 		return -1;
+
+	if (ParentalBlocked(gameHdr))
+	{
+		gprintf("Boot Game: %.6s is blocked by parental control\n", gameHdr->id);
+		return -1;
+	}
 
 	ocarinaAnswer = useOcarina;
 	struct discHdr gameHeader;

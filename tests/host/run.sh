@@ -9,6 +9,7 @@
 #
 #   usage: tests/host/run.sh
 #   env:   CC          host C compiler (default: cc, then gcc)
+#          CXX         host C++ compiler for *_test.cpp (default: c++, then g++)
 #          WSL_DISTRO  on Windows with no host compiler, run in this WSL distro
 #                      (default Ubuntu-24.04, the one scripts/build.sh uses)
 #
@@ -44,19 +45,36 @@ if [ -z "$CC" ]; then
 	exit 2
 fi
 
+# Tests of C++ sources (*_test.cpp) need a C++ compiler.
+CXX="${CXX:-}"
+if [ -z "$CXX" ]; then
+	for c in c++ g++ clang++; do
+		if command -v "$c" >/dev/null 2>&1 &&
+			printf '#include <string>\nint main(){std::string s;return (int)s.size();}\n' |
+			"$c" -x c++ -o /dev/null - >/dev/null 2>&1; then
+			CXX="$c"
+			break
+		fi
+	done
+fi
+
 OUT="$(mktemp -d)"
 trap 'rm -rf "$OUT"' EXIT
 status=0
 
-for t in "$HERE"/*_test.c; do
-	name="$(basename "$t" .c)"
-	if ! "$CC" -std=gnu11 -O1 -g -Wall -Wextra -fsanitize=address,undefined \
+# run_test <compiler> <std> <source file> [extra flags]
+run_test() {
+	cc="$1"; std="$2"; t="$3"; extra="${4:-}"
+	name="$(basename "$t")"
+	name="${name%.*}"
+	# shellcheck disable=SC2086
+	if ! "$cc" -std="$std" -O1 -g -Wall -Wextra $extra -fsanitize=address,undefined \
 		-fno-sanitize-recover=all -I "$HERE/shim" -I "$ROOT/source" \
 		-o "$OUT/$name" "$t" 2>"$OUT/$name.err"; then
 		echo "FAIL: $name does not compile:" >&2
 		cat "$OUT/$name.err" >&2
 		status=1
-		continue
+		return
 	fi
 	# A compiler warning in the code under test is a failure too.
 	if [ -s "$OUT/$name.err" ]; then
@@ -65,6 +83,21 @@ for t in "$HERE"/*_test.c; do
 		status=1
 	fi
 	"$OUT/$name" || { echo "FAIL: $name" >&2; status=1; }
+}
+
+for t in "$HERE"/*_test.c; do
+	run_test "$CC" gnu11 "$t"
+done
+
+for t in "$HERE"/*_test.cpp; do
+	[ -e "$t" ] || continue
+	if [ -z "$CXX" ]; then
+		echo "FAIL: $(basename "$t"): no host C++ compiler: set CXX, or install g++" >&2
+		status=1
+		continue
+	fi
+	# -funsigned-char: plain char is unsigned on the Wii's PowerPC, and the C++ sources rely on it.
+	run_test "$CXX" gnu++17 "$t" -funsigned-char
 done
 
 [ "$status" -eq 0 ] && echo "OK: host tests pass"

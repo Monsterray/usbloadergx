@@ -89,8 +89,8 @@ int GCTCheats::createGCT(const std::vector<int> &vCheats, const char * filename)
 	fwrite(GCT_Header, sizeof(GCT_Header), 1, pFile);
 
 	int cnt = vCheats.size();
-	int c = 0;
-	while (c < cnt)
+	//! a for loop: the old while skipped its c++ on an index out of range and never ended
+	for (int c = 0; c < cnt; c++)
 	{
 		if((unsigned int)vCheats[c] >= cheatList.size())
 			continue;
@@ -98,8 +98,6 @@ int GCTCheats::createGCT(const std::vector<int> &vCheats, const char * filename)
 		std::vector<unsigned int> &cheatBuf = cheatList[vCheats[c]].sCheats;
 		if(cheatBuf.size() > 0)
 			fwrite((char*)&cheatBuf[0], cheatBuf.size() * sizeof(unsigned int), 1, pFile);
-
-		c++;
 	}
 
 	fwrite(GCT_Footer, sizeof(GCT_Footer), 1, pFile);
@@ -151,10 +149,13 @@ int GCTCheats::openTxtfile(const char * filename)
 		return -1;
 	}
 
-	fgets(line, max_line_size, pFile);
+	//! a failed read leaves the buffer as it was: new[] does not clear it, so RemoveLineEnds would run on garbage
+	if (!fgets(line, max_line_size, pFile))
+		*line = 0;
 	RemoveLineEnds(line);
 	sGameID = line;
-	fgets(line, max_line_size, pFile);
+	if (!fgets(line, max_line_size, pFile))
+		*line = 0;
 	RemoveLineEnds(line);
 	sGameTitle = line;
 
@@ -221,6 +222,10 @@ bool GCTCheats::IsCode(const char *str)
 bool GCTCheats::IsCheatIncluded(int iCheat, const unsigned char *gctBuf, unsigned int gctSize)
 {
 	if(!gctBuf || (unsigned int)iCheat >= cheatList.size())
+		return false;
+
+	//! a file shorter than header and footer holds no cheat, and the size below would wrap around
+	if(gctSize < sizeof(GCT_Header) + sizeof(GCT_Footer))
 		return false;
 
 	std::vector<unsigned int> &Cheat = cheatList[iCheat].sCheats;

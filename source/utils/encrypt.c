@@ -23,35 +23,59 @@
  *
  * for WiiXplorer 2010
  ***************************************************************************/
-#include <stdio.h>
-#include <string.h>
+#include <stddef.h>
+#include "encrypt.h"
 
 //! No need for high security crap. It's a simple encrypter/decrypter
 //! with a constant sid.
 const char * sid = "USBLoaderGX";
 
-void EncryptString(const char *src, char *dst)
+//! Writes two hex digits per source character and a terminator: at most
+//! (dstsize - 1) / 2 characters of src fit, the rest is dropped.
+void EncryptString(const char *src, char *dst, size_t dstsize)
 {
-	unsigned int i;
-	char tmp[3];
-	dst[0] = 0;
+	static const char hex[] = "0123456789abcdef";
+	size_t i, n = 0;
 
-	for (i = 0; i < strlen(src); i++)
+	if (dstsize == 0)
+		return;
+
+	for (i = 0; src[i] != 0 && n + 3 <= dstsize; i++)
 	{
-		sprintf(tmp, "%02x", src[i] ^ sid[i%10]);
-		strcat(dst, tmp);
+		unsigned char c = (unsigned char) src[i] ^ (unsigned char) sid[i%10];
+		dst[n++] = hex[c >> 4];
+		dst[n++] = hex[c & 15];
 	}
+	dst[n] = 0;
 }
 
-void DecryptString(const char *src, char *dst)
+static int HexDigit(char c)
 {
-	unsigned int i;
-	for (i = 0; i < strlen(src); i += 2)
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	return -1;
+}
+
+//! src comes from a file on the card. Writes at most dstsize - 1 characters and a
+//! terminator, and stops at the first pair that is not two hex digits.
+void DecryptString(const char *src, char *dst, size_t dstsize)
+{
+	size_t i = 0, n = 0;
+
+	if (dstsize == 0)
+		return;
+
+	while (n + 1 < dstsize)
 	{
-		char c = (src[i] >= 'a' ? (src[i] - 'a') + 10 : (src[i] - '0')) << 4;
-		c += (src[i+1] >= 'a' ? (src[i+1] - 'a') + 10 : (src[i+1] - '0'));
-		dst[i>>1] = c ^ sid[(i>>1)%10];
+		int hi = HexDigit(src[i]);
+		int lo = hi < 0 ? -1 : HexDigit(src[i+1]);
+		if (hi < 0 || lo < 0)
+			break;
+		dst[n] = (char) (((hi << 4) | lo) ^ (unsigned char) sid[n%10]);
+		n++;
+		i += 2;
 	}
-	dst[strlen(src)>>1] = 0;
+	dst[n] = 0;
 }
 

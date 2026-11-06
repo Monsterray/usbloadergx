@@ -363,7 +363,7 @@ bool CSettings::Save()
 	fprintf(file, "tooltips = %d\n", tooltips);
 	fprintf(file, "RememberUnlock = %d\n", RememberUnlock);
 	char EncryptedTxt[50];
-	EncryptString(unlockCode, EncryptedTxt);
+	EncryptString(unlockCode, EncryptedTxt, sizeof(EncryptedTxt));
 	fprintf(file, "password = %s\n", EncryptedTxt);
 	fprintf(file, "GameSort = %d\n", GameSort);
 	fprintf(file, "PlayersFilter = %d\n", PlayersFilter);
@@ -685,7 +685,7 @@ bool CSettings::SetSetting(char *name, char *value)
 	{
 		char EncryptedTxt[50];
 		strlcpy(EncryptedTxt, value, sizeof(EncryptedTxt));
-		DecryptString(EncryptedTxt, unlockCode);
+		DecryptString(EncryptedTxt, unlockCode, sizeof(unlockCode));
 
 		if(!RememberUnlock && strlen(unlockCode) > 0 && strcmp(unlockCode, "Not set") != 0)
 			godmode = 0;

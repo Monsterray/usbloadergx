@@ -30,8 +30,11 @@
 extern "C" {
 #endif
 
-void EncryptString(const char *src, char *dst);
-void DecryptString(const char *src, char *dst);
+#include <stddef.h>
+
+//! dst gets a NUL-terminated string of at most dstsize - 1 characters.
+void EncryptString(const char *src, char *dst, size_t dstsize);
+void DecryptString(const char *src, char *dst, size_t dstsize);
 
 #ifdef __cplusplus
 }

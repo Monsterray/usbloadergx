@@ -52,6 +52,10 @@ bool RemoveDirectory(const char *path);
 //! goes through this: the name is chosen by whoever sent the archive.
 bool IsSafeRelativePath(const char *name);
 
+//! true when path names a folder below a device root and RemoveDirectory() may
+//! delete it: not empty, not "sd:" or "sd:/" or "/", no "." or ".." component.
+bool IsDeletableDirPath(const char *path);
+
 #ifdef __cplusplus
 }
 #endif

@@ -98,7 +98,7 @@ GameWindow::GameWindow(GameBrowseMenu *m, struct discHdr *header)
 	nameBtn->SetSoundOver(btnSoundOver);
 	nameBtn->SetSoundClick(btnSoundClick2);
 
-	if (Settings.godmode == 1 && !dvdheader)
+	if (Settings.godmode && !dvdheader)
 	{
 		nameBtn->SetToolTip(nameBtnTT, 24, -30, ALIGN_LEFT);
 		nameBtn->SetTrigger(trigA);

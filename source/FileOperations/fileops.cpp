@@ -418,8 +418,13 @@ extern "C" bool RenameFile(const char * srcpath, const char * destpath)
  ***************************************************************************/
 extern "C" bool RemoveDirectory(const char *path)
 {
+	//! Refuses "", a device root and "."/".." paths: a configured folder
+	//! (cache, covers) must never turn this into "wipe the card".
+	if(!IsDeletableDirPath(path))
+		return false;
+
 	std::string folderpath = path;
-	while(folderpath[folderpath.size()-1] == '/')
+	while(!folderpath.empty() && folderpath[folderpath.size()-1] == '/')
 		folderpath.erase(folderpath.size()-1);
 
 	bool isRoot = (folderpath.find('/') == std::string::npos);

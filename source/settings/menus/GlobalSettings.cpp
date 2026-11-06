@@ -233,7 +233,9 @@ void GlobalSettings::CreateSettingsMenu(int menuNr)
 	//! Default Settings
 	else if(menuNr == Idx++)
 	{
-		if(!Settings.godmode && (Settings.ParentalBlocks & BLOCK_RESET_SETTINGS))
+		//! Reset() also clears the password, godmode and ParentalBlocks, so the
+		//! console has to be unlocked whatever BLOCK_RESET_SETTINGS says
+		if(!Settings.godmode)
 		{
 			WindowPrompt(tr( "Permission denied." ), tr( "Console must be unlocked for this option." ), tr( "OK" ));
 			return;

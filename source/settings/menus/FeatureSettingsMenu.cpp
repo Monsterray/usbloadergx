@@ -319,6 +319,7 @@ int FeatureSettingsMenu::GetMenuInternal()
 			char nandPath[ISFS_MAXPATH];
 			bool noErrors = true;
 			bool skipErrors = false;
+			bool canceled = false;
 			wString filter(gameList.GetCurrentFilter());
 			gameList.LoadUnfiltered();
 
@@ -352,6 +353,7 @@ int FeatureSettingsMenu::GetMenuInternal()
 				int extractRet = NandTitle::ExtractDir(nandPath, filePath);
 				if(extractRet == PROGRESS_CANCELED)
 				{
+					canceled = true;
 					break;
 				}
 				else if(extractRet < 0) //! Games with installable channels: Mario Kart, Wii Fit, etc.
@@ -359,6 +361,11 @@ int FeatureSettingsMenu::GetMenuInternal()
 					snprintf(nandPath, sizeof(nandPath), "/title/00010004/%02x%02x%02x%02x", gameList[i]->id[0], gameList[i]->id[1], gameList[i]->id[2], gameList[i]->id[3]);
 					snprintf(filePath, sizeof(filePath), "%s%s", Settings.NandEmuPath, nandPath);
 					extractRet = NandTitle::ExtractDir(nandPath, filePath);
+					if(extractRet == PROGRESS_CANCELED)
+					{
+						canceled = true;
+						break;
+					}
 				}
 				if(extractRet < 0 && !skipErrors)
 				{
@@ -378,7 +385,7 @@ int FeatureSettingsMenu::GetMenuInternal()
 			ProgressStop();
 			ProgressCancelEnable(false);
 
-			if(ret != PROGRESS_CANCELED)
+			if(!canceled)
 			{
 				if(noErrors)
 					WindowPrompt(tr("Success."), tr("All files extracted."), tr("OK"));
@@ -701,6 +708,13 @@ int FeatureSettingsMenu::GetMenuInternal()
 	//! Reset All Game Settings
 	else if(ret == ++Idx)
 	{
+		//! RemoveAll() also drops every per-game Locked flag, so this is a parental action
+		if(!Settings.godmode)
+		{
+			WindowPrompt(tr( "Permission denied." ), tr( "Console must be unlocked for this option." ), tr( "OK" ));
+			return MENU_NONE;
+		}
+
 		int choice = WindowPrompt(tr( "Reset All Game Settings" ), tr( "Are you sure you want to reset?" ), tr( "Yes" ), tr( "Cancel" ));
 		if (choice == 1)
 			GameSettings.RemoveAll();

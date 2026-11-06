@@ -185,7 +185,8 @@ int OnScreenKeyboard(char * var, u32 maxlen, int min, bool hide, bool restrict)
 	int save = -1;
 	int keyset = (restrict) ? 0 : Settings.keyset;
 
-	gprintf("\nOnScreenKeyboard(%s, %i, %i) \n\tkeyset = %i", var, maxlen, min, keyset);
+	//! var is not logged: it holds the old password, proxy password and URLs
+	gprintf("\nOnScreenKeyboard(%i, %i) \n\tkeyset = %i", (int) maxlen, min, keyset);
 
 	GuiKeyboard keyboard(var, maxlen, min, keyset);
 	keyboard.SetVisibleText(!hide);

@@ -23,6 +23,7 @@
 #include "usbloader/wbfs.h"
 #include "usbloader/wdvd.h"
 #include "usbloader/GameList.h"
+#include "cache/cache.hpp"
 #include "network/networkops.h"
 #include "network/update.h"
 #include "network/ImageDownloader.h"
@@ -1405,7 +1406,7 @@ int GameBrowseMenu::MainLoop()
 			Settings.SDMode = Settings.SDMode ? OFF : ON;
 			Settings.partition = 0;
 			Settings.NandEmuMode = EMUNAND_OFF;
-			RemoveDirectory(Settings.GameHeaderCachePath);
+			ResetGameHeaderCache();
 			RebootApp();
 		}
 		sdcardBtn->ResetState();

@@ -30,6 +30,7 @@
 #include "prompts/PromptWindows.h"
 #include "language/gettext.h"
 #include "usbloader/GameList.h"
+#include "cache/cache.hpp"
 #include "usbloader/wbfs.h"
 #include "prompts/ProgressWindow.h"
 #include "settings/GameTitles.h"
@@ -142,7 +143,7 @@ HardDriveSM::~HardDriveSM()
 		{
 			Settings.partition = 0;
 			Settings.NandEmuMode = EMUNAND_OFF;
-			RemoveDirectory(Settings.GameHeaderCachePath);
+			ResetGameHeaderCache();
 			RebootApp();
 		}
 	}

@@ -22,8 +22,43 @@ static void expect(const char *name, bool want)
 	}
 }
 
+static void expect_del(const char *path, bool want)
+{
+	bool got = IsDeletableDirPath(path);
+	if (got != want)
+	{
+		printf("FAIL: IsDeletableDirPath(%s%s%s) = %s, want %s\n",
+		       path ? "\"" : "", path ? path : "NULL", path ? "\"" : "",
+		       got ? "true" : "false", want ? "true" : "false");
+		failures++;
+	}
+}
+
 int main(void)
 {
+	/* IsDeletableDirPath: what RemoveDirectory() may wipe. A configured folder
+	 * that is empty or a device root must never reach the recursive delete. */
+	expect_del("sd:/apps/usbloader_gx/cache/", true);
+	expect_del("sd:/apps/usbloader_gx/cache", true);
+	expect_del("usb1:/wbfs/x", true);
+	expect_del("sd:/a", true);
+	expect_del("sd:a", true);
+	expect_del("sd://a//", true);
+	expect_del("sd:/..a/b", true);
+	expect_del("", false);
+	expect_del(NULL, false);
+	expect_del("/", false);
+	expect_del("//", false);
+	expect_del("sd:", false);
+	expect_del("sd:/", false);
+	expect_del("sd://", false);
+	expect_del("usb1:/", false);
+	expect_del(":", false);
+	expect_del("sd:/.", false);
+	expect_del("sd:/..", false);
+	expect_del("sd:/a/../..", false);
+	expect_del("sd:/apps/./", false);
+
 	/* Ordinary names inside the destination. */
 	expect("boot.dol", true);
 	expect("apps/myapp/boot.dol", true);

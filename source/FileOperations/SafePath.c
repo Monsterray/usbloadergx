@@ -35,3 +35,38 @@ bool IsSafeRelativePath(const char *name)
 
 	return true;
 }
+
+bool IsDeletableDirPath(const char *path)
+{
+	//! RemoveDirectory() deletes everything under the path it is given. Some of
+	//! those paths come from the config file or the folder browser (the game
+	//! header cache, the cover folder), so refuse the ones that can never name
+	//! one folder of ours: nothing at all, a device root ("sd:", "sd:/", "/")
+	//! and any path with a "." or ".." component.
+	if (!path)
+		return false;
+
+	const char *rest = strchr(path, ':');
+	rest = rest ? rest + 1 : path;
+
+	bool named = false;
+	for (const char *p = rest; *p != '\0'; )
+	{
+		while (*p == '/')
+			p++;
+		if (*p == '\0')
+			break;
+
+		size_t len = 0;
+		while (p[len] != '\0' && p[len] != '/')
+			len++;
+
+		if ((len == 1 && p[0] == '.') || (len == 2 && p[0] == '.' && p[1] == '.'))
+			return false;
+
+		named = true;
+		p += len;
+	}
+
+	return named;
+}

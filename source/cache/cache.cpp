@@ -20,7 +20,14 @@
 
 void ResetGameHeaderCache()
 {
-	RemoveDirectory(Settings.GameHeaderCachePath);
+	//! GameHeaderCachePath is chosen by the user or the config file, so only the
+	//! cache's own three files go, never the folder and whatever else is in it.
+	const char *files[] = { WII_HEADER_CACHE_FILE, GAMECUBE_HEADER_CACHE_FILE, EMUNAND_HEADER_CACHE_FILE };
+	for (size_t i = 0; i < sizeof(files) / sizeof(files[0]); ++i)
+	{
+		std::string path = std::string(Settings.GameHeaderCachePath) + files[i];
+		RemoveFile(path.c_str());
+	}
 }
 
 void GetDirectoryList(const char *path, std::string &list)

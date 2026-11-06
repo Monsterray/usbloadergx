@@ -404,24 +404,42 @@ s32 Disc_Mount(struct discHdr *header)
 //! What libogc 2's __exception_closeall() did; libogc 3 has no such call. The
 //! program GX starts must not find a handler or breakpoint of GX's: every
 //! exception vector returns at once until that program puts in its own.
+//! Nothing but inline code may follow it before the jump. libogc 3 turns the FPU on
+//! per thread from the 0x800 vector, so once that is an rfi its code can stop for
+//! good: every GX disc and channel boot hung here, in Dolphin and on the Wii, while
+//! it still printed and cleared memory afterwards. So it calls nothing and reads no
+//! data (the boot clears GX's .rodata and .data next).
 void CloseExceptionVectors(void)
 {
-	static const u32 vectors[] = {
-		0x0100, 0x0200, 0x0300, 0x0400, 0x0500, 0x0600, 0x0700, 0x0800,
-		0x0900, 0x0C00, 0x0D00, 0x0F00, 0x1300, 0x1400, 0x1700
-	};
-
 	mtmsr((mfmsr() & ~MSR_EE) | MSR_FP | MSR_RI);
 	mtspr(IABR, 0);
 	mtspr(DABR, 0);
 
-	for (u32 i = 0; i < sizeof(vectors) / sizeof(vectors[0]); i++)
+	//! libogc 3 keeps its exception table at 0x80003000 (__ppc_excpt_table), where the
+	//! game's OS has its exception and interrupt handler tables, and the module list
+	//! follows at 0x800030C8. Clear them as libogc's own SYS_ResetSystem() does; its
+	//! other clears would undo Disc_SetLowMem().
+	for (u32 a = 0x80003000; a < 0x800030C0; a += 4)
+		*(vu32 *)a = 0;
+	for (u32 a = 0x800030C8; a < 0x800030D4; a += 4)
+		*(vu32 *)a = 0;
+	*(vu8 *)0x800030E2 = 0;
+
+	//! The vectors libogc 2 closed, as a bit mask (a table would sit in .rodata): 0x100-0x900,
+	//! 0xC00, 0xD00, 0xF00, 0x1300, 0x1400, 0x1700. Never 0x1000-0x1200: load_handler()
+	//! puts the multidol handler and its hook at 0x80001000.
+	const u32 closed = 0x0098B3FE;
+	for (u32 i = 1; i <= 0x17; i++)
 	{
-		vu32 *vector = (vu32 *)(0x80000000 | vectors[i]);
-		*vector = 0x4C000064; // rfi
-		DCFlushRange((void *)vector, 32);
-		ICInvalidateRange((void *)vector, 32);
+		if (!(closed & (1u << i)))
+			continue;
+		u32 v = 0x80000000 | (i << 8);
+		*(vu32 *)v = 0x4C000064; // rfi
+		asm volatile("dcbf 0,%0; sync; icbi 0,%0" : : "r"(v) : "memory");
 	}
+	for (u32 a = 0x80003000; a < 0x80003100; a += 32)
+		asm volatile("dcbf 0,%0" : : "r"(a) : "memory");
+	asm volatile("sync; isync" : : : "memory");
 }
 
 s32 Disc_JumpToEntrypoint(s32 hooktype, u32 dolparameter)
@@ -432,19 +450,31 @@ s32 Disc_JumpToEntrypoint(s32 hooktype, u32 dolparameter)
 	/* Set time */
 	__Disc_SetTime();
 
-	/* Shutdown IOS subsystems */
-	u32 level = IRQ_Disable();
+	//! The last line GX prints. gprintf() takes stdout's lock and opens files: with
+	//! interrupts off a wait there never ends, and libogc 3 then runs its idle thread
+	//! for good (disc boots with codes on hung so, in Dolphin and on the Wii)
+	gprintf("Clearing segment @ %p (len: 0x%x)\n", &etext, &edata - &etext);
+
+	//! IOS first, with interrupts still on, as libogc's own SYS_ResetSystem() does: an IOS
+	//! close waits for its reply, and the reply is an interrupt
 	__IOS_ShutdownSubsystems();
-	CloseExceptionVectors();
+	u32 level = IRQ_Disable();
 
 	 /* Originally from tueidj - taken from NeoGamme (thx) */
 	*(vu32*)0xCC003024 = dolparameter != 0 ? dolparameter : 1;
 
-	/* A little clean up */
-	gprintf("Clearing segment @ %p (len: 0x%x)\n", &etext, &edata - &etext);
-	memset((void*)&etext, 0, &edata - &etext);
-	DCFlushRange((void*)&etext, &edata - &etext);
-	ICInvalidateRange((void*)&etext, &edata - &etext);
+	//! From here on no libogc code may run: interrupts off for good, and the clear below
+	//! wipes libogc 3's own data
+	CloseExceptionVectors();
+
+	//! etext and edata are section starts, 32-byte aligned (gx_symbols.ld)
+	for (u32 a = (u32)&etext; a < (u32)&edata; a += 32)
+	{
+		for (u32 w = 0; w < 32; w += 4)
+			*(vu32 *)(a + w) = 0;
+		asm volatile("dcbf 0,%0; icbi 0,%0" : : "r"(a) : "memory");
+	}
+	asm volatile("sync; isync" : : : "memory");
 
  	if(AppEntrypoint == 0x3400)
 	{

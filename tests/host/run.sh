@@ -133,6 +133,11 @@ for t in "$HERE"/*_test.cpp; do
 		fi
 		flags="$flags $PUGI_FLAGS"
 	fi
+	# settings_test compiles CSettings.cpp, which needs stand-ins for a few libogc and
+	# GUI headers: found only for that test, so no other test can pick one up by accident.
+	case "$(basename "$t")" in
+	settings_test.cpp) flags="$flags -I $HERE/settings_shim" ;;
+	esac
 	run_test "$CXX" gnu++17 "$t" "$flags"
 done
 

@@ -22,6 +22,7 @@
  * distribution.
  ***************************************************************************/
 #include <ogcsys.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -589,6 +590,39 @@ bool CSettings::ValidateURL(char *value, int type)
 	return false;
 }
 
+// A value out of a settings file is data somebody else wrote: a number with no digits, a
+// number that does not fit, or one outside what the menu can reach keeps the current value.
+static bool ParseLong(const char *s, long &out)
+{
+	char *end = NULL;
+	errno = 0;
+	long n = strtol(s, &end, 10);
+	if (end == s || *end != 0 || errno == ERANGE)
+		return false;
+	out = n;
+	return true;
+}
+
+template<class T> static bool SetRanged(T &dst, const char *v, long lo, long hi)
+{
+	long n;
+	if (!ParseLong(v, n) || n < lo || n > hi)
+		return false;
+	dst = (T) n;
+	return true;
+}
+
+// The comparison also rejects NaN and infinity.
+static bool SetRangedF(float &dst, const char *v, double lo, double hi)
+{
+	char *end = NULL;
+	double d = strtod(v, &end);
+	if (end == v || *end != 0 || !(d >= lo && d <= hi))
+		return false;
+	dst = (float) d;
+	return true;
+}
+
 bool CSettings::SetSetting(char *name, char *value)
 {
 	if (strcmp(name, "godmode") == 0)
@@ -598,87 +632,87 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "videomode") == 0)
 	{
-		videomode = atoi(value);
+		SetRanged(videomode, value, 0, VIDEO_MODE_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "videopatch") == 0)
 	{
-		videopatch = atoi(value);
+		SetRanged(videopatch, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "videoPatchDol") == 0)
 	{
-		videoPatchDol = atoi(value);
+		SetRanged(videoPatchDol, value, 0, VIDEO_PATCH_DOL_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "patchFix480p") == 0)
 	{
-		patchFix480p = atoi(value);
+		SetRanged(patchFix480p, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "deflicker") == 0)
 	{
-		deflicker = atoi(value);
+		SetRanged(deflicker, value, 0, DEFLICKER_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "videowidth") == 0)
 	{
-		videoWidth = atoi(value);
+		SetRanged(videoWidth, value, 0, WIDTH_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "language") == 0)
 	{
-		language = atoi(value);
+		SetRanged(language, value, 0, MAX_LANGUAGE - 1);
 		return true;
 	}
 	else if (strcmp(name, "ocarina") == 0)
 	{
-		ocarina = atoi(value);
+		SetRanged(ocarina, value, 0, OCARINA_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "hddinfo") == 0)
 	{
-		hddinfo = atoi(value);
+		SetRanged(hddinfo, value, 0, CLOCK_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "sinfo") == 0)
 	{
-		sinfo = atoi(value);
+		SetRanged(sinfo, value, 0, GAMEINFO_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "rumble") == 0)
 	{
-		rumble = atoi(value);
+		SetRanged(rumble, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "volume") == 0)
 	{
-		volume = atoi(value);
+		SetRanged(volume, value, 0, 100);
 		return true;
 	}
 	else if (strcmp(name, "sfxvolume") == 0)
 	{
-		sfxvolume = atoi(value);
+		SetRanged(sfxvolume, value, 0, 100);
 		return true;
 	}
 	else if (strcmp(name, "gamesoundvolume") == 0)
 	{
-		gamesoundvolume = atoi(value);
+		SetRanged(gamesoundvolume, value, 0, 100);
 		return true;
 	}
 	else if (strcmp(name, "ResampleTo48kHz") == 0)
 	{
-		ResampleTo48kHz = atoi(value);
+		SetRanged(ResampleTo48kHz, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "tooltips") == 0)
 	{
-		tooltips = atoi(value);
+		SetRanged(tooltips, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "RememberUnlock") == 0)
 	{
-		RememberUnlock = atoi(value);
+		SetRanged(RememberUnlock, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "password") == 0)
@@ -705,27 +739,27 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "LoaderIOS") == 0)
 	{
-		LoaderIOS = atoi(value);
+		SetRanged(LoaderIOS, value, 0, 255);
 		return true;
 	}
 	else if (strcmp(name, "cios") == 0)
 	{
-		cios = atoi(value);
+		SetRanged(cios, value, 0, 255);
 		return true;
 	}
 	else if (strcmp(name, "autoios") == 0)
 	{
-		AutoIOS = atoi(value);
+		SetRanged(AutoIOS, value, 0, GAME_IOS_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "keyset") == 0)
 	{
-		keyset = atoi(value);
+		SetRanged(keyset, value, 0, KEYBOARD_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "xflip") == 0)
 	{
-		xflip = atoi(value);
+		SetRanged(xflip, value, 0, XFLIP_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "gridRows") == 0)
@@ -735,7 +769,7 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "quickboot") == 0)
 	{
-		quickboot = atoi(value);
+		SetRanged(quickboot, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "partition") == 0)
@@ -745,32 +779,34 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "wsprompt") == 0)
 	{
-		wsprompt = atoi(value);
+		SetRanged(wsprompt, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "gameDisplay") == 0)
 	{
-		gameDisplay = atoi(value);
+		SetRanged(gameDisplay, value, 0, 3);
 		return true;
 	}
 	else if (strcmp(name, "parentalcontrol") == 0)
 	{
-		parentalcontrol = atoi(value);
+		// Fail closed: a level nobody can read is the most restrictive one, not the default
+		if (!SetRanged(parentalcontrol, value, 0, 4))
+			parentalcontrol = PARENTAL_LVL_EVERYONE;
 		return true;
 	}
 	else if (strcmp(name, "screensaver") == 0)
 	{
-		screensaver = atoi(value);
+		SetRanged(screensaver, value, 0, SCREENSAVER_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "TitlesType") == 0)
 	{
-		TitlesType = atoi(value);
+		SetRanged(TitlesType, value, 0, 2);
 		return true;
 	}
 	else if (strcmp(name, "CacheCheck") == 0)
 	{
-		CacheCheck = atoi(value);
+		SetRanged(CacheCheck, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "CacheCheckCRC") == 0)
@@ -780,225 +816,258 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "CacheTitles") == 0)
 	{
-		CacheTitles = atoi(value);
+		SetRanged(CacheTitles, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "musicloopmode") == 0)
 	{
-		musicloopmode = atoi(value);
+		SetRanged(musicloopmode, value, 0, 3);
 		return true;
 	}
 	else if (strcmp(name, "gamesound") == 0)
 	{
-		gamesound = atoi(value);
+		SetRanged(gamesound, value, 0, 2);
 		return true;
 	}
 	else if (strcmp(name, "wiilight") == 0)
 	{
-		wiilight = atoi(value);
+		SetRanged(wiilight, value, 0, WIILIGHT_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "marknewtitles") == 0)
 	{
-		marknewtitles = atoi(value);
+		SetRanged(marknewtitles, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "ShowPlayCount") == 0)
 	{
-		ShowPlayCount = atoi(value);
+		SetRanged(ShowPlayCount, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "bannerFavIcon") == 0)
 	{
-		bannerFavIcon = atoi(value);
+		SetRanged(bannerFavIcon, value, 0, BANNER_FAVICON_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "ShowFreeSpace") == 0)
 	{
-		ShowFreeSpace = atoi(value);
+		SetRanged(ShowFreeSpace, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "ShowGameCount") == 0)
 	{
-		ShowGameCount = atoi(value);
+		SetRanged(ShowGameCount, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "HomeMenu") == 0)
 	{
-		HomeMenu = atoi(value);
+		SetRanged(HomeMenu, value, 0, HOME_MENU_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "SilentHomeMenu") == 0)
 	{
-		SilentHomeMenu = atoi(value);
+		SetRanged(SilentHomeMenu, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "MultiplePartitions") == 0)
 	{
-		MultiplePartitions = atoi(value);
+		SetRanged(MultiplePartitions, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "BlockIOSReload") == 0)
 	{
-		BlockIOSReload = atoi(value);
+		SetRanged(BlockIOSReload, value, 0, 2);
 		return true;
 	}
 	else if (strcmp(name, "USBPort") == 0)
 	{
-		USBPort = atoi(value);
+		SetRanged(USBPort, value, 0, 2);
 		return true;
 	}
 	else if (strcmp(name, "patchcountrystrings") == 0)
 	{
-		patchcountrystrings = atoi(value);
+		SetRanged(patchcountrystrings, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "discart") == 0)
 	{
-		discart = atoi(value);
+		SetRanged(discart, value, 0, DISCARTS_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "coversfull") == 0)
 	{
-		coversfull = atoi(value);
+		SetRanged(coversfull, value, 0, COVERSFULL_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "CoverAction") == 0)
 	{
-		CoverAction = atoi(value);
+		SetRanged(CoverAction, value, 0, COVER_ACTION_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "autonetwork") == 0)
 	{
-		autonetwork = atoi(value);
+		SetRanged(autonetwork, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "InstallToDir") == 0)
 	{
-		InstallToDir = atoi(value);
+		SetRanged(InstallToDir, value, 0, INSTALL_TO_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "GameSplit") == 0)
 	{
-		GameSplit = atoi(value);
+		SetRanged(GameSplit, value, 0, GAMESPLIT_MAX - 1);
 		return true;
 	}
 	else if (strcmp(name, "PlaylogUpdate") == 0)
 	{
-		PlaylogUpdate = atoi(value);
+		SetRanged(PlaylogUpdate, value, 0, 1);
 		return true;
 	}
 	else if(strcmp(name, "Wiinnertag") == 0)
 	{
-		Wiinnertag = atoi(value);
+		SetRanged(Wiinnertag, value, 0, 1);
+		return true;
 	}
 	else if(strcmp(name, "SelectedGame") == 0)
 	{
-		SelectedGame = atoi(value);
+		SetRanged(SelectedGame, value, 0, 32767);
+		return true;
 	}
 	else if(strcmp(name, "GameListOffset") == 0)
 	{
-		GameListOffset = atoi(value);
+		SetRanged(GameListOffset, value, 0, 32767);
+		return true;
 	}
 	else if(strcmp(name, "RememberLastGame") == 0)
 	{
-		RememberLastGame = atoi(value);
+		SetRanged(RememberLastGame, value, 0, 1);
+		return true;
 	}
 	else if(strcmp(name, "sneekVideoPatch") == 0)
 	{
-		sneekVideoPatch = atoi(value);
+		SetRanged(sneekVideoPatch, value, 0, 1);
+		return true;
 	}
 	else if(strcmp(name, "UseSystemFont") == 0)
 	{
-		UseSystemFont = atoi(value);
+		SetRanged(UseSystemFont, value, 0, 1);
+		return true;
 	}
 	else if (strcmp(name, "AutobootDiscs") == 0)
 	{
-		AutobootDiscs = atoi(value);
+		SetRanged(AutobootDiscs, value, 0, 1);
+		return true;
 	}
 	else if (strcmp(name, "AutobootDiscsDelay") == 0)
 	{
-		AutobootDiscsDelay = atoi(value);
+		SetRanged(AutobootDiscsDelay, value, 0, 5);
+		return true;
 	}
 	else if(strcmp(name, "Hooktype") == 0)
 	{
-		Hooktype = atoi(value);
+		SetRanged(Hooktype, value, 0, 7);
+		return true;
 	}
 	else if(strcmp(name, "WiirdDebugger") == 0)
 	{
-		WiirdDebugger = atoi(value);
+		SetRanged(WiirdDebugger, value, 0, 1);
+		return true;
 	}
 	else if(strcmp(name, "WiirdDebuggerPause") == 0)
 	{
-		WiirdDebuggerPause = atoi(value);
+		SetRanged(WiirdDebuggerPause, value, 0, 1);
+		return true;
 	}
 	else if(strcmp(name, "wpadMotor") == 0)
 	{
-		wpadMotor = atoi(value);
+		SetRanged(wpadMotor, value, 0, 1);
+		return true;
 	}
 	else if(strcmp(name, "wpadSpeaker") == 0)
 	{
-		wpadSpeaker = atoi(value);
+		SetRanged(wpadSpeaker, value, 0, 1);
+		return true;
 	}
 	else if(strcmp(name, "NandEmuMode") == 0)
 	{
-		NandEmuMode = SDMode ? EMUNAND_OFF : atoi(value);
+		if (SDMode)
+			NandEmuMode = EMUNAND_OFF;
+		else
+			SetRanged(NandEmuMode, value, 0, EMUNAND_MAX - 1);
+		return true;
 	}
 	else if(strcmp(name, "NandEmuChanMode") == 0)
 	{
-		NandEmuChanMode = atoi(value);
+		SetRanged(NandEmuChanMode, value, 0, EMUNAND_MAX - 1);
+		return true;
 	}
 	else if(strcmp(name, "GameDisplayType") == 0)
 	{
-		GameDisplayType = atoi(value);
+		long n;
+		if (ParseLong(value, n) && (n == 0 || n == 1 || n == 2 || n == 4 || n == 8 || n == 0x10))
+			GameDisplayType = n;
+		return true;
 	}
 	else if(strcmp(name, "LoaderMode") == 0)
 	{
 		LoaderMode = atoi(value);
+		return true;
 	}
 	else if(strcmp(name, "SearchMode") == 0)
 	{
-		SearchMode = atoi(value);
+		SetRanged(SearchMode, value, 0, SEARCH_MAX_CHOICE - 1);
+		return true;
 	}
 	else if(strcmp(name, "GameAspectRatio") == 0)
 	{
-		GameAspectRatio = atoi(value);
+		SetRanged(GameAspectRatio, value, 0, ASPECT_MAX - 1);
+		return true;
 	}
 	else if(strcmp(name, "ScreenMode") == 0)
 	{
-		ScreenMode = atoi(value);
+		SetRanged(ScreenMode, value, 0, SCREEN_MAX - 1);
+		return true;
 	}
 	else if(strcmp(name, "UseChanLauncher") == 0)
 	{
-		UseChanLauncher = atoi(value);
+		SetRanged(UseChanLauncher, value, 0, 1);
+		return true;
 	}
 	else if(strcmp(name, "AdjustOverscanX") == 0)
 	{
-		AdjustOverscanX = atoi(value);
+		SetRanged(AdjustOverscanX, value, -320, 320);
+		return true;
 	}
 	else if(strcmp(name, "AdjustOverscanY") == 0)
 	{
-		AdjustOverscanY = atoi(value);
+		SetRanged(AdjustOverscanY, value, -320, 320);
+		return true;
 	}
 	else if(strcmp(name, "TooltipDelay") == 0)
 	{
-		TooltipDelay = atoi(value);
+		SetRanged(TooltipDelay, value, 0, 30000);
+		return true;
 	}
 	else if(strcmp(name, "BannerZoomDuration") == 0)
 	{
-		BannerZoomDuration = atoi(value);
+		SetRanged(BannerZoomDuration, value, 0, 600);
+		return true;
 	}
 	else if(strcmp(name, "GameWindowMode") == 0)
 	{
-		GameWindowMode = atoi(value);
+		SetRanged(GameWindowMode, value, 0, GAMEWINDOW_MAX - 1);
+		return true;
 	}
 	else if(strcmp(name, "BannerAnimStart") == 0)
 	{
-		BannerAnimStart = atoi(value);
+		SetRanged(BannerAnimStart, value, 0, 1);
+		return true;
 	}
 	else if(strcmp(name, "CacheBNRFiles") == 0)
 	{
-		CacheBNRFiles = atoi(value);
+		SetRanged(CacheBNRFiles, value, 0, 1);
+		return true;
 	}
 	else if (strcmp(name, "InstallPartitions") == 0)
 	{
@@ -1007,52 +1076,52 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "WSFactor") == 0)
 	{
-		WSFactor = atof(value);
+		SetRangedF(WSFactor, value, 0.01, 4.0);
 		return true;
 	}
 	else if (strcmp(name, "FontScaleFactor") == 0)
 	{
-		FontScaleFactor = atof(value);
+		SetRangedF(FontScaleFactor, value, 0.01, 4.0);
 		return true;
 	}
 	else if (strcmp(name, "ClockFontScaleFactor") == 0)
 	{
-		ClockFontScaleFactor = atof(value);
+		SetRangedF(ClockFontScaleFactor, value, 0.01, 4.0);
 		return true;
 	}
 	else if (strcmp(name, "PointerSpeed") == 0)
 	{
-		PointerSpeed = atof(value);
+		SetRangedF(PointerSpeed, value, 0.01, 5.0);
 		return true;
 	}
 	else if (strcmp(name, "BannerGridSpeed") == 0)
 	{
-		BannerGridSpeed = atof(value);
+		SetRangedF(BannerGridSpeed, value, 0.1, 200.0);
 		return true;
 	}
 	else if (strcmp(name, "BannerProjectionOffsetX") == 0)
 	{
-		BannerProjectionOffsetX = atof(value);
+		SetRangedF(BannerProjectionOffsetX, value, -1000.0, 1000.0);
 		return true;
 	}
 	else if (strcmp(name, "BannerProjectionOffsetY") == 0)
 	{
-		BannerProjectionOffsetY = atof(value);
+		SetRangedF(BannerProjectionOffsetY, value, -1000.0, 1000.0);
 		return true;
 	}
 	else if (strcmp(name, "BannerProjectionWidth") == 0)
 	{
-		BannerProjectionWidth = atof(value);
+		SetRangedF(BannerProjectionWidth, value, 100.0, 2000.0);
 		return true;
 	}
 	else if (strcmp(name, "BannerProjectionHeight") == 0)
 	{
-		BannerProjectionHeight = atof(value);
+		SetRangedF(BannerProjectionHeight, value, 100.0, 2000.0);
 		return true;
 	}
 	else if (strcmp(name, "GCBannerScale") == 0)
 	{
-		GCBannerScale = atof(value);
+		SetRangedF(GCBannerScale, value, 0.1, 8.0);
 		return true;
 	}
 	else if (strcmp(name, "ParentalBlocks") == 0)
@@ -1062,67 +1131,67 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "GameCubeMode") == 0)
 	{
-		GameCubeMode = atoi(value);
+		SetRanged(GameCubeMode, value, 0, CG_MODE_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "GameCubeSource") == 0)
 	{
-		GameCubeSource = atoi(value);
+		SetRanged(GameCubeSource, value, 0, CG_SOURCE_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "MultiDiscPrompt") == 0)
 	{
-		MultiDiscPrompt = atoi(value);
+		SetRanged(MultiDiscPrompt, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DMLVideo") == 0)
 	{
-		DMLVideo = atoi(value);
+		SetRanged(DMLVideo, value, 0, DML_VIDEO_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "DMLProgPatch") == 0)
 	{
-		DMLProgPatch = atoi(value);
+		SetRanged(DMLProgPatch, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DMLNMM") == 0)
 	{
-		DMLNMM = atoi(value);
+		SetRanged(DMLNMM, value, 0, 2);
 		return true;
 	}
 	else if (strcmp(name, "DMLActivityLED") == 0)
 	{
-		DMLActivityLED = atoi(value);
+		SetRanged(DMLActivityLED, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DMLPADHOOK") == 0)
 	{
-		DMLPADHOOK = atoi(value);
+		SetRanged(DMLPADHOOK, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DMLNoDisc2") == 0)
 	{
-		DMLNoDisc2 = atoi(value);
+		SetRanged(DMLNoDisc2, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DMLWidescreen") == 0)
 	{
-		DMLWidescreen = atoi(value);
+		SetRanged(DMLWidescreen, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DMLScreenshot") == 0)
 	{
-		DMLScreenshot = atoi(value);
+		SetRanged(DMLScreenshot, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DMLJPNPatch") == 0)
 	{
-		DMLJPNPatch = atoi(value);
+		SetRanged(DMLJPNPatch, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DMLDebug") == 0)
 	{
-		DMLDebug = atoi(value);
+		SetRanged(DMLDebug, value, 0, 2);
 		return true;
 	}
 	else if (strcmp(name, "NINDeflicker") == 0)
@@ -1133,52 +1202,54 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "NINPal50Patch") == 0)
 	{
-		NINPal50Patch = atoi(value);
+		SetRanged(NINPal50Patch, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINWiiUWide") == 0)
 	{
-		NINWiiUWide = atoi(value);
+		SetRanged(NINWiiUWide, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINVideoScale") == 0)
 	{
-		NINVideoScale = atoi(value);
+		long n;
+		if (ParseLong(value, n) && (n == 0 || (n >= 40 && n <= 120)))
+			NINVideoScale = n;
 		return true;
 	}
 	else if (strcmp(name, "NINVideoOffset") == 0)
 	{
-		NINVideoOffset = atoi(value);
+		SetRanged(NINVideoOffset, value, -20, 20);
 		return true;
 	}
 	else if (strcmp(name, "NINRemlimit") == 0)
 	{
-		NINRemlimit = atoi(value);
+		SetRanged(NINRemlimit, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINArcadeMode") == 0)
 	{
-		NINArcadeMode = atoi(value);
+		SetRanged(NINArcadeMode, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINCCRumble") == 0)
 	{
-		NINCCRumble = atoi(value);
+		SetRanged(NINCCRumble, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINSkipIPL") == 0)
 	{
-		NINSkipIPL = atoi(value);
+		SetRanged(NINSkipIPL, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINBBA") == 0)
 	{
-		NINBBA = atoi(value);
+		SetRanged(NINBBA, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINBBAProfile") == 0)
 	{
-		NINBBAProfile = atoi(value);
+		SetRanged(NINBBAProfile, value, 0, NIN_BBA_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "NINHybridEXI") == 0)
@@ -1198,97 +1269,97 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "NINWiiUGamepadSlot") == 0)
 	{
-		NINWiiUGamepadSlot = atoi(value);
+		SetRanged(NINWiiUGamepadSlot, value, 0, 4);
 		return true;
 	}
 	else if (strcmp(name, "NINMCEmulation") == 0)
 	{
-		NINMCEmulation = atoi(value);
+		SetRanged(NINMCEmulation, value, 0, NIN_MC_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "NINMCSize") == 0)
 	{
-		NINMCSize = atoi(value);
+		SetRanged(NINMCSize, value, 0, 5);
 		return true;
 	}
 	else if (strcmp(name, "NINAutoboot") == 0)
 	{
-		NINAutoboot = atoi(value);
+		SetRanged(NINAutoboot, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINSettings") == 0)
 	{
-		NINSettings = atoi(value);
+		SetRanged(NINSettings, value, 0, 2);
 		return true;
 	}
 	else if (strcmp(name, "NINUSBHID") == 0)
 	{
-		NINUSBHID = atoi(value);
+		SetRanged(NINUSBHID, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINMaxPads") == 0)
 	{
-		NINMaxPads = atoi(value);
+		SetRanged(NINMaxPads, value, 0, 4);
 		return true;
 	}
 	else if (strcmp(name, "NINNativeSI") == 0)
 	{
-		NINNativeSI = atoi(value);
+		SetRanged(NINNativeSI, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINOSReport") == 0)
 	{
-		NINOSReport = atoi(value);
+		SetRanged(NINOSReport, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINLED") == 0)
 	{
-		NINLED = atoi(value);
+		SetRanged(NINLED, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "NINLog") == 0)
 	{
-		NINLog = atoi(value);
+		SetRanged(NINLog, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DEVOMCEmulation") == 0)
 	{
-		DEVOMCEmulation = atoi(value);
+		SetRanged(DEVOMCEmulation, value, 0, DEVO_MC_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "DEVOWidescreen") == 0)
 	{
-		DEVOWidescreen = atoi(value);
+		SetRanged(DEVOWidescreen, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DEVOActivityLED") == 0)
 	{
-		DEVOActivityLED = atoi(value);
+		SetRanged(DEVOActivityLED, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DEVOFZeroAX") == 0)
 	{
-		DEVOFZeroAX = atoi(value);
+		SetRanged(DEVOFZeroAX, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DEVOTimerFix") == 0)
 	{
-		DEVOTimerFix = atoi(value);
+		SetRanged(DEVOTimerFix, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DEVODButtons") == 0)
 	{
-		DEVODButtons = atoi(value);
+		SetRanged(DEVODButtons, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DEVOCropOverscan") == 0)
 	{
-		DEVOCropOverscan = atoi(value);
+		SetRanged(DEVOCropOverscan, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DEVODiscDelay") == 0)
 	{
-		DEVODiscDelay = atoi(value);
+		SetRanged(DEVODiscDelay, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "DEVOLoaderPath") == 0)
@@ -1303,12 +1374,12 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "GCInstallCompressed") == 0)
 	{
-		GCInstallCompressed = atoi(value);
+		SetRanged(GCInstallCompressed, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "GCInstallAligned") == 0)
 	{
-		GCInstallAligned = atoi(value);
+		SetRanged(GCInstallAligned, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "covers_path") == 0)
@@ -1495,7 +1566,7 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if (strcmp(name, "ProxyUseSystem") == 0)
 	{
-		ProxyUseSystem = atoi(value);
+		SetRanged(ProxyUseSystem, value, 0, 1);
 		return true;
 	}
 	else if (strcmp(name, "ProxyUsername") == 0)
@@ -1518,7 +1589,7 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if(strcmp(name, "ProxyPort") == 0)
 	{
-		ProxyPort = atoi(value);
+		SetRanged(ProxyPort, value, 0, 65535);
 		return true;
 	}
 	else if (strcmp(name, "CustomAddress") == 0)
@@ -1529,7 +1600,7 @@ bool CSettings::SetSetting(char *name, char *value)
 	}
 	else if(strcmp(name, "PrivateServer") == 0)
 	{
-		PrivateServer = atoi(value);
+		SetRanged(PrivateServer, value, 0, PRIVSERV_MAX_CHOICE - 1);
 		return true;
 	}
 	else if (strcmp(name, "EnabledCategories") == 0)
@@ -1597,10 +1668,10 @@ bool CSettings::FindConfig()
 {
 	char CheckPath[300];
 	std::string device(ConfigPath);
-	char *ptr = strchr(device.c_str(), ':');
-	if (ptr)
+	size_t colon = device.find(':');
+	if (colon != std::string::npos)
 	{
-		*ptr = 0;
+		device.resize(colon);
 		// Check if the config file is in the same location as the executable
 		snprintf(CheckPath, sizeof(CheckPath), "%sGXGlobal.cfg", ConfigPath);
 

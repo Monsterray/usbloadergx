@@ -102,7 +102,7 @@ void BNSDecoder::OpenFile()
 
 	// Set sound information
 	Format = SoundData.format;
-	SampleRate = SoundData.frequency;
+	SampleRate = ClampSampleRate(SoundData.frequency);
 
 	Decode();
 }
@@ -281,7 +281,8 @@ static void decodeADPCMBlock(s16 *buffer, const BNSADPCMBlock &block, BNSDecObj 
 	for (int i = 0; i < 14; ++i)
 	{
 		int nibSample = ((i & 1) == 0) ? block.samples[i / 2].sample1 : block.samples[i / 2].sample2;
-		int sampleDeltaHP = (nibSample << block.lshift) << 11;
+		//! Same value as (nibSample << lshift) << 11, without shifting a negative number.
+		int sampleDeltaHP = nibSample * (1 << (block.lshift + 11));
 		int predictedSampleHP = c1 * h1 + c2 * h2;
 		int sampleHP = predictedSampleHP + sampleDeltaHP;
 		buffer[i] = std::min(std::max(-32768, (sampleHP + 1024) >> 11), 32767);

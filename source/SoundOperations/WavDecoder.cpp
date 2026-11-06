@@ -87,13 +87,21 @@ void WavDecoder::OpenFile()
 	//! at the end of the file, or a wrapped size makes this loop run forever.
 	u32 FileSize = file_fd->size();
 
-	DataOffset = sizeof(SWaveHdr)+le32(FmtChunk.size)+8;
+	//! u64: a fmt size near 4 GB wraps a u32 back to the start of the file.
+	u64 Offset64 = (u64) sizeof(SWaveHdr) + le32(FmtChunk.size) + 8;
+	if(Offset64 + sizeof(SWaveChunk) > FileSize)
+	{
+		CloseFile();
+		return;
+	}
+
+	DataOffset = (u32) Offset64;
 	SWaveChunk DataChunk;
 	memset(&DataChunk, 0, sizeof(SWaveChunk));
 
 	while(1)
 	{
-		if(DataOffset + sizeof(SWaveChunk) > FileSize)
+		if((u64) DataOffset + sizeof(SWaveChunk) > FileSize)
 		{
 			CloseFile();
 			return;
@@ -109,14 +117,14 @@ void WavDecoder::OpenFile()
 		if(DataChunk.magicDATA == 'data')
 			break;
 
-		u32 NextOffset = DataOffset + 8 + le32(DataChunk.size);
-		if(NextOffset <= DataOffset)
+		u64 NextOffset = (u64) DataOffset + 8 + le32(DataChunk.size);
+		if(NextOffset <= DataOffset || NextOffset >= FileSize)
 		{
 			CloseFile();
 			return;
 		}
 
-		DataOffset = NextOffset;
+		DataOffset = (u32) NextOffset;
 	}
 
 	DataOffset += 8;
@@ -128,7 +136,7 @@ void WavDecoder::OpenFile()
 	//! SampleRate is a u16 and reaches ASND, so a rate the file made up must not
 	//! reach it as 0 or as a truncated value.
 	u32 freq = le32(FmtChunk.freq);
-	SampleRate = (freq >= 8000 && freq <= 48000) ? freq : 48000;
+	SampleRate = ClampSampleRate(freq);
 
 	if (le16(FmtChunk.channels) == 1 && le16(FmtChunk.bps) == 8 && le16(FmtChunk.alignment) <= 1)
 		Format = VOICE_MONO_8BIT;

@@ -174,7 +174,8 @@ SoundDecoder * SoundHandler::GetSoundDecoder(const char * filepath)
 		return new Mp3Decoder(filepath);
 	}
 
-	return new SoundDecoder(filepath);
+	//! An unknown file has no format; the base class would play raw bytes of it.
+	return NULL;
 }
 
 SoundDecoder * SoundHandler::GetSoundDecoder(const u8 * sound, int length)
@@ -215,7 +216,7 @@ SoundDecoder * SoundHandler::GetSoundDecoder(const u8 * sound, int length)
 		return new Mp3Decoder(sound, length);
 	}
 
-	return new SoundDecoder(sound, length);
+	return NULL;
 }
 
 void * SoundHandler::UpdateThread(void *arg)

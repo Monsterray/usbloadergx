@@ -80,13 +80,17 @@ void SoundDecoder::Init()
 	SoundBuffer.Resize(SoundBlocks);
 	ResampleBuffer = NULL;
 	ResampleRatio = 0;
+	Format = VOICE_STEREO_16BIT;
+	SampleRate = 48000;
+	whichLoad = 0;
 }
 
 int SoundDecoder::Rewind()
 {
 	CurPos = 0;
 	EndOfFile = false;
-	file_fd->rewind();
+	if(file_fd)
+		file_fd->rewind();
 
 	return 0;
 }
@@ -108,10 +112,21 @@ void SoundDecoder::EnableUpsample(void)
 	}
 	if(IsStereo() && Is16Bit() && SampleRate != 32000 && SampleRate < 48000)
 	{
-		ResampleBuffer = (u8*)memalign(32, SoundBlockSize);
-		ResampleRatio =  ( FixedPointScale * SampleRate ) / 48000;
-		SoundBlockSize = ( SoundBlockSize * ResampleRatio ) / FixedPointScale;
-		SoundBlockSize &= ~0x03;
+		// A rate that gives a ratio of 0 or a block under 4 bytes would divide by
+		// zero in Decode(); leave the stream as it is then.
+		u32 ratio = ( FixedPointScale * SampleRate ) / 48000;
+		int blockSize = ( SoundBlockSize * ratio ) / FixedPointScale;
+		blockSize &= ~0x03;
+		if(ratio == 0 || blockSize < 4)
+			return;
+
+		u8 *buf = (u8*)memalign(32, SoundBlockSize);
+		if(!buf)
+			return;
+
+		ResampleBuffer = buf;
+		ResampleRatio = ratio;
+		SoundBlockSize = blockSize;
 		// Set new sample rate
 		SampleRate = 48000;
 	}
@@ -174,15 +189,18 @@ void SoundDecoder::Decode()
 	if(ResampleTo48kHz && !ResampleBuffer)
 		EnableUpsample();
 
+	bool rewound = false;
 	while(done < SoundBlockSize)
 	{
 		int ret = Read(&write_buf[done], SoundBlockSize-done, Tell());
 
 		if(ret <= 0)
 		{
-			if(Loop)
+			// One rewind per empty read: an empty file must not loop forever
+			if(Loop && !rewound)
 			{
 				Rewind();
+				rewound = true;
 				continue;
 			}
 			else
@@ -192,6 +210,7 @@ void SoundDecoder::Decode()
 			}
 		}
 
+		rewound = false;
 		done += ret;
 	}
 
@@ -208,11 +227,16 @@ void SoundDecoder::Decode()
 			Upsample((s16*)ResampleBuffer, (s16*)write_buf, src_samples, dest_samples);
 			done = dest_samples << 1;
 		}
-		SoundBuffer.SetBufferSize(newWhich, done);
-		SoundBuffer.SetBufferReady(newWhich, true);
+		//! A tail of under 4 bytes resamples to nothing: do not hand out an empty buffer
+		if(done > 0)
+		{
+			SoundBuffer.SetBufferSize(newWhich, done);
+			SoundBuffer.SetBufferReady(newWhich, true);
+		}
 	}
 
-	if(!SoundBuffer.IsBufferReady((newWhich+1) % SoundBuffer.Size()))
+	// Only keep filling while data arrives: with nothing decoded this would recurse forever
+	if(done > 0 && !SoundBuffer.IsBufferReady((newWhich+1) % SoundBuffer.Size()))
 		Decode();
 
 	Decoding = false;

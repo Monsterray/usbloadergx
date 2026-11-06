@@ -100,7 +100,7 @@ void Mp3Decoder::OpenFile()
 		return;
 	}
 
-	SampleRate = (u32) Frame.header.samplerate;
+	SampleRate = ClampSampleRate((u32) Frame.header.samplerate);
 	Format = ((MAD_NCHANNELS(&Frame.header) == 2) ? VOICE_STEREO_16BIT : VOICE_MONO_16BIT);
 	Rewind();
 	Decode();

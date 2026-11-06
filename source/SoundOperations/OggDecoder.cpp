@@ -106,7 +106,7 @@ void OggDecoder::OpenFile()
 	}
 
 	Format = ((ogg_info->channels == 2) ? VOICE_STEREO_16BIT : VOICE_MONO_16BIT);
-	SampleRate = ogg_info->rate;
+	SampleRate = ClampSampleRate((u32) ogg_info->rate);
 
 	Decode();
 }

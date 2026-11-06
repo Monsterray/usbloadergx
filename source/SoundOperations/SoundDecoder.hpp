@@ -70,6 +70,8 @@ public:
 	void EnableUpsample(void);
 protected:
 	void Init();
+	// The file picks the sample rate, so keep it inside what ASND and the resampler handle
+	static u16 ClampSampleRate(u32 rate) { return (rate >= 8000 && rate <= 48000) ? (u16) rate : 48000; }
 	void Upsample(s16 *src, s16 *dst, u32 nr_src_samples, u32 nr_dst_samples);
 
 	CFile * file_fd;

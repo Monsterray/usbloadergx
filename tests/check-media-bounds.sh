@@ -65,5 +65,40 @@ grep -q 'offset >= name_table_len' "$SRC/utils/U8Archive.cpp" \
 grep -qE '^\s+free\(name_table\);' "$SRC/utils/U8Archive.cpp" \
 	&& fail "U8NandArchive::SetFile() frees a pointer into the fst allocation"
 
+# 7. The sample rate is a u16 that reaches ASND, and a file picks it. Every decoder
+#    goes through ClampSampleRate(); Decode() recurses only after data arrived.
+for f in BNSDecoder OggDecoder Mp3Decoder WavDecoder AifDecoder; do
+	grep -q 'ClampSampleRate(' "$SRC/SoundOperations/$f.cpp" \
+		|| fail "$f does not clamp the sample rate it takes from the file"
+done
+grep -q 'ratio == 0 || blockSize < 4' "$SRC/SoundOperations/SoundDecoder.cpp" \
+	|| fail "EnableUpsample() can set a resample ratio of 0 or a block under 4 bytes"
+grep -q 'done > 0 && !SoundBuffer.IsBufferReady' "$SRC/SoundOperations/SoundDecoder.cpp" \
+	|| fail "SoundDecoder::Decode() recurses when nothing was decoded"
+grep -q 'Loop && !rewound' "$SRC/SoundOperations/SoundDecoder.cpp" \
+	|| fail "SoundDecoder::Decode() rewinds an empty looping file for ever"
+
+# 8. Format, SampleRate and whichLoad were never set for a decoder that failed to
+#    open, and the base class played the bytes of an unknown file as raw audio.
+grep -q 'SampleRate = 48000;' "$SRC/SoundOperations/SoundDecoder.cpp" \
+	|| fail "SoundDecoder::Init() does not set SampleRate"
+grep -q 'new SoundDecoder(' "$SRC/SoundOperations/SoundHandler.cpp" \
+	&& fail "SoundHandler returns a raw SoundDecoder for a file it does not know"
+grep -q 'if(file_fd)' "$SRC/SoundOperations/SoundDecoder.cpp" \
+	|| fail "SoundDecoder::Rewind() dereferences a closed file"
+
+# 9. MusicPlayer::Load() indexed an empty playlist with at(), which throws.
+grep -q 'PlayList.empty() || RandomPlayList.empty()' "$SRC/SoundOperations/MusicPlayer.cpp" \
+	|| fail "MusicPlayer::Load() does not check for an empty playlist"
+
+# 10. AIFF pads odd chunks and a short file made the COMM scan loop for ever; a
+#     WAV fmt size near 4 GB wrapped DataOffset.
+grep -q 'chunkHdr.size & 1' "$SRC/SoundOperations/AifDecoder.cpp" \
+	|| fail "AifDecoder does not skip the pad byte of an odd chunk"
+grep -q 'ret < (int) sizeof(magic)' "$SRC/SoundOperations/AifDecoder.cpp" \
+	|| fail "AifDecoder COMM scan can loop on a short read"
+grep -q 'u64 Offset64' "$SRC/SoundOperations/WavDecoder.cpp" \
+	|| fail "WavDecoder computes DataOffset from fmt size in 32 bits"
+
 [ "$status" -eq 0 ] && echo "OK: media bounds guards are in place"
 exit "$status"

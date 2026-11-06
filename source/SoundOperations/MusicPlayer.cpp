@@ -87,6 +87,13 @@ bool MusicPlayer::Load(const char *path, const bool forceNewRandom)
 
 	if (ParsePath(path))
 	{
+		//! An empty folder makes every .at() below throw, and nothing catches it.
+		if (PlayList.empty() || RandomPlayList.empty())
+		{
+			LoadStandard();
+			return false;
+		}
+
 		if (Settings.musicloopmode == SHUFFLE_MUSIC && forceNewRandom)
 		{
 			rndCurrentPlaying = 0;

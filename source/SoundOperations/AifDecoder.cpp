@@ -137,7 +137,9 @@ void AifDecoder::OpenFile()
 	while(1)
 	{
 		int ret = file_fd->read((u8 *) &magic, sizeof(magic));
-		if(ret <= 0)
+		//! A short read (13..15 byte file) would otherwise seek back 3 and read the
+		//! same bytes for ever.
+		if(ret < (int) sizeof(magic))
 		{
 			CloseFile();
 			return;
@@ -180,14 +182,16 @@ void AifDecoder::OpenFile()
 
 	do
 	{
-		u32 NextOffset = file_fd->tell() + chunkHdr.size;
-		if(NextOffset < (u32) file_fd->tell() || NextOffset >= (u32) file_fd->size())
+		//! AIFF pads a chunk of odd size with one byte. u64 so that a size near
+		//! 4 GB cannot wrap back into the file.
+		u64 NextOffset = (u64) file_fd->tell() + chunkHdr.size + (chunkHdr.size & 1);
+		if(NextOffset >= (u64) file_fd->size())
 		{
 			CloseFile();
 			return;
 		}
 
-		file_fd->seek(NextOffset, SEEK_SET);
+		file_fd->seek((int) NextOffset, SEEK_SET);
 		ret = file_fd->read((u8 *) &chunkHdr, sizeof(SWaveChunk));
 	}
 	while(ret > 0 && chunkHdr.magicDATA != 'SSND');
@@ -230,7 +234,7 @@ void AifDecoder::OpenFile()
 	//! ConvertFromIeeeExtended can return HUGE_VAL or a negative value, and
 	//! SampleRate is a u16 that reaches ASND.
 	double freq = ConvertFromIeeeExtended(CommHdr.freq);
-	SampleRate = (freq >= 8000.0 && freq <= 48000.0) ? (u16) freq : 48000;
+	SampleRate = ClampSampleRate((freq >= 8000.0 && freq <= 48000.0) ? (u32) freq : 0);
 	Format = VOICE_STEREO_16BIT;
 
 	if(CommHdr.channels == 1 && CommHdr.bps == 8)

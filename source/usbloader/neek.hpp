@@ -65,6 +65,14 @@ typedef struct _NandConfig
 
 
 
+// The GameID4 neek's DI matches against a game's header: the first 4 bytes of the
+// ID, as the big-endian u32 they are on disc ('R','S','P','E' -> 0x52535045).
+static inline u32 neekGameId4(const u8 *id)
+{
+	return ((u32)id[0] << 24) | ((u32)id[1] << 16) | ((u32)id[2] << 8) | (u32)id[3];
+}
+
+
 #ifdef __cplusplus
 extern "C"
 {

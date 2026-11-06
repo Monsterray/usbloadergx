@@ -17,6 +17,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <malloc.h>
+#include <stdint.h>
 #include <gccore.h>
 #include <ogc/machine/processor.h>
 
@@ -75,7 +76,23 @@ bool neekLoadKernel (const char* nandpath)
 	fseek(f, 0, SEEK_END);
 	long fsize = ftell(f);
 	rewind(f);
-	
+
+	// An empty file (a failed copy) or a failed ftell (-1) is not a kernel, and booting
+	// a 0-byte block would hand IOS garbage.
+	if(fsize <= 0)
+	{
+		gprintf("Kernel file %s is empty or unreadable.\n", kernelPath);
+		fclose(f);
+		return false;
+	}
+
+	// Drop a kernel from an earlier call before loading another one.
+	if(kernel)
+	{
+		MEM2_free(kernel);
+		kernel = NULL;
+	}
+
 	// Allocate kernel to mem2
 	kernel = (u32 *) MEM2_alloc(fsize);
 	if(!kernel)
@@ -83,14 +100,22 @@ bool neekLoadKernel (const char* nandpath)
 		fclose(f);
 		return false;
 	}
-	
-	fread(kernel, 1, fsize, f);
+
+	// A short read leaves the rest of the block uninitialised: do not boot that.
+	if(fread(kernel, 1, fsize, f) != (size_t) fsize)
+	{
+		gprintf("Short read of kernel file %s.\n", kernelPath);
+		fclose(f);
+		MEM2_free(kernel);
+		kernel = NULL;
+		return false;
+	}
 	//((ioshdr*)kernel)->argument = 0x42; // set argument size
 	DCFlushRange(kernel, fsize);
-	
-	gprintf("Loaded to 0x%08x, size: %ld\n", (u32) kernel, fsize);
-	gprintf("NEEK: offset memory address: %08x\n", (u32)kernel - 0x80000000);	// offset
-	
+
+	gprintf("Loaded to 0x%08x, size: %ld\n", (u32)(uintptr_t) kernel, fsize);
+	gprintf("NEEK: offset memory address: %08x\n", (u32)(uintptr_t) kernel - 0x80000000);	// offset
+
 	fclose(f);
 	return true;
 }
@@ -139,7 +164,7 @@ int neekBoot(void)
 	*(vu32*)(i+0x08)        = 0xE6000870;   // SYSCALL
 	*(vu32*)(i+0x0C)        = 0xE12FFF1E;   // BLR
 	//*(vu32*)(i+0x10)    	= 0x11000000;   // kernel offset from 0x80000000. Kernel loaded to (void *)0x91000000
-	*(vu32*)(i+0x10)   		= (u32)kernel - 0x80000000;   // kernel offset
+	*(vu32*)(i+0x10)   		= (u32)(uintptr_t) kernel - 0x80000000;   // kernel offset
 	*(vu32*)(i+0x14)        = 0x0000FF01;   // version
 	
 	DCFlushRange( (void*)i, 0x20 );
@@ -188,14 +213,23 @@ int neekIsNeek2o(const char* nandpath)
 	u8 *buffer = NULL;
 	u32 filesize = 0;
 	const char* str = "NEEK2O";
-	if(LoadFileToMem(tempPath, &buffer, &filesize))
+	// LoadFileToMem returns 1 on success and a negative code on failure (which is true in an if).
+	if(LoadFileToMem(tempPath, &buffer, &filesize) == 1)
 	{
-		for(u32 i = filesize-strlen(str); i > 0; i--)
+		const u32 len = strlen(str);
+		// A file shorter than the tag (an empty file after a failed copy) holds no tag:
+		// filesize-len would wrap and memcmp would run off the block.
+		if(buffer && filesize >= len)
 		{
-			if( memcmp(buffer+i, str, strlen(str)) == 0)
+			for(u32 i = filesize-len; ; i--)
 			{
-				found = 1;
-				break;
+				if( memcmp(buffer+i, str, len) == 0)
+				{
+					found = 1;
+					break;
+				}
+				if(i == 0)
+					break;
 			}
 		}
 	}
@@ -215,14 +249,18 @@ int neekIsNeek2o(const char* nandpath)
  ***************************************************************************/
 int neekPathFormat(char* nandpath_out, const char* nandpath_in, u32 len)
 {
+	if(!nandpath_out || len == 0 || !nandpath_in)
+		return -1;
+
 	const char* neekNandPathTemp = strchr(nandpath_in, '/');
 	if(!neekNandPathTemp)
 		return -1;
 	
 	snprintf(nandpath_out, len, "%s", neekNandPathTemp);
 	
-	if(nandpath_out[strlen(nandpath_out)-1] == '/')
-		*(strrchr(nandpath_out, '/')) = '\0';				// remove trailing slash
+	size_t outlen = strlen(nandpath_out);
+	if(outlen > 0 && nandpath_out[outlen-1] == '/')
+		nandpath_out[outlen-1] = '\0';						// remove trailing slash
 	
 	return 1;
 }
@@ -255,7 +293,7 @@ bool neek2oSetBootSettings(NEEK_CFG* neek_config, u64 TitleID, u32 Magic, u64 re
 		neek_config->titleid = TitleID; 			// Set channel ID
 	else
 	{
-		neek_config->gameid = (u32)TitleID; 		// Wii or Gamecube title ID4 to autoboot
+		neek_config->gameid = (u32)TitleID; 		// Wii or Gamecube title ID4 to autoboot (neekGameId4() form)
 		neek_config->gamemagic = Magic; 			// set to 0x5d1c9ea3 for Wii game, 0xC2339F3D for gamecube and quadforce games
 		neek_config->config |= NCON_EXT_BOOT_GAME ; // set Disc booting
 	}
@@ -290,7 +328,7 @@ bool neek2oSetBootSettings(NEEK_CFG* neek_config, u64 TitleID, u32 Magic, u64 re
 	{
 		// ensure path is correct format
 		char neekNandPath[256] = "";
-		if(neekPathFormat(neekNandPath, nandpath, sizeof(neekNandPath)))
+		if(neekPathFormat(neekNandPath, nandpath, sizeof(neekNandPath)) > 0) // -1 is failure, and is true
 		{
 			snprintf(neek_config->nandpath, sizeof(neek_config->nandpath), "%s", neekNandPath);
 			neek_config->config |= NCON_EXT_NAND_PATH ; // Use custom NAND path
@@ -346,8 +384,8 @@ int neek2oSetNAND(const char* nandpath)
 	// create the file if it doesn't exist
 	if(!CheckFile(nandconfigPath) || FileSize(nandconfigPath) < NANDCONFIG_HEADER_SIZE+1)
 	{
-		u8* nandConfigHeader[NANDCONFIG_HEADER_SIZE] = {};
-		
+		u8 nandConfigHeader[NANDCONFIG_HEADER_SIZE] = {}; // was an array of u8* (only 16 bytes of it were written)
+
 		f = fopen(nandconfigPath, "wb");
 		if(!f)
 		{
@@ -356,21 +394,36 @@ int neek2oSetNAND(const char* nandpath)
 		}
 		
 		// create an empty header with 0 NAND
-		fwrite(nandConfigHeader, 1, NANDCONFIG_HEADER_SIZE, f);
+		if(fwrite(nandConfigHeader, 1, NANDCONFIG_HEADER_SIZE, f) != NANDCONFIG_HEADER_SIZE)
+		{
+			gprintf("Failed writing file %s.\n", nandconfigPath);
+			fclose(f);
+			return -1;
+		}
 		fclose(f);
 	}
-	
+
 	f = fopen(nandconfigPath, "rb");
 	if(!f)
 	{
 		gprintf("Failed loading file %s.\n", nandconfigPath);
 		return -1;
 	}
-	
+
 	fseek(f , 0 , SEEK_END);
-	u32 filesize = ftell(f);
+	long filesizeL = ftell(f);
 	rewind(f);
-	
+	if(filesizeL < NANDCONFIG_HEADER_SIZE)
+	{
+		fclose(f);
+		return -1;
+	}
+
+	// Only the header and NANDCONFIG_MAXNAND entries mean anything: a bigger file is
+	// not read past that, whatever its size says.
+	const u32 maxsize = NANDCONFIG_HEADER_SIZE + NANDCONFIG_MAXNAND * NANDCONFIG_NANDINFO_SIZE;
+	u32 filesize = (u32) filesizeL > maxsize ? maxsize : (u32) filesizeL;
+
 	/* Allocate memory */
 	NandConfig *nandCfg = (NandConfig *) MEM2_alloc(filesize);
 	if (!nandCfg)
@@ -378,7 +431,7 @@ int neek2oSetNAND(const char* nandpath)
 		fclose (f);
 		return -1;
 	}
-	
+
 	// Read the file
 	ret = fread (nandCfg, 1, filesize, f);
 	if(ret != filesize)
@@ -402,6 +455,27 @@ int neek2oSetNAND(const char* nandpath)
 		return -1;
 	}
 
+	// The header promises NandCnt entries: they must all be in the file, or the search
+	// below would read past the block. Leave a short file alone, it may be a failed copy.
+	const u32 usedsize = NANDCONFIG_HEADER_SIZE + nandCfg->NandCnt * NANDCONFIG_NANDINFO_SIZE;
+	if(filesize < usedsize)
+	{
+		gprintf("%s is truncated (%u bytes, %u NAND(s) need %u).\n", nandconfigPath, filesize, (unsigned) nandCfg->NandCnt, usedsize);
+		fclose(f);
+		MEM2_free(nandCfg);
+		return -1;
+	}
+
+	// A path of 128 or more bytes does not fit NandInfo::Path: it would be stored cut,
+	// never match itself, and be added again on every boot.
+	if(strlen(neekNandPath) >= sizeof(NandInfo::Path))
+	{
+		gprintf("EmuNAND path too long for nandcfg.bin: %s\n", neekNandPath);
+		fclose(f);
+		MEM2_free(nandCfg);
+		return -1;
+	}
+
 #ifdef DEBUG
 	// List found nands from the file
 	gprintf("NandCnt = %d\n", nandCfg->NandCnt);
@@ -414,7 +488,8 @@ int neek2oSetNAND(const char* nandpath)
 
 	for( i = 0 ; i < nandCfg->NandCnt ; i++)
 	{
-		if(strcmp((const char *)&nandCfg->Nands[i], neekNandPath) == 0)
+		// Path is 128 bytes with no promise of a terminator in a damaged file.
+		if(strncmp(nandCfg->Nands[i].Path, neekNandPath, sizeof(nandCfg->Nands[i].Path)) == 0)
 		{
 			found = true;
 			break;
@@ -439,8 +514,17 @@ int neek2oSetNAND(const char* nandpath)
 				MEM2_free(nandCfg);
 				return -1;
 			}
-			ret = fwrite(nandCfg, sizeof(char), filesize, f); // Write full file
+			ret = fwrite(nandCfg, sizeof(char), usedsize, f); // Write header and entries
+			if(ret != usedsize)
+				gprintf("Writing %s failed\n", nandconfigPath);
 		}
+	}
+	else if(nandCfg->NandCnt >= NANDCONFIG_MAXNAND) // full: a 9th entry would make the next call delete the file
+	{
+		gprintf("nandcfg.bin already holds %d EmuNANDs, cannot add %s\n", NANDCONFIG_MAXNAND, neekNandPath);
+		fclose(f);
+		MEM2_free(nandCfg);
+		return -1;
 	}
 	else // new NAND path to nandcfg.bin
 	{
@@ -456,6 +540,7 @@ int neek2oSetNAND(const char* nandpath)
 			gprintf("new nandCfg");
 			hexdump(newNand, sizeof(NandInfo));
 #endif
+			// i == old NandCnt here: the entry is appended after the existing ones
 			nandCfg->NandCnt++;
 			nandCfg->NandSel = ++i;
 			
@@ -473,7 +558,7 @@ int neek2oSetNAND(const char* nandpath)
 				MEM2_free(nandCfg);
 				return -1;
 			}
-			ret = fwrite(nandCfg, sizeof(char), filesize, f); 	// Write full file
+			ret = fwrite(nandCfg, sizeof(char), usedsize, f); 	// Write header and the old entries only
 			ret = fwrite(newNand,1,sizeof(NandInfo),f); 		// append new NANDInfo
 			if(ret != sizeof(NandInfo))
 				gprintf("Writing new NAND info failed\n");

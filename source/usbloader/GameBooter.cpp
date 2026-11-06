@@ -2214,7 +2214,7 @@ int GameBooter::BootNeek(struct discHdr *gameHdr)
 	else if (autoboot && (gameHeader.type == TYPE_GAME_WII_IMG || gameHeader.type == TYPE_GAME_WII_DISC)) // This autoobot method doesn't work in neek2o r96
 	{
 		neek_config->gamemagic = 0x5d1c9ea3;	   // Wii game
-		neek_config->gameid = (u32)gameHeader.id;  // wbfs GameID4 to autoboot
+		neek_config->gameid = neekGameId4(gameHeader.id); // wbfs GameID4 to autoboot
 		neek_config->config |= NCON_EXT_BOOT_GAME; // Boot di Game
 	}
 
@@ -2222,7 +2222,7 @@ int GameBooter::BootNeek(struct discHdr *gameHdr)
 	else if (autoboot && (gameHeader.type == TYPE_GAME_GC_IMG || gameHdr->type == TYPE_GAME_GC_EXTRACTED)) // not implemented yet
 	{
 		neek_config->gamemagic = 0xC2339F3D;	   // gamecube games
-		neek_config->gameid = (u32)gameHeader.id;  // GameCube GameID4 to autoboot
+		neek_config->gameid = neekGameId4(gameHeader.id); // GameCube GameID4 to autoboot
 		neek_config->config |= NCON_EXT_BOOT_GAME; // Boot di Game
 
 		// set DML setttings in Neek config2

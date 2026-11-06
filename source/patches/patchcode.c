@@ -74,6 +74,14 @@ static const u32 multidolhooks[4] = {0x7C0004AC, 0x4C00012C, 0x7FE903A6, 0x4E800
 static const u32 multidolchanhooks[4] = {0x4200FFF4, 0x48000004, 0x38800000, 0x4E800020};
 static const u32 langpatch[3] = {0x7C600775, 0x40820010, 0x38000000};
 
+//! Says where the code handler got its hook: without one the codes never run, and the
+//! game shows nothing of it.
+static void hook_at(void *addr, u32 len)
+{
+	gprintf("Ocarina: hook at %p\n", addr);
+	patchhook((u32)addr, len);
+}
+
 //---------------------------------------------------------------------------------
 void dogamehooks(u32 hooktype, void *addr, u32 len)
 //---------------------------------------------------------------------------------
@@ -91,38 +99,38 @@ void dogamehooks(u32 hooktype, void *addr, u32 len)
 			break;
 		case 0x01:
 			if (memcmp(addr_start, viwiihooks, sizeof(viwiihooks)) == 0)
-				patchhook((u32)addr_start, len);
+				hook_at(addr_start, len);
 			break;
 		case 0x02:
 			if (memcmp(addr_start, kpadhooks, sizeof(kpadhooks)) == 0)
-				patchhook((u32)addr_start, len);
+				hook_at(addr_start, len);
 			if (memcmp(addr_start, kpadoldhooks, sizeof(kpadoldhooks)) == 0)
-				patchhook((u32)addr_start, len);
+				hook_at(addr_start, len);
 			break;
 		case 0x03:
 			if (memcmp(addr_start, joypadhooks, sizeof(joypadhooks)) == 0)
-				patchhook((u32)addr_start, len);
+				hook_at(addr_start, len);
 			break;
 		case 0x04:
 			if (memcmp(addr_start, gxdrawhooks, sizeof(gxdrawhooks)) == 0)
-				patchhook((u32)addr_start, len);
+				hook_at(addr_start, len);
 			break;
 		case 0x05:
 			if (memcmp(addr_start, gxflushhooks, sizeof(gxflushhooks)) == 0)
-				patchhook((u32)addr_start, len);
+				hook_at(addr_start, len);
 			break;
 		case 0x06:
 			if (memcmp(addr_start, ossleepthreadhooks, sizeof(ossleepthreadhooks)) == 0)
-				patchhook((u32)addr_start, len);
+				hook_at(addr_start, len);
 			break;
 		case 0x07:
 			if (memcmp(addr_start, axnextframehooks, sizeof(axnextframehooks)) == 0)
-				patchhook((u32)addr_start, len);
+				hook_at(addr_start, len);
 			break;
 		/*
 		case 0x08:
 			if (memcmp(addr_start, customhook, customhooksize) == 0)
-				patchhook((u32)addr_start, len);
+				hook_at(addr_start, len);
 			if (memcmp(addr_start, multidolhooks, sizeof(multidolhooks)) == 0)
 				multidolhook((u32)addr_start + sizeof(multidolhooks) - 4);
 			break;

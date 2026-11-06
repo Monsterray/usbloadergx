@@ -31,7 +31,7 @@
 
 u8 * uncompressLZ77(const u8 *inBuf, u32 inLength, u32 * size)
 {
-	if(!inBuf)
+	if(!inBuf || inLength < 4)
 		return NULL;
 
 	u8 *buffer = NULL;

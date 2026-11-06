@@ -222,7 +222,7 @@ u8 *U8Archive::DecompressCopy( const u8 * stuff, u32 len, u32 *size ) const
 			return NULL;
 		}
 	}
-	else if( *(u32*)( stuff ) == 0x4C5A3737 )// LZ77
+	else if( len >= 4 && *(u32*)( stuff ) == 0x4C5A3737 )// LZ77
 	{
 		// LZ77 with a magic word
 		if( decompressLZ77content( stuff + 4, len - 4, &ret, &len ) )
@@ -584,7 +584,7 @@ u8* U8NandArchive::GetFileAllocated( const char *path, u32 *size ) const
 		}
 		free( ret );
 	}
-	else if( *(u32*)( ret ) == 0x4C5A3737 )// LZ77
+	else if( len >= 4 && *(u32*)( ret ) == 0x4C5A3737 )// LZ77
 	{
 		// LZ77 with a magic word
 		if( decompressLZ77content( ret + 4, len - 4, &ret2, &len ) )

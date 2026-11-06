@@ -43,7 +43,7 @@ fi
 # The Makefile's CFLAGS/LDFLAGS are recursive variables, so passing them on the
 # make command line keeps $(MACHDEP)/$(INCLUDE) expansion.
 BASE_CFLAGS='-ggdb -Os -Wall -Wno-multichar -Wno-unused-parameter -Wextra -Wformat-security $(MACHDEP) $(INCLUDE) -D_GNU_SOURCE -DNDEBUG -DWOLFSSL_USER_SETTINGS'
-BASE_LDFLAGS='-ggdb $(MACHDEP) -Wl,-Map,$(notdir $@).map,--section-start,.init=0x80B00000,-wrap,malloc,-wrap,free,-wrap,memalign,-wrap,calloc,-wrap,realloc,-wrap,malloc_usable_size $(PROJECTDIR)/source/gx_symbols.ld'
+BASE_LDFLAGS='-ggdb $(MACHDEP) -Wl,-Map,$(notdir $@).map,--section-start,.init=0x80B00000,-wrap,malloc,-wrap,free,-wrap,memalign,-wrap,calloc,-wrap,realloc,-wrap,malloc_usable_size,-wrap,__reload $(PROJECTDIR)/source/gx_symbols.ld'
 
 case "$MODE" in
 	warnings)

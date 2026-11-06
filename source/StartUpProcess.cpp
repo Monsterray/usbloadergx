@@ -28,6 +28,8 @@
 #include "sys.h"
 #include "version.h"
 #include "settings/meta.h"
+#include "system/CrashReset.h"
+#include "FileOperations/fileops.h"
 
 extern bool isWiiVC; // in sys.cpp
 
@@ -106,6 +108,10 @@ StartUpProcess::~StartUpProcess()
 //! -ios= from the boot arguments, or -1: Settings.Load() reads LoaderIOS from the
 //! config later, and the argument has to win over it
 static int argLoaderIOS = -1;
+#ifdef AUTOINPUT
+//! -crashtest (or sd:/crashtest.txt): a DSI right after the config is read, inside start-up's crash window
+static bool crashTest = false;
+#endif
 
 int StartUpProcess::ParseArguments(int argc, char *argv[])
 {
@@ -128,6 +134,10 @@ int StartUpProcess::ParseArguments(int argc, char *argv[])
 				Settings.LoaderIOS = LIMIT(atoi(ptr + strlen("-ios=")), 200, 255);
 			argLoaderIOS = Settings.LoaderIOS;
 		}
+#ifdef AUTOINPUT
+		if (strcasecmp(argv[i], "-crashtest") == 0)
+			crashTest = true;
+#endif
 
 		ptr = strcasestr(argv[i], "-bootios=");
 		if (ptr)
@@ -393,6 +403,14 @@ int StartUpProcess::Execute(bool quickGameBoot, bool isBadBoot)
 		Settings.LoaderIOSFromArg = argLoaderIOS;
 		Settings.LoaderIOS = argLoaderIOS;
 	}
+#ifdef AUTOINPUT
+	//! Dolphin boots a .dol without arguments: sd:/crashtest.txt asks for it too
+	if (crashTest || CheckFile("sd:/crashtest.txt"))
+	{
+		gprintf("crashtest: a DSI now, inside start-up's crash window\n");
+		*(volatile u32 *)0 = 0;
+	}
+#endif
 	gprintf("\tLoading language...%s\n", Settings.LoadLanguage(Settings.language_path, CONSOLE_DEFAULT) ? "done" : "failed");
 	gprintf("\tLoading game settings...%s\n", GameSettings.Load(Settings.ConfigPath) ? "done" : "failed");
 	gprintf("\tLoading game statistics...%s\n", GameStatistics.Load(Settings.ConfigPath) ? "done" : "failed");
@@ -556,6 +574,8 @@ int StartUpProcess::FinalizeExecute()
 
 	// After the last IOS reload and Sys_Init()'s Reset and Power handlers
 	HbcAgent_Init();
+	// Start-up's crash window (main.cpp) ends: from here a crash leaves through the stub
+	CrashReset_Leave();
 
 	return 0;
 }

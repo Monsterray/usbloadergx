@@ -20,6 +20,7 @@
 #include "utils/tools.h"
 #include "gecko.h"
 #include "libs/libruntimeiospatch/runtimeiospatch.h"
+#include "system/CrashReset.h"
 
 extern u32 hdd_sector_size[2];
 
@@ -231,8 +232,12 @@ s32 IosLoader::ReloadIosSafe(s32 ios)
 s32 IosLoader::ReloadIosKeepingRights(s32 ios)
 {
 	IosPatch_AHBPROT(false);
-	// Reload IOS. MEM2 protection is implicitly re-enabled
-	return IOS_ReloadIOS(ios);
+	// Reload IOS. MEM2 protection is implicitly re-enabled. A crash in between could
+	// leave IOS unable to run the reload stub: CrashReset resets the console then
+	CrashReset_Enter();
+	s32 ret = IOS_ReloadIOS(ios);
+	CrashReset_Leave();
+	return ret;
 }
 
 //! The furthest byte any of the matches below reads, counted from i.

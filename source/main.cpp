@@ -25,6 +25,7 @@
 #include "StartUpProcess.h"
 #include "sys.h"
 #include "system/IoGuard.h"
+#include "system/CrashReset.h"
 
 extern "C"
 {
@@ -35,6 +36,10 @@ extern "C"
 int main(int argc, char *argv[])
 {
 	__exception_setreload(20);
+	// a crash during start-up (it reloads IOS) resets the console rather than wait on the stub;
+	// the window closes once the hbc agent runs (HbcAgent_Init)
+	CrashReset_Init();
+	CrashReset_Enter();
 	// activate magic access rights
 	MagicPatches(1);
 	// init video

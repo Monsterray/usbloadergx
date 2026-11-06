@@ -2138,6 +2138,30 @@ int GameBrowseMenu::AutoInputAction(const char *action)
 		else
 			gprintf("autoinput update: unknown %s\n", arg);
 	}
+	else if (strcasecmp(cmd, "bootdisc") == 0)
+	{
+		// The disc button, then the disc started as quick boot does
+		u32 cover = 0;
+		if (WDVD_GetCoverStatus(&cover) < 0 || !(cover & 0x2))
+		{
+			gprintf("autoinput bootdisc: no disc in the drive (cover status %08x)\n", cover);
+			return MENU_NONE;
+		}
+		if (!dvdheader)
+			dvdheader = new struct discHdr;
+		if (Disc_Mount(dvdheader) < 0)
+		{
+			gprintf("autoinput bootdisc: Disc_Mount() failed\n");
+			delete dvdheader;
+			dvdheader = NULL;
+			return MENU_NONE;
+		}
+		gprintf("autoinput bootdisc: %.6s %s\n", (const char *)dvdheader->id, dvdheader->title);
+		SetState(STATE_DISABLED);
+		GameWindow::BootGame(dvdheader);
+		SetState(STATE_DEFAULT);
+		gprintf("autoinput bootdisc: returned to the browser\n");
+	}
 	else if (strcasecmp(cmd, "stall") == 0)
 	{
 		// What the lrwii's dump did: a USB write that never returns. IoGuard ends GX

@@ -145,7 +145,7 @@ static const Key table[] = {
 	{ "GameDisplayType", [](const CSettings &s) -> double { return s.GameDisplayType; }, 0, 0x10, false,
 	  validDisplayType, false, 0 },
 	// fail closed: a value nobody can read as a level is the most restrictive one
-	{ "parentalcontrol", [](const CSettings &s) -> double { return s.parentalcontrol; }, 0, 4, false,
+	{ "ParentalLevel", [](const CSettings &s) -> double { return s.parentalcontrol; }, 0, PARENTAL_LVL_ADULT, false,
 	  nullptr, true, PARENTAL_LVL_EVERYONE },
 
 	// floats
@@ -398,6 +398,39 @@ static void testHostileFile()
 	check("hostile file: CoverAction", t.CoverAction == dflt.CoverAction);
 }
 
+static void testLegacyParental()
+{
+	// "parentalcontrol" (0-4) came before the 17+ level: its 4 was 18+, the others keep their place
+	static const struct { const char *in; int want; } cases[] = {
+		{ "0", PARENTAL_LVL_EVERYONE }, { "1", PARENTAL_LVL_CHILD }, { "2", PARENTAL_LVL_TEEN },
+		{ "3", PARENTAL_LVL_MATURE }, { "4", PARENTAL_LVL_ADULT },
+		{ "5", PARENTAL_LVL_EVERYONE }, { "-1", PARENTAL_LVL_EVERYONE }, { "x", PARENTAL_LVL_EVERYONE },
+	};
+	for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++)
+	{
+		T t;
+		setup(t);
+		put(t, "parentalcontrol", cases[i].in);
+		char what[64];
+		snprintf(what, sizeof(what), "legacy parentalcontrol = %s", cases[i].in);
+		check(what, t.parentalcontrol == cases[i].want);
+	}
+
+	// A rating's minimum age as the level that may play it: 17+ and 18+ stay apart
+	static const struct { int age, level; } ages[] = {
+		{ -1, -1 }, { 0, PARENTAL_LVL_EVERYONE }, { 6, PARENTAL_LVL_EVERYONE }, { 7, PARENTAL_LVL_CHILD },
+		{ 11, PARENTAL_LVL_CHILD }, { 12, PARENTAL_LVL_TEEN }, { 15, PARENTAL_LVL_TEEN },
+		{ 16, PARENTAL_LVL_MATURE }, { 17, PARENTAL_LVL_MATURE17 }, { 18, PARENTAL_LVL_ADULT },
+		{ 21, PARENTAL_LVL_ADULT },
+	};
+	for (size_t i = 0; i < sizeof(ages) / sizeof(ages[0]); i++)
+	{
+		char what[64];
+		snprintf(what, sizeof(what), "level for age %d", ages[i].age);
+		check(what, ParentalLevelForAge(ages[i].age) == ages[i].level);
+	}
+}
+
 static void testPassword()
 {
 	T t;
@@ -452,6 +485,7 @@ int main()
 	testRoundTrip(false);
 	testRoundTrip(true);
 	testHostileFile();
+	testLegacyParental();
 	testPassword();
 
 	unlink(CFG);

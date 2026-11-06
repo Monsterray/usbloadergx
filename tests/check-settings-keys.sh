@@ -36,7 +36,8 @@ check() {
 
 	# $7: a name Save() writes that is not a setting (the game line's "game:<id> = ").
 	sed -nE "$5" "$TMP/save.txt" | grep -vx "${7:-^}" > "$TMP/save.keys"
-	sed -nE "$6" "$TMP/set.txt" > "$TMP/set.keys"
+	# A key renamed in Save() is still read under its old name, marked "//! legacy key".
+	grep -v '//! legacy key' "$TMP/set.txt" | sed -nE "$6" > "$TMP/set.keys"
 
 	[ -s "$TMP/save.keys" ] || fail "$label: no keys found in Save()"
 	[ -s "$TMP/set.keys" ] || fail "$label: no keys found in SetSetting()"

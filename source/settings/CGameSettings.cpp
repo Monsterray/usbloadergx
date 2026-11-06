@@ -196,7 +196,7 @@ bool CGameSettings::Save()
 		fprintf(f, "vipatch:%d; ", GameList[i].vipatch);
 		fprintf(f, "ios:%d; ", GameList[i].ios);
 		fprintf(f, "autoios:%d; ", GameList[i].autoios);
-		fprintf(f, "parentalcontrol:%d; ", GameList[i].parentalcontrol);
+		fprintf(f, "ParentalLevel:%d; ", GameList[i].parentalcontrol);
 		fprintf(f, "iosreloadblock:%d; ", GameList[i].iosreloadblock);
 		fprintf(f, "patchcountrystrings:%d; ", GameList[i].patchcountrystrings);
 		fprintf(f, "loadalternatedol:%d; ", GameList[i].loadalternatedol);
@@ -263,6 +263,17 @@ bool CGameSettings::Save()
 	return true;
 }
 
+//! A game's level, which indexes the menus' level names. Anything unreadable is the most
+//! restrictive level. oldScale: the legacy "parentalcontrol" key had no 17+, so its 4 is 18+.
+static short ParentalLevel(const char *value, bool oldScale)
+{
+	char *end = NULL;
+	long n = strtol(value, &end, 10);
+	if (end == value || *end != 0 || n < 0 || n > (oldScale ? 4 : PARENTAL_LVL_ADULT))
+		return PARENTAL_LVL_ADULT;
+	return (oldScale && n == 4) ? (short) PARENTAL_LVL_ADULT : (short) n;
+}
+
 bool CGameSettings::SetSetting(GameCFG & game, const char *name, const char *value)
 {
 	if (strcmp(name, "video") == 0)
@@ -325,9 +336,14 @@ bool CGameSettings::SetSetting(GameCFG & game, const char *name, const char *val
 		game.autoios = atoi(value);
 		return true;
 	}
-	else if(strcmp(name, "parentalcontrol") == 0)
+	else if(strcmp(name, "ParentalLevel") == 0)
 	{
-		game.parentalcontrol = atoi(value);
+		game.parentalcontrol = ParentalLevel(value, false);
+		return true;
+	}
+	else if(strcmp(name, "parentalcontrol") == 0) //! legacy key: 0-4, before the 17+ level
+	{
+		game.parentalcontrol = ParentalLevel(value, true);
 		return true;
 	}
 	else if(strcmp(name, "iosreloadblock") == 0)
@@ -639,7 +655,7 @@ bool CGameSettings::ReadGameID(const char * src, char * GameID, int size)
 	if(strncasecmp(src, "game:", 5) != 0)
 		return false;
 
-	char * ptr = strchr(src, ':');
+	const char * ptr = strchr(src, ':');
 	if(!ptr)
 		return false;
 
@@ -713,18 +729,6 @@ void CGameSettings::TrimLine(std::string &dest, const char *src, char stopChar)
 
 		dest.push_back(*src);
 		src++;
-	}
-}
-
-int CGameSettings::GetPartenalPEGI(int parental)
-{
-	switch(parental)
-	{
-		case 1: return 7;
-		case 2: return 12;
-		case 3: return 16;
-		case 4: return 18;
-		default: return -1;
 	}
 }
 

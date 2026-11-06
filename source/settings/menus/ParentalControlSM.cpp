@@ -40,13 +40,14 @@ static const char * LockModeText[] =
 	trNOOP( "Unlocked" )
 };
 
-static const char * ParentalText[5] =
+static const char * ParentalText[PARENTAL_LVL_MAX] =
 {
 	trNOOP( "0 (Everyone)" ),
 	trNOOP( "1 (Child 7+)" ),
 	trNOOP( "2 (Teen 12+)" ),
 	trNOOP( "3 (Mature 16+)" ),
-	trNOOP( "4 (Adults Only 18+)" )
+	trNOOP( "4 (Mature 17+)" ),
+	trNOOP( "5 (Adults Only 18+)" )
 };
 
 ParentalControlSM::ParentalControlSM()
@@ -247,7 +248,7 @@ int ParentalControlSM::GetMenuInternal()
 	//! Settings: Control Level
 	else if (ret == ++Idx)
 	{
-		if (++Settings.parentalcontrol >= 5) Settings.parentalcontrol = 0;
+		if (++Settings.parentalcontrol >= PARENTAL_LVL_MAX) Settings.parentalcontrol = 0;
 	}
 
 	//! Settings: Remember Unlock

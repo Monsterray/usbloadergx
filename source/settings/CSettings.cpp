@@ -376,7 +376,7 @@ bool CSettings::Save()
 	fprintf(file, "gridRows = %d\n", gridRows);
 	fprintf(file, "quickboot = %d\n", quickboot);
 	fprintf(file, "wsprompt = %d\n", wsprompt);
-	fprintf(file, "parentalcontrol = %d\n", parentalcontrol);
+	fprintf(file, "ParentalLevel = %d\n", parentalcontrol);
 	fprintf(file, "covers_path = %s\n", covers_path);
 	fprintf(file, "covers2d_path = %s\n", covers2d_path);
 	fprintf(file, "coversFull_path = %s\n", coversFull_path);
@@ -787,11 +787,19 @@ bool CSettings::SetSetting(char *name, char *value)
 		SetRanged(gameDisplay, value, 0, 3);
 		return true;
 	}
-	else if (strcmp(name, "parentalcontrol") == 0)
+	else if (strcmp(name, "ParentalLevel") == 0)
 	{
 		// Fail closed: a level nobody can read is the most restrictive one, not the default
+		if (!SetRanged(parentalcontrol, value, 0, PARENTAL_LVL_ADULT))
+			parentalcontrol = PARENTAL_LVL_EVERYONE;
+		return true;
+	}
+	else if (strcmp(name, "parentalcontrol") == 0) //! legacy key: 0-4, before the 17+ level, so 4 is 18+
+	{
 		if (!SetRanged(parentalcontrol, value, 0, 4))
 			parentalcontrol = PARENTAL_LVL_EVERYONE;
+		else if (parentalcontrol == 4)
+			parentalcontrol = PARENTAL_LVL_ADULT;
 		return true;
 	}
 	else if (strcmp(name, "screensaver") == 0)

@@ -126,7 +126,8 @@ static const char * ParentalText[] =
 	trNOOP( "1 (Child 7+)" ),
 	trNOOP( "2 (Teen 12+)" ),
 	trNOOP( "3 (Mature 16+)" ),
-	trNOOP( "4 (Adults Only 18+)" )
+	trNOOP( "4 (Mature 17+)" ),
+	trNOOP( "5 (Adults Only 18+)" )
 };
 
 static const char * AlternateDOLText[] =
@@ -521,7 +522,7 @@ int GameLoadSM::GetMenuInternal()
 	//! Settings: Parental Control
 	else if (ret == ++Idx)
 	{
-		if (++GameConfig.parentalcontrol >= 5) GameConfig.parentalcontrol = 0;
+		if (++GameConfig.parentalcontrol >= PARENTAL_LVL_MAX) GameConfig.parentalcontrol = 0;
 	}
 
 	//! Settings: Video Mode

@@ -301,10 +301,8 @@ bool GameBooter::ParentalBlocked(const struct discHdr *gameHdr)
 		path += "wiitdb.xml";
 
 		GameTDB XML_DB;
-		std::string value;
-		int board = -1;
-		if (XML_DB.OpenFile(path.c_str()) && (board = XML_DB.GetRating(id)) >= 0 && XML_DB.GetRatingValue(id, value))
-			rating = GameTDB::ConvertRating(value.c_str(), GameTDB::RatingToString(board), "PEGI");
+		if (XML_DB.OpenFile(path.c_str()))
+			rating = ParentalLevelForAge(XML_DB.GetRatingAge(id));
 	}
 
 	return rating > Settings.parentalcontrol;

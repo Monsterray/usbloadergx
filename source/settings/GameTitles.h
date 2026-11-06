@@ -12,7 +12,7 @@ typedef struct _GameTitle
 	char GameID[7];
 	std::string Title;
 	std::string Region;
-	int ParentalRating;
+	int RatingAge; // the minimum age of the game's rating, -1 when unrated
 	int PlayersCount;
 	char TitleType;
 
@@ -23,7 +23,7 @@ typedef struct _CacheTitle
 	char GameID[7];
 	char Title[130]; // long titles e.g. RGOJJ9 & DLSP64
 	char Region[7];
-	int ParentalRating;
+	int RatingAge;
 	int PlayersCount;
 	char TitleType;
 
@@ -35,7 +35,7 @@ class CGameTitles
 		//! Sort the title list
 		void SortTitleList();
 		//! Set a game title from GameTDB
-		void SetGameTitle(const char * id, const char * title, char TitleType = TITLETYPE_DEFAULT, std::string region = "NULL", int ParentalRating = -1, int PlayersCount = 1);
+		void SetGameTitle(const char * id, const char * title, char TitleType = TITLETYPE_DEFAULT, std::string region = "NULL", int RatingAge = -1, int PlayersCount = 1);
 		//! Overload
 		void SetGameTitle(const u8 * id, const char * title, char TitleType = TITLETYPE_DEFAULT) { SetGameTitle((const char *) id, title, TitleType); };
 
@@ -49,7 +49,7 @@ class CGameTitles
 		char GetTitleType(const char * id) const;
 		//! Get game region
 		const char * GetRegion(const char * id) const;
-		//! Get game parental rating
+		//! Get the parental level that may play the game (PARENTAL_LVL_*), -1 when unrated
 		int GetParentalRating(const char * id) const;
 		//! Get possible number of players for this game
 		int GetPlayersCount(const char * id) const;

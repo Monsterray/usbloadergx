@@ -186,8 +186,6 @@ class CGameSettings
 		GameCFG * GetGameCFG(const u8 * id) { return GetGameCFG((const char *) id); }
 		//!Overload
 		GameCFG * GetGameCFG(const struct discHdr * game) { if(!game) return NULL; else return GetGameCFG(game->id); }
-		//!Quick settings to PEGI conversion
-		static int GetPartenalPEGI(int parentalsetting);
 		//!Set the default configuration block
 		void SetDefault(GameCFG &game);
 	protected:

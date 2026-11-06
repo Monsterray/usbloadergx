@@ -10,7 +10,8 @@
 #include "version.h"
 #include "FileOperations/fileops.h"
 
-#define VALID_CACHE_REVISION 1280
+//! 1284: RatingAge holds the minimum age; older caches held a level on the old 0-4 scale
+#define VALID_CACHE_REVISION 1284
 
 CGameTitles GameTitles;
 
@@ -22,7 +23,7 @@ void CGameTitles::SortTitleList()
 			  { return (strncasecmp(x.GameID, y.GameID, 6) < 0); });
 }
 
-void CGameTitles::SetGameTitle(const char *id, const char *title, char TitleType, const std::string region, int ParentalRating, int PlayersCount)
+void CGameTitles::SetGameTitle(const char *id, const char *title, char TitleType, const std::string region, int RatingAge, int PlayersCount)
 {
 	if (!id || !title)
 		return;
@@ -33,8 +34,8 @@ void CGameTitles::SetGameTitle(const char *id, const char *title, char TitleType
 		{
 			TitleList[i].Title = title;
 			TitleList[i].Region = region;
-			if (ParentalRating != -1)
-				TitleList[i].ParentalRating = ParentalRating;
+			if (RatingAge != -1)
+				TitleList[i].RatingAge = RatingAge;
 			if (PlayersCount != 1)
 				TitleList[i].PlayersCount = PlayersCount;
 			TitleList[i].TitleType = TitleType;
@@ -46,7 +47,7 @@ void CGameTitles::SetGameTitle(const char *id, const char *title, char TitleType
 	snprintf(newTitle.GameID, sizeof(newTitle.GameID), "%s", id);
 	newTitle.Title = title;
 	newTitle.Region = region;
-	newTitle.ParentalRating = ParentalRating;
+	newTitle.RatingAge = RatingAge;
 	newTitle.PlayersCount = PlayersCount;
 	newTitle.TitleType = TitleType;
 
@@ -133,7 +134,7 @@ int CGameTitles::GetParentalRating(const char *id) const
 	for (u32 i = 0; i < TitleList.size(); ++i)
 	{
 		if (strncasecmp(TitleList[i].GameID, id, 6) == 0)
-			return TitleList[i].ParentalRating;
+			return ParentalLevelForAge(TitleList[i].RatingAge);
 	}
 
 	return -1;
@@ -257,7 +258,7 @@ u32 CGameTitles::ReadCachedTitles(const char *path)
 		snprintf(TitleList[i].GameID, sizeof(TitleList[i].GameID), "%.6s", CachedList[i].GameID);
 		TitleList[i].Title.assign(CachedList[i].Title, strnlen(CachedList[i].Title, sizeof(CachedList[i].Title)));
 		TitleList[i].Region.assign(CachedList[i].Region, strnlen(CachedList[i].Region, sizeof(CachedList[i].Region)));
-		TitleList[i].ParentalRating = CachedList[i].ParentalRating;
+		TitleList[i].RatingAge = CachedList[i].RatingAge;
 		TitleList[i].PlayersCount = CachedList[i].PlayersCount;
 		TitleList[i].TitleType = CachedList[i].TitleType;
 	}
@@ -278,7 +279,7 @@ void CGameTitles::WriteCachedTitles(const char *path)
 
 	CacheTitle Cache;
 	u32 count = TitleList.size();
-	u32 revision = atoi(LOADER_REV);
+	u32 revision = VALID_CACHE_REVISION;
 	fwrite(&revision, 1, 4, f);
 	fwrite(Settings.db_language, 1, 10, f);
 	fwrite(&count, 1, 4, f);
@@ -290,7 +291,7 @@ void CGameTitles::WriteCachedTitles(const char *path)
 		snprintf(Cache.GameID, sizeof(Cache.GameID), "%s", TitleList[i].GameID);
 		snprintf(Cache.Title, sizeof(Cache.Title), "%s", TitleList[i].Title.c_str());
 		snprintf(Cache.Region, sizeof(Cache.Region), "%s", TitleList[i].Region.c_str());
-		Cache.ParentalRating = TitleList[i].ParentalRating;
+		Cache.RatingAge = TitleList[i].RatingAge;
 		Cache.PlayersCount = TitleList[i].PlayersCount;
 		Cache.TitleType = TitleList[i].TitleType;
 
@@ -372,8 +373,7 @@ void CGameTitles::LoadTitlesFromGameTDB(const char *path)
 	{
 		std::string Title;
 		std::string Region;
-		std::string RatValTxt;
-		int ParentalRating = -1;
+		int RatingAge = -1;
 		int PlayersCount = 1;
 
 		if (!XML_DB.GetTitle(MissingTitles[i].c_str(), Title))
@@ -383,21 +383,16 @@ void CGameTitles::LoadTitlesFromGameTDB(const char *path)
 		if (Title.compare("Ōkami") == 0)
 			Title.assign("Okami");
 
-		int Rating = XML_DB.GetRating(MissingTitles[i].c_str());
-		if (Rating >= 0)
-		{
-			if (XML_DB.GetRatingValue(MissingTitles[i].c_str(), RatValTxt))
-				ParentalRating = GameTDB::ConvertRating(RatValTxt.c_str(), GameTDB::RatingToString(Rating), "PEGI");
-		}
+		RatingAge = XML_DB.GetRatingAge(MissingTitles[i].c_str());
 
 		int pc = XML_DB.GetPlayers(MissingTitles[i].c_str());
 		if (pc > 0)
 			PlayersCount = pc;
 
 		if (XML_DB.GetRegion(MissingTitles[i].c_str(), Region))
-			SetGameTitle(MissingTitles[i].c_str(), Title.c_str(), TITLETYPE_FROMWIITDB, Region, ParentalRating, PlayersCount);
+			SetGameTitle(MissingTitles[i].c_str(), Title.c_str(), TITLETYPE_FROMWIITDB, Region, RatingAge, PlayersCount);
 		else
-			SetGameTitle(MissingTitles[i].c_str(), Title.c_str(), TITLETYPE_FROMWIITDB, "NULL", ParentalRating, PlayersCount);
+			SetGameTitle(MissingTitles[i].c_str(), Title.c_str(), TITLETYPE_FROMWIITDB, "NULL", RatingAge, PlayersCount);
 	}
 	XML_DB.CloseFile();
 	SortTitleList();

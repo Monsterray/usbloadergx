@@ -274,8 +274,28 @@ enum
 	PARENTAL_LVL_CHILD,
 	PARENTAL_LVL_TEEN,
 	PARENTAL_LVL_MATURE,
-	PARENTAL_LVL_ADULT
+	PARENTAL_LVL_MATURE17,
+	PARENTAL_LVL_ADULT,
+	PARENTAL_LVL_MAX
 };
+
+//! The level that may play a game rated for this minimum age; -1 (unrated) stays -1
+static inline int ParentalLevelForAge(int age)
+{
+	if (age < 0)
+		return -1;
+	if (age < 7)
+		return PARENTAL_LVL_EVERYONE;
+	if (age < 12)
+		return PARENTAL_LVL_CHILD;
+	if (age < 16)
+		return PARENTAL_LVL_TEEN;
+	if (age < 17)
+		return PARENTAL_LVL_MATURE;
+	if (age < 18)
+		return PARENTAL_LVL_MATURE17;
+	return PARENTAL_LVL_ADULT;
+}
 
 enum
 {

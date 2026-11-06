@@ -100,7 +100,7 @@ public:
 	//! Get the genre list of a game for a specific game id
 	bool GetGenreList(const char *id, std::vector<std::string> &genre);
 	//! Get the rating type for a specific game id
-	//! The rating type can be converted to a std::string with GameTDB::RatingTostd::string(rating)
+	//! 0 CERO, 1 ESRB, 2 PEGI (the boards with images in the game info), -1 any other
 	int GetRating(const char *id);
 	//! Get the rating value for a specific game id
 	bool GetRatingValue(const char *id, std::string &rating_value);
@@ -130,12 +130,10 @@ public:
 	void TranslateGenres(std::vector<std::string> &GenreList);
 	//! Translate descriptors list to configure language code
 	//! void TranslateDescriptors(std::vector<std::string> &DescList);
-	//! Convert a specific game rating to a std::string
-	static const char *RatingToString(int rating);
-	//! Convert a rating std::string to a rating number
-	static int StringToRating(const char *rate_string);
-	//! Convert a rating to another rating
-	static int ConvertRating(const char *value, const char *from, const char *to);
+	//! The minimum age a rating names (any board), -1 when it names none
+	static int RatingAge(const char *board, const char *value);
+	//! The minimum age of a game's rating, -1 when it has none
+	int GetRatingAge(const char *id);
 	//! Get the version of the gametdb xml database
 	unsigned long long GetGameTDBVersion();
 	//! Get the entry count in the xml database

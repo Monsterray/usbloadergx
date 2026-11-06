@@ -373,102 +373,54 @@ bool GameTDB::ParseFile()
 	return true;
 }
 
-const char *GameTDB::RatingToString(int rating)
+//! A rating as the minimum age it names, for every board wiitdb.xml uses; -1 when it names
+//! none (no rating, "RP", a board not known here). Ages, not one board's scale, so that a
+//! 17+ game (ESRB M, CERO D) and an 18+ one stay apart.
+int GameTDB::RatingAge(const char *board, const char *value)
 {
-	switch (rating)
-	{
-	case 0:
-		return "CERO";
-	case 1:
-		return "ESRB";
-	case 2:
-		return "PEGI";
-	default:
-		break;
-	}
-
-	return NULL;
-}
-
-int GameTDB::StringToRating(const char *rate_string)
-{
-	if (strcasecmp(rate_string, "CERO") == 0)
-		return 0;
-
-	if (strcasecmp(rate_string, "ESRB") == 0)
-		return 1;
-
-	if (strcasecmp(rate_string, "PEGI") == 0)
-		return 2;
-
-	return -1;
-}
-
-int GameTDB::ConvertRating(const char *value, const char *from, const char *to)
-{
-	if (strcasecmp(from, to) == 0)
-	{
-		int ret = atoi(value);
-		if (ret < 7)
-			return 0;
-		else if (ret < 12)
-			return 1;
-		else if (ret < 16)
-			return 2;
-		else if (ret < 18)
-			return 3;
-		else
-			return 4;
-	}
-
-	int type = -1;
-	int desttype = -1;
-
-	type = StringToRating(from);
-	desttype = StringToRating(to);
-	if (type == -1 || desttype == -1)
+	if (!board || !value || !*value)
 		return -1;
 
-	/* rating conversion table */
-	/* the list is ordered to pick the most likely value first: */
-	/* EC and AO are less likely to be used so they are moved down to only be picked up when converting ESRB to PEGI or CERO */
-	/* the conversion can never be perfect because ratings can differ between regions for the same game */
-	const int table_size = 12;
-	char ratingtable[table_size][3][5] =
-		{
-			{{"A"},   {"E"},    {"3"}},
-			{{"A"},   {"E"},    {"4"}},
-			{{"A"},   {"E"},    {"6"}},
-			{{"A"},   {"E"},    {"7"}},
-			{{"A"},   {"EC"},   {"3"}},
-			{{"A"},   {"E10+"}, {"7"}},
-			{{"B"},   {"T"},    {"12"}},
-			{{"D"},   {"M"},    {"18"}},
-			{{"D"},   {"M"},    {"16"}},
-			{{"C"},   {"T"},    {"16"}},
-			{{"C"},   {"T"},    {"15"}},
-			{{"Z"},   {"AO"},   {"18"}},
-		};
+	//! PEGI, USK, GRB and CSRR give the age itself
+	char *end = NULL;
+	long age = strtol(value, &end, 10);
+	if (end != value && *end == 0)
+		return (age >= 0 && age <= 21) ? (int) age : -1;
 
-	for (int i = 0; i < table_size; i++)
+	if (strcasecmp(board, "OFLC") == 0)
+		board = "ACB";
+
+	static const struct
 	{
-		if (strcasecmp(ratingtable[i][type], value) == 0)
-		{
-			int res = atoi(ratingtable[i][desttype]);
-			if (res < 7)
-				return 0;
-			else if (res < 12)
-				return 1;
-			else if (res < 16)
-				return 2;
-			else if (res < 18)
-				return 3;
-			else
-				return 4;
-		}
+		const char *board; // NULL: any board
+		const char *value;
+		int age;
+	} table[] =
+	{
+		{ "CERO", "A", 0 }, { "CERO", "B", 12 }, { "CERO", "C", 15 }, { "CERO", "D", 17 }, { "CERO", "Z", 18 },
+		{ "ESRB", "EC", 3 }, { "ESRB", "E", 6 }, { "ESRB", "E10+", 10 }, { "ESRB", "T", 13 },
+		{ "ESRB", "M", 17 }, { "ESRB", "AO", 18 },
+		{ "ACB", "G", 0 }, { "ACB", "PG", 8 }, { "ACB", "M", 15 }, { "ACB", "MA15+", 15 },
+		{ "ACB", "R18+", 18 }, { "ACB", "X18+", 18 },
+		{ NULL, "ALL", 0 }, // GRB, CSRR
+	};
+
+	for (size_t i = 0; i < sizeof(table) / sizeof(table[0]); i++)
+	{
+		if ((!table[i].board || strcasecmp(table[i].board, board) == 0) && strcasecmp(table[i].value, value) == 0)
+			return table[i].age;
 	}
 
 	return -1;
+}
+
+int GameTDB::GetRatingAge(const char *id)
+{
+	if (!id || !ParseGameNode(id))
+		return -1;
+
+	pugi::xml_node rating = xmlDoc.child("game").child("rating");
+	return RatingAge(rating.attribute("type").value(), rating.attribute("value").value());
 }
 
 bool GameTDB::GetGameXMLInfo(const char *id, GameXMLInfo *gameInfo)

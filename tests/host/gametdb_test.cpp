@@ -149,6 +149,46 @@ static void case_failed_parse_keeps_cache_honest(void)
 	check("A reads again after B failed", db.GetTitle("RSPE01", again) && again == "Alpha");
 }
 
+static void case_rating_age(void)
+{
+	/* Every board and value in the 2026-10 wiitdb.xml, plus USK and ACB/OFLC */
+	static const struct { const char *board, *value; int age; } r[] = {
+		{"CERO", "A", 0}, {"CERO", "B", 12}, {"CERO", "C", 15}, {"CERO", "D", 17}, {"CERO", "Z", 18},
+		{"ESRB", "EC", 3}, {"ESRB", "E", 6}, {"ESRB", "E10+", 10}, {"ESRB", "T", 13},
+		{"ESRB", "M", 17}, {"ESRB", "AO", 18}, {"ESRB", "RP", -1}, {"ESRB", "12", 12},
+		{"PEGI", "3", 3}, {"PEGI", "6", 6}, {"PEGI", "7", 7}, {"PEGI", "12", 12},
+		{"PEGI", "15", 15}, {"PEGI", "16", 16}, {"PEGI", "18", 18},
+		{"USK", "0", 0}, {"USK", "6", 6}, {"USK", "16", 16},
+		{"GRB", "ALL", 0}, {"GRB", "12", 12}, {"GRB", "15", 15}, {"GRB", "18", 18}, {"CSRR", "ALL", 0},
+		{"ACB", "G", 0}, {"ACB", "PG", 8}, {"ACB", "M", 15}, {"ACB", "MA15+", 15}, {"ACB", "R18+", 18},
+		{"OFLC", "M", 15}, {"OFLC", "R18+", 18},
+		{"", "3", 3}, {"", "", -1}, {"CERO", "", -1}, {"XYZ", "Q", -1}, {"PEGI", "99", -1},
+		{"PEGI", "-3", -1}, {"PEGI", "12x", -1}, {"esrb", "m", 17},
+	};
+	for (size_t i = 0; i < sizeof r / sizeof r[0]; i++)
+	{
+		char what[64];
+		snprintf(what, sizeof what, "rating age %s %s", r[i].board, r[i].value);
+		check(what, GameTDB::RatingAge(r[i].board, r[i].value) == r[i].age);
+	}
+	check("rating age: no board", GameTDB::RatingAge(NULL, "3") == -1);
+	check("rating age: no value", GameTDB::RatingAge("PEGI", NULL) == -1);
+}
+
+static void case_rating_from_node(void)
+{
+	std::string xml = std::string(HEADER) + "<WiiTDB version=\"1\" games=\"3\"/>\n" +
+		"<game name=\"RM8E01\">\n<id>RM8E01</id>\n<rating type=\"ESRB\" value=\"M\">\n</rating>\n</game>\n" +
+		"<game name=\"RM8K01\">\n<id>RM8K01</id>\n<rating type=\"GRB\" value=\"ALL\"/>\n</game>\n" +
+		game("RSPE01", "No rating") + "</datafile>\n";
+	GameTDB db(write_xml(xml).c_str());
+	check("rating node: ESRB M", db.GetRatingAge("RM8E01") == 17);
+	check("rating node: GRB ALL", db.GetRatingAge("RM8K01") == 0);
+	check("rating node: none", db.GetRatingAge("RSPE01") == -1);
+	check("rating node: unknown game", db.GetRatingAge("XXXX01") == -1);
+	check("rating node: no id", db.GetRatingAge(NULL) == -1);
+}
+
 typedef struct
 {
 	const char *name;
@@ -165,6 +205,8 @@ static const test_case cases[] = {
 	{"node_ends_at_last_byte", case_node_ends_at_last_byte},
 	{"node_never_closes", case_node_never_closes},
 	{"failed_parse_keeps_cache_honest", case_failed_parse_keeps_cache_honest},
+	{"rating_age", case_rating_age},
+	{"rating_from_node", case_rating_from_node},
 };
 
 int main(int argc, char **argv)

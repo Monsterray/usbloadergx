@@ -149,7 +149,7 @@ static const char * NandEmuText[] =
 static const char * HooktypeText[] =
 {
 	trNOOP( "None" ),
-	trNOOP( "VBI (Default)" ),
+	trNOOP( "VBI" ),
 	trNOOP( "KPAD Read" ),
 	trNOOP( "Joypad" ),
 	trNOOP( "GXDraw" ),

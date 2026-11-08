@@ -27,12 +27,12 @@ MINIZIP_VERSION=1.3.2
 MINIZIP_URL=https://github.com/madler/zlib/releases/download/v1.3.2/zlib-1.3.2.tar.gz
 MINIZIP_SHA256=bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16
 
-# The Homebrew Channel's in-app agent (sdk/hbc_agent.h), HBC 1.11.0 (tag v1.11.0): its way
+# The Homebrew Channel's in-app agent (sdk/hbc_agent.h), HBC 1.15.11 (develop b01e0c8): its way
 # out leaves a wedged IOS (ES launch, then a reset) when GX's IoGuard ends a stuck USB or
 # disc request.
-HBCAGENT_VERSION=ec7111c7ebe6b366ecf8bc305b35aa07b8d8ddf9
-HBCAGENT_URL=https://github.com/Monsterray/hbc-reborn/archive/ec7111c7ebe6b366ecf8bc305b35aa07b8d8ddf9.tar.gz
-HBCAGENT_SHA256=7162a4aa06e0c47fe97594d0038b2c35b575ea7b444b475b9534aac83756baea
+HBCAGENT_VERSION=b01e0c850ca11ec81f6fddcd891ed6a70170f2a4
+HBCAGENT_URL=https://github.com/Monsterray/hbc-reborn/archive/b01e0c850ca11ec81f6fddcd891ed6a70170f2a4.tar.gz
+HBCAGENT_SHA256=ec861c7d48005843de45967f3e2a6b67694f0ce884bb0e8039a6133596d3464a
 
 DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
 DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"

@@ -3,7 +3,7 @@
 #
 #   usage: scripts/dolphin_start.sh [--stop]
 #   env:   DOL=<path>     .dol to boot (default: usbloader_gx/boot.dol)
-#          DOLPHIN=<dir>  Dolphin install (default /c/tools/Dolphin-x64)
+#          DOLPHIN=<dir>  Dolphin install (default: the folder of the one scripts/wii_paths.py dolphin finds)
 #
 # Unlike scripts/dolphin_run.sh this never kills the instance on a timer, so it
 # is the one to use when you want to look at the loader. It uses the same
@@ -18,7 +18,14 @@ set -u
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOL="${DOL:-$ROOT/usbloader_gx/boot.dol}"
-D="${DOLPHIN:-/c/tools/Dolphin-x64}"
+D="${DOLPHIN:-}"
+if [ -z "$D" ]; then  # the folder of the Dolphin that wii_paths.py finds (PATH, standard install, ~/.wii-paths.json)
+	_py="$(command -v py || command -v python3 || command -v python)"
+	_exe="$("$_py" "$ROOT/scripts/wii_paths.py" dolphin)" || { echo "no Dolphin: put it on PATH or set DOLPHIN to its folder" >&2; exit 2; }
+	_exe="$(printf '%s' "$_exe" | tr -d '\r')"
+	command -v cygpath >/dev/null 2>&1 && _exe="$(cygpath -u "$_exe")"
+	D="$(dirname "$_exe")"
+fi
 U="$ROOT/.dev/dolphin_profile"
 SD="$U/Load/WiiSDSync"
 mkdir -p "$U"

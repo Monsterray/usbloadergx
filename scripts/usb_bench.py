@@ -18,7 +18,7 @@ Everything goes to .runs/usb_bench/<time>-<mode>/.
   dump    reads only: boot/FSInfo sectors, FAT1 against FAT2, root directory, usbbench folder
 
 Safety, as WiiStation's bench scripts do it (scripts/wii_targets.py, Gamecube/hbc_home.c,
-Gamecube/boot_guard.c in C:/projects/WiiStation):
+Gamecube/boot_guard.c in the WiiStation repository):
   - Runs only as a wii-bench queue job, and never against a production-style Wii.
   - Every hbc.py call has a timeout, so a wedged Wii never holds the queue lease.
   - Read-only by default: the build refuses every USB write in usbstorage2.c, before IOS
@@ -33,11 +33,15 @@ Gamecube/boot_guard.c in C:/projects/WiiStation):
 It installs nothing, never touches a cIOS, and writes on SD only the two logs and GX's own
 review-folder files (settings, caches).
 
-    C:/Python312/python.exe C:/tools/wii-bench/wiibench.py add --wii dev --timeout 1800 \\
-        --cwd C:/projects/usbloadergx-bench --name "GX USB bench dump (read-only)" -- \\
-        C:/Python312/python.exe scripts/usb_bench.py --mode dump
+    python "$WII_BENCH" add --wii devwii --timeout 1800 --cwd . \\
+        --name "GX USB bench dump (read-only)" -- python scripts/usb_bench.py --mode dump
 
-HBC_TOOL overrides the hbc.py path (default C:/projects/hbc-reborn/tools/hbc.py).
+($WII_BENCH is the bench shim: `python scripts/wii_paths.py wii_bench`. Queued commands are
+not run by a shell, so give `add` the expanded paths, and an absolute path to python if a
+bare `python` is not the one you want.)
+
+hbc.py is found by scripts/wii_paths.py: $HBC_PY, else $HBC_REBORN/tools/hbc.py, HBC_REBORN
+defaulting to ../hbc-reborn. The older HBC_TOOL still works in place of HBC_PY.
 Exit status 0 when both logs came back and the bench reached its exit; 2 when HBC did not
 come back (STUCK: someone has to bring the Wii back).
 """
@@ -52,11 +56,23 @@ import time
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 REVIEW = "sd:/apps/usbloader_gx_review/"
-HBC_TOOL = os.environ.get("HBC_TOOL", "C:/projects/hbc-reborn/tools/hbc.py")
+HBC_TOOL = None  # hbc.py's path, set by find_hbc() in main()
 # Production-style Wiis with real data on them (WiiStation scripts/wii_targets.py)
 PRODUCTION_WII = "192.168.8.200"
 LRWII = "192.168.8.243"
 PROTECTED_WIIS = (PRODUCTION_WII, LRWII)
+
+
+def find_hbc():
+    """hbc.py's path through scripts/wii_paths.py; HBC_TOOL is the older name for HBC_PY."""
+    if os.environ.get("HBC_TOOL") and not os.environ.get("HBC_PY"):
+        os.environ["HBC_PY"] = os.environ["HBC_TOOL"]
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    import wii_paths
+    try:
+        return str(wii_paths.hbc_py())
+    except wii_paths.NotFound as e:
+        sys.exit(f"usb_bench.py: no hbc.py: {e}")
 
 
 def bench_wii(allowed=None):
@@ -207,6 +223,8 @@ def main():
         print("dry run: nothing sent")
         return 0
     wii = bench_wii(o.allow_wii)
+    global HBC_TOOL
+    HBC_TOOL = find_hbc()
     out.mkdir(parents=True, exist_ok=True)
 
     if answer(wii) != "hbc":

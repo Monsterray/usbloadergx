@@ -115,10 +115,9 @@ run Nintendont's kernel, so neither shows Nintendont's screen).
 | Range | What | Notes |
 | --- | --- | --- |
 | 0x90000000-0x90200000 | IOS reload area | Never used by GX (`IOS_RELOAD_AREA`) |
-| 0x90200000-0x91800000 | GX heap, lower pool (22 MB) | Tried first |
-| 0x91800000-0x91801140 | hbc agent records: netlog copy, crash block, last log | Left out of the heap. Only the 32-byte netlog copy is written while GX runs (by `hbc.py log`); see `@Shared/handoff-hbc-agent-mem2-records.md` |
-| 0x91801140-heap end | GX heap, upper pool (27.1 MB) | Keeps the large free block |
-| heap end-Arena2Hi | 768 KB left for libogc (`LIBOGC_ARENA2_RESERVE`) | *measured* use: 233 KB, i.e. Bluetooth buffers 85 KB per `WPAD_Init()` (twice at start-up) and the 64 KB net heap |
+| 0x90200000-heap end | GX heap, one pool (49.1 MB) | |
+| 0x91800000-0x91801140 | hbc agent records: netlog copy, crash block, last log | Inside the heap. Since HBC 1.10.7 the agent writes them only when the app stops (exit, exception, fatal, hang), after GX's heap is gone |
+| heap end-Arena2Hi | 768 KB left for libogc (`LIBOGC_ARENA2_RESERVE`) | *measured* use: 233 KB in Dolphin, at most 256 KB on the bench Wii (2026-11-06), i.e. Bluetooth buffers 85 KB per `WPAD_Init()` (twice at start-up) and the 64 KB net heap |
 | 0x933E0000-0x93400000 | libogc IPC buffer | |
 | 0x93400000-0x94000000 | IOS | GX only reads it (`sys.cpp` 0x938B2xxx, `neek.cpp` 0x939F0000) |
 
@@ -145,7 +144,7 @@ The `malloc`, `calloc`, `memalign`, `realloc` and `free` wrappers are in
 - Over 30 KB (`MEM2_PRIORITY_SIZE`), or when the request would push the MEM1
   heap past 0x81700000: MEM2 first, then MEM1.
 - `free`, `realloc` and `malloc_usable_size` pick the bank by address bit
-  0x10000000, then the pool by range. A MEM2 pointer no pool owns is logged
+  0x10000000, then the pool by range. A MEM2 pointer the heap does not own is logged
   and left alone. A MEM1 pointer inside the texture pool's ranges goes to the
   pool, also after it closed (the free is then dropped); any other MEM1
   pointer goes to newlib.

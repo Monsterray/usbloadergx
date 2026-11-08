@@ -99,9 +99,10 @@ grep -qE '\bgprintf\(tmp\)' "$SRC/StartUpProcess.cpp" \
 
 # 14. GX's MEM2 heap runs from 0x90200000 to the top of the SYS arena less what
 #     libogc takes later. Nothing may write a fixed address inside it while GX
-#     runs, and the heap must leave out the hbc agent's records at 0x91800000.
+#     runs. The hbc agent's records at 0x91800000 need no gap: since HBC 1.10.7
+#     the agent writes them only when the app stops, so the heap is one pool.
 grep -q 'HBC_RECORDS_START' "$SRC/memory/mem2.cpp" \
-	|| fail "the MEM2 heap does not leave out the hbc agent's records"
+	&& fail "the MEM2 heap is split around the hbc records, which the agent no longer writes while GX runs"
 grep -q 'static u32 \*buffer = (u32 \*) 0x93' "$SRC/usbloader/disc.c" \
 	&& fail "disc.c reads the disc into a fixed address inside the MEM2 heap"
 grep -q 'homebrewbuffer = EXECUTE_ADDR' "$SRC/homebrewboot/BootHomebrew.cpp" \

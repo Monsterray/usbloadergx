@@ -28,7 +28,7 @@ if command -v docker >/dev/null 2>&1; then
 	MOUNT_ROOT="$ROOT"
 elif command -v wsl.exe >/dev/null 2>&1; then
 	DOCKER=(wsl.exe -d "$WSL_DISTRO" -e docker)
-	# /c/projects/x -> /mnt/c/projects/x
+	# /c/dir/x -> /mnt/c/dir/x
 	MOUNT_ROOT="$(printf '%s' "$ROOT" | sed -E 's|^/([a-zA-Z])/|/mnt/\L\1/|')"
 else
 	echo "docker not found, natively or through WSL." >&2

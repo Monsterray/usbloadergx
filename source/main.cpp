@@ -26,6 +26,7 @@
 #include "sys.h"
 #include "system/IoGuard.h"
 #include "system/CrashReset.h"
+#include "utils/UsbBench.h"
 
 extern "C"
 {
@@ -55,6 +56,7 @@ int main(int argc, char *argv[])
 	MEM_Report("start");
 
 	setlocale(LC_ALL, "en_US.UTF-8");
+	UsbBench_Init(argc, argv); // only in the cIOS bench build
 
 	if(StartUpProcess::Run(argc, argv) < 0)
 		return -1;

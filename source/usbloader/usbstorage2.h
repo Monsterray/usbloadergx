@@ -20,6 +20,14 @@ extern "C"
 	s32 USBStorage2_GetPort();
 	//! While on, a write whose sectors already hold those bytes is skipped (PartitionHandle::UnMount)
 	void USBStorage2_SkipUnchangedWrites(bool on);
+#ifdef USB_BENCH
+	//! The cIOS bench build only (utils/UsbBench.cpp): no skip in unmounts, and write counters
+	void USBStorage2_BenchNoSkip(bool on);
+	//! On by default: every USB write is refused, until -benchwrites=1
+	void USBStorage2_BenchReadOnly(bool on);
+	u32 USBStorage2_BenchRefused(void);
+	void USBStorage2_BenchWrites(u32 *calls, u32 *sectors, u32 *failed, u32 *totalMs, u32 *maxUs);
+#endif
 
 #define DEVICE_TYPE_WII_UMS (('W'<<24)|('U'<<16)|('M'<<8)|'S')
 

@@ -36,6 +36,9 @@
 #include "memory/mem2.h"
 #include "gecko.h"
 #include "system/IoGuard.h"
+#ifdef USB_BENCH
+#include <ogc/lwp_watchdog.h>
+#endif
 
 
 /* IOCTL commands */
@@ -227,10 +230,74 @@ s32 USBStorage2_ReadSectors(u32 port, u32 sector, u32 numSectors, void *buffer)
 
 static bool skipUnchangedWrites = false;
 
+#ifdef USB_BENCH
+//! The cIOS bench build (utils/UsbBench.cpp) counts and times every write, and
+//! can turn the unchanged-sector skip off to time the unmount's real writes.
+static bool benchNoSkip = false, benchReadOnly = true;
+static u32 benchCalls, benchSectors, benchFailed, benchMaxUs, benchRefused;
+static u64 benchUs;
+
+void USBStorage2_BenchNoSkip(bool on)
+{
+	benchNoSkip = on;
+}
+
+//! On from the start: every write fails at once, before IOS sees it. A cIOS
+//! whose writes land as junk must not touch the drive (-benchwrites=1 lifts it).
+void USBStorage2_BenchReadOnly(bool on)
+{
+	benchReadOnly = on;
+}
+
+u32 USBStorage2_BenchRefused(void)
+{
+	return benchRefused;
+}
+
+void USBStorage2_BenchWrites(u32 *calls, u32 *sectors, u32 *failed, u32 *totalMs, u32 *maxUs)
+{
+	*calls = benchCalls;
+	*sectors = benchSectors;
+	*failed = benchFailed;
+	*totalMs = (u32)(benchUs / 1000);
+	*maxUs = benchMaxUs;
+}
+#endif
+
 void USBStorage2_SkipUnchangedWrites(bool on)
 {
+#ifdef USB_BENCH
+	if (benchNoSkip)
+		on = false;
+#endif
 	skipUnchangedWrites = on;
 }
+
+#ifdef USB_BENCH
+static s32 BenchWriteSectors(u32 port, u32 sector, u32 numSectors, const void *buffer);
+
+s32 USBStorage2_WriteSectors(u32 port, u32 sector, u32 numSectors, const void *buffer)
+{
+	if (benchReadOnly)
+	{
+		benchRefused++;
+		gprintf("usbbench: USB write of %u sector(s) at %u refused (read-only)\n", numSectors, sector);
+		return -1;
+	}
+	u64 start = gettime();
+	s32 ret = BenchWriteSectors(port, sector, numSectors, buffer);
+	u32 us = ticks_to_microsecs(diff_ticks(start, gettime()));
+	benchCalls++;
+	benchSectors += numSectors;
+	benchFailed += ret < 0;
+	benchUs += us;
+	if (us > benchMaxUs)
+		benchMaxUs = us;
+	return ret;
+}
+//! The driver below, under the bench's name, until its end
+#define USBStorage2_WriteSectors BenchWriteSectors
+#endif
 
 s32 USBStorage2_WriteSectors(u32 port, u32 sector, u32 numSectors, const void *buffer)
 {
@@ -290,6 +357,9 @@ s32 USBStorage2_WriteSectors(u32 port, u32 sector, u32 numSectors, const void *b
 
 	return ret;
 }
+#ifdef USB_BENCH
+#undef USBStorage2_WriteSectors
+#endif
 
 static bool __usbstorage_Startup(void)
 {

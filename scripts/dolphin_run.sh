@@ -3,7 +3,7 @@
 #
 #   usage: scripts/dolphin_run.sh <outdir> [seconds]
 #   env:   DOL=<path>       .dol to boot (default: usbloader_gx/boot.dol from the last scripts/build.sh)
-#          DOLPHIN=<dir>    Dolphin install (default /c/tools/Dolphin-x64)
+#          DOLPHIN=<dir>    Dolphin install (default: the folder of the one scripts/wii_paths.py dolphin finds)
 #          KEEP=<n>         frames to keep, the last ones (default 60)
 #          AUTOINPUT=<file> copy it to sd:/autoinput.txt for this run (a .dol from
 #                           scripts/diag.sh autoinput plays it), removed afterwards
@@ -42,7 +42,14 @@ set -u
 OUT="${1:?usage: dolphin_run.sh <outdir> [seconds]}"; SECS="${2:-60}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DOL="${DOL:-$ROOT/usbloader_gx/boot.dol}"
-D="${DOLPHIN:-/c/tools/Dolphin-x64}"
+D="${DOLPHIN:-}"
+if [ -z "$D" ]; then  # the folder of the Dolphin that wii_paths.py finds (PATH, standard install, ~/.wii-paths.json)
+	_py="$(command -v py || command -v python3 || command -v python)"
+	_exe="$("$_py" "$ROOT/scripts/wii_paths.py" dolphin)" || { echo "no Dolphin: put it on PATH or set DOLPHIN to its folder" >&2; exit 2; }
+	_exe="$(printf '%s' "$_exe" | tr -d '\r')"
+	command -v cygpath >/dev/null 2>&1 && _exe="$(cygpath -u "$_exe")"
+	D="$(dirname "$_exe")"
+fi
 U="$ROOT/.dev/dolphin_profile"
 KEEP="${KEEP:-60}"
 

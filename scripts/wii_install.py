@@ -13,12 +13,16 @@ meta.xml names it "USB Loader GX (review)" so the two can be told apart in HBC.
 
 Needs a Homebrew Channel that answers hbc.py (hbc-reborn), and:
     WII_BENCH_IP   the Wii's address (the bench queue sets it for every job; HBC_WII also works)
-    HBC_TOOL       path to hbc.py (default: C:/projects/hbc-reborn/tools/hbc.py)
+    HBC_PY         path to hbc.py (default: $HBC_REBORN/tools/hbc.py, HBC_REBORN defaulting
+                   to ../hbc-reborn; found by scripts/wii_paths.py)
 
 On a shared bench Wii, run it only as a queue job, never directly:
 
-    C:/Python312/python.exe C:/tools/wii-bench/wiibench.py add --cwd C:/projects/usbloadergx \\
-        --name "USB Loader GX install" -- C:/Python312/python.exe scripts/wii_install.py
+    python "$WII_BENCH" add --cwd . --name "USB Loader GX install" -- python scripts/wii_install.py
+
+($WII_BENCH is the bench shim: `python scripts/wii_paths.py wii_bench`. Queued commands are
+not run by a shell, so give `add` the expanded paths, and an absolute path to python if a
+bare `python` is not the one you want.)
 """
 import os
 import pathlib
@@ -80,9 +84,12 @@ def main():
     wii = os.environ.get("WII_BENCH_IP") or os.environ.get("HBC_WII")
     if not wii:
         sys.exit("no Wii address: set WII_BENCH_IP (the bench queue does) or HBC_WII")
-    hbc = pathlib.Path(os.environ.get("HBC_TOOL", "C:/projects/hbc-reborn/tools/hbc.py"))
-    if not hbc.exists():
-        sys.exit(f"no hbc.py at {hbc}: set HBC_TOOL")
+    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+    import wii_paths
+    try:
+        hbc = wii_paths.hbc_py()
+    except wii_paths.NotFound as e:
+        sys.exit(f"no hbc.py: {e}")
 
     r = subprocess.run([sys.executable, str(hbc), "--wii", wii, "sync", str(local), remote])
     if r.returncode:

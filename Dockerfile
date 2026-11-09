@@ -18,6 +18,10 @@ FROM devkitpro/devkitppc:20260503 AS toolchain
 RUN dkp-pacman -U --noconfirm https://pkg.devkitpro.org/packages/devkitppc-crtls-2.1.0-1-any.pkg.tar.zst
 COPY deps/ /tmp/deps/
 RUN bash /tmp/deps/build.sh /opt/devkitpro/portlibs/usbloadergx && rm -rf /tmp/deps
+# Containers run as root on a tree the host user owns (a bind mount or a tar copy).
+# git refuses such a repository ("dubious ownership"), and makexml.sh then wrote
+# version 0.0.0+g0000001. -c safe.directory is not honoured by this git (2.39).
+RUN git config --system --add safe.directory '*'
 
 # Copy current folder into container, then compile
 FROM toolchain AS usbloadergx

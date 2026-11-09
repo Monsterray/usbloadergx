@@ -36,6 +36,9 @@ else
 fi
 
 cd "$ROOT"
+# version.h and meta.xml from the host's git: in a git worktree the container cannot read
+# the repository (.git names a host folder), and makexml.sh there keeps these.
+bash makexml.sh 2>/dev/null || true
 toolchain() {
 	"${DOCKER[@]}" build -q --target toolchain -t "$IMAGE" "$MOUNT_ROOT" >/dev/null
 }

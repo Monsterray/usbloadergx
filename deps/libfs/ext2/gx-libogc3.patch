@@ -1,0 +1,340 @@
+diff --git a/source/ext2.c b/source/ext2.c
+index 02b9470..e88d29c 100644
+--- a/source/ext2.c
++++ b/source/ext2.c
+@@ -58,15 +58,8 @@ bool ext2Mount(const char *name, const DISC_INTERFACE *interface, sec_t startSec
+     fd->cachePageCount = cachePageCount;
+     fd->cachePageSize = cachePageSize;
+ 
+-    fs = mem_alloc(sizeof(struct struct_ext2_filsys));
+-	if (!fs)
+-	{
+-        ext2_log_trace("no memory for fs\n");
+-        errno = ENOMEM;
+-        goto cleanup;
+-    }
+-
+-	memset(fs, 0, sizeof(struct struct_ext2_filsys));
++    // ext2fs_open2 allocates the filesystem itself
++    fs = NULL;
+ 
+ 	io_chan = mem_alloc(sizeof(struct struct_io_channel));
+ 	if (!io_chan)
+@@ -93,6 +86,7 @@ bool ext2Mount(const char *name, const DISC_INTERFACE *interface, sec_t startSec
+     if(retval)
+     {
+         ext2_log_trace("error mounting %i\n", (int) retval);
++        fs = NULL; // freed by ext2fs_open2, which can still leave *ret_fs set (MMP failure)
+ 		goto cleanup;
+     }
+ 
+@@ -118,17 +112,19 @@ bool ext2Mount(const char *name, const DISC_INTERFACE *interface, sec_t startSec
+     return true;
+ 
+ cleanup:
+-	if(fd)
+-		mem_free(fd);
++	// ext2fs_open2 frees the filesystem (and closes the channel) on failure;
++	// ext2fs_close frees it on success, and only keeps it when the flush fails
++	if(fs && ext2fs_close(fs))
++		ext2fs_free(fs);
+ 	if(io_chan)
++	{
++		free(io_chan->name);
+ 		mem_free(io_chan);
++	}
++	if(fd)
++		mem_free(fd);
+     if(vd)
+         mem_free(vd);
+-	if(fs)
+-	{
+-        ext2fs_close(fs);
+-		ext2fs_free(fs);
+-	}
+ 
+     return false;
+ }
+@@ -149,10 +145,11 @@ void ext2Unmount(const char *name)
+     ext2DeinitVolume(vd);
+ 
+     // Unmount the volume
+-    ext2fs_close(vd->fs);
+-    ext2fs_free(vd->fs);
++    if (ext2fs_close(vd->fs))
++        ext2fs_free(vd->fs);
+ 
+     //Free the io manager
++    free(vd->io->name);
+     mem_free(vd->io->private_data);
+     mem_free(vd->io);
+ 
+diff --git a/source/ext2_frag.c b/source/ext2_frag.c
+index e05a4bc..0e05a14 100644
+--- a/source/ext2_frag.c
++++ b/source/ext2_frag.c
+@@ -5,6 +5,7 @@ typedef struct _PrivData
+ {
+     _ext2_frag_append_t append_fragment;
+     void * callback_data;
++    int error;
+ } PrivDataST;
+ 
+ static int block_iter_callback(ext2_filsys fs, blk64_t *blocknr, e2_blkcnt_t blockcnt, blk64_t ref_block, int ref_offset,  void *privateData)
+@@ -13,7 +14,14 @@ static int block_iter_callback(ext2_filsys fs, blk64_t *blocknr, e2_blkcnt_t blo
+     blk64_t block;
+     block = *blocknr;
+ 
+-    return priv->append_fragment(priv->callback_data, blockcnt*fs->io->block_size/512, block*fs->io->block_size/512, fs->io->block_size/512);
++    int ret = priv->append_fragment(priv->callback_data, blockcnt*fs->io->block_size/512, block*fs->io->block_size/512, fs->io->block_size/512);
++    if (ret != 0) {
++        // ext2fs_block_iterate3 reads the return value as flags, not as an error code:
++        // keep the code and stop the walk.
++        priv->error = ret;
++        return BLOCK_ABORT | BLOCK_ERROR;
++    }
++    return 0;
+ }
+ 
+ int _EXT2_get_fragments(const char *in_path, _ext2_frag_append_t append_fragment, void *callback_data)
+@@ -36,9 +44,12 @@ int _EXT2_get_fragments(const char *in_path, _ext2_frag_append_t append_fragment
+         return -1;
+     }
+ 
++    ext2Lock(vd);
++
+     // Find the entry
+     ni = ext2OpenEntry(vd, path);
+     if (!ni) {
++        ext2Unlock(vd);
+         errno = ENOENT;
+         return -1;
+     }
+@@ -46,15 +57,22 @@ int _EXT2_get_fragments(const char *in_path, _ext2_frag_append_t append_fragment
+     PrivDataST priv;
+     priv.callback_data = callback_data;
+     priv.append_fragment = append_fragment;
++    priv.error = 0;
+ 
+     int ret = ext2fs_block_iterate3(vd->fs, ni->ino, BLOCK_FLAG_DATA_ONLY, NULL, block_iter_callback, &priv);
+ 
+-    if(ret == 0)
++    if (priv.error)
++        ret = priv.error;
++    else if (ret)
++        ret = -1;
++    else
+         ret = priv.append_fragment(callback_data, EXT2_I_SIZE(&ni->ni) >> 9, 0, 0);
+ 
+-    ext2UpdateTimes(vd, ni, EXT2_UPDATE_ATIME);
++    // No ext2UpdateTimes(): a lookup for a game boot must not dirty an inode that is
++    // written back at unmount (the volume is mounted read-write).
+ 
+     ext2CloseEntry(vd, ni);
++    ext2Unlock(vd);
+ 
+     return ret;
+ }
+diff --git a/source/ext2_internal.c b/source/ext2_internal.c
+index ddb5f2a..5f940cd 100644
+--- a/source/ext2_internal.c
++++ b/source/ext2_internal.c
+@@ -67,7 +67,6 @@ int ext2AddDevice (const char *name, void *deviceData)
+     const devoptab_t *devoptab_ext2 = ext2GetDevOpTab();
+     devoptab_t *dev = NULL;
+     char *devname = NULL;
+-    int i;
+ 
+     // Sanity check
+     if (!name || !deviceData || !devoptab_ext2) {
+@@ -91,15 +90,14 @@ int ext2AddDevice (const char *name, void *deviceData)
+     dev->name = devname;
+     dev->deviceData = deviceData;
+ 
+-    // Add the device to the devoptab table (if there is a free slot)
+-    for (i = 0; i < STD_MAX; i++) {
+-        if (devoptab_list[i] == devoptab_list[0] && i != 0) {
+-            devoptab_list[i] = dev;
+-            return 0;
+-        }
+-    }
++    // Add the device to the devoptab table (if there is a free slot). The slots are not
++    // scanned by hand: unused ones do not all equal slot 0 once something else (the USB
++    // keyboard, for one) has replaced stdin, and the scan then never found a free slot.
++    if (AddDevice(dev) >= 0)
++        return 0;
+ 
+     // If we reach here then there are no free slots in the devoptab table for this device
++    mem_free(dev);
+     errno = EADDRNOTAVAIL;
+     return -1;
+ }
+@@ -108,27 +106,17 @@ void ext2RemoveDevice (const char *path)
+ {
+     const devoptab_t *devoptab = NULL;
+     char name[128] = {0};
+-    int i;
++    char devname[130];
+ 
+     // Get the device name from the path
+     strncpy(name, path, 127);
+     strtok(name, ":/");
+ 
+-    // Find and remove the specified device from the devoptab table
+-    // NOTE: We do this manually due to a 'bug' in RemoveDevice
+-    //       which ignores names with suffixes
+-    for (i = 0; i < STD_MAX; i++) {
+-        devoptab = devoptab_list[i];
+-        if (devoptab && devoptab->name) {
+-            if (strcmp(name, devoptab->name) == 0) {
+-                devoptab_list[i] = devoptab_list[0];
+-                mem_free((devoptab_t*)devoptab);
+-                break;
+-            }
+-        }
+-    }
+-
+-    return;
++    snprintf(devname, sizeof(devname), "%s:", name);
++    devoptab = GetDeviceOpTab(devname);
++    if (devoptab && devoptab->name && strcmp(name, devoptab->name) == 0 &&
++        RemoveDevice(devname) >= 0)
++        mem_free((devoptab_t*)devoptab);
+ }
+ 
+ const devoptab_t *ext2GetDevice (const char *path)
+@@ -179,7 +167,7 @@ int ext2InitVolume (ext2_vd *vd)
+     memset(vd, 0, sizeof(ext2_vd));
+ 
+     // Initialise the volume lock
+-    LWP_MutexInit(&vd->lock, false);
++    LWP_MutexInit(&vd->lock, true);
+ 
+     return 0;
+ }
+diff --git a/source/ext2file.c b/source/ext2file.c
+index f2b77c1..1dac2a1 100644
+--- a/source/ext2file.c
++++ b/source/ext2file.c
+@@ -180,7 +180,7 @@ int ext2_open_r (struct _reent *r, void *fileStruct, const char *path, int flags
+     return (int)fileStruct;
+ }
+ 
+-int ext2_close_r (struct _reent *r, int fd)
++int ext2_close_r (struct _reent *r, void *fd)
+ {
+     ext2_log_trace("fd %p\n", (void *) fd);
+ 
+@@ -213,7 +213,7 @@ int ext2_close_r (struct _reent *r, int fd)
+     return 0;
+ }
+ 
+-ssize_t ext2_write_r (struct _reent *r, int fd, const char *ptr, size_t len)
++ssize_t ext2_write_r (struct _reent *r, void *fd, const char *ptr, size_t len)
+ {
+     ext2_log_trace("fd %p, ptr %p, len %i\n", (void *) fd, ptr, len);
+ 
+@@ -269,7 +269,7 @@ ssize_t ext2_write_r (struct _reent *r, int fd, const char *ptr, size_t len)
+     return (written == 0 ? -1 : written);
+ }
+ 
+-ssize_t ext2_read_r (struct _reent *r, int fd, char *ptr, size_t len)
++ssize_t ext2_read_r (struct _reent *r, void *fd, char *ptr, size_t len)
+ {
+     ext2_log_trace("fd %p, ptr %p, len %i\n", (void *) fd, ptr, len);
+ 
+@@ -313,7 +313,7 @@ ssize_t ext2_read_r (struct _reent *r, int fd, char *ptr, size_t len)
+     return (read == 0) ? -1 : read;
+ }
+ 
+-off_t ext2_seek_r (struct _reent *r, int fd, off_t pos, int dir)
++off_t ext2_seek_r (struct _reent *r, void *fd, off_t pos, int dir)
+ {
+     ext2_log_trace("fd %p, pos %lli, dir %i\n", (void *) fd, pos, dir);
+ 
+@@ -332,7 +332,7 @@ off_t ext2_seek_r (struct _reent *r, int fd, off_t pos, int dir)
+     return (off_t) pos_loaded;
+ }
+ 
+-int ext2_fstat_r (struct _reent *r, int fd, struct stat *st)
++int ext2_fstat_r (struct _reent *r, void *fd, struct stat *st)
+ {
+     ext2_log_trace("fd %p\n", (void *) fd);
+ 
+@@ -357,7 +357,7 @@ int ext2_fstat_r (struct _reent *r, int fd, struct stat *st)
+     return ret;
+ }
+ 
+-int ext2_ftruncate_r (struct _reent *r, int fd, off_t len)
++int ext2_ftruncate_r (struct _reent *r, void *fd, off_t len)
+ {
+     ext2_log_trace("fd %p, len %Li\n", (void *) fd, len);
+ 
+@@ -395,7 +395,7 @@ int ext2_ftruncate_r (struct _reent *r, int fd, off_t len)
+     return err;
+ }
+ 
+-int ext2_fsync_r (struct _reent *r, int fd)
++int ext2_fsync_r (struct _reent *r, void *fd)
+ {
+     ext2_log_trace("fd %p\n", (void *) fd);
+ 
+diff --git a/source/ext2file.h b/source/ext2file.h
+index 249ba52..05b4cef 100644
+--- a/source/ext2file.h
++++ b/source/ext2file.h
+@@ -48,13 +48,13 @@ void ext2CloseFile (ext2_file_state *file);
+ 
+ /* Gekko devoptab file routines for EXT2-based devices */
+ extern int ext2_open_r (struct _reent *r, void *fileStruct, const char *path, int flags, int mode);
+-extern int ext2_close_r (struct _reent *r, int fd);
+-extern ssize_t ext2_write_r (struct _reent *r, int fd, const char *ptr, size_t len);
+-extern ssize_t ext2_read_r (struct _reent *r, int fd, char *ptr, size_t len);
+-extern off_t ext2_seek_r (struct _reent *r, int fd, off_t pos, int dir);
+-extern int ext2_fstat_r (struct _reent *r, int fd, struct stat *st);
+-extern int ext2_ftruncate_r (struct _reent *r, int fd, off_t len);
+-extern int ext2_fsync_r (struct _reent *r, int fd);
++extern int ext2_close_r (struct _reent *r, void *fd);
++extern ssize_t ext2_write_r (struct _reent *r, void *fd, const char *ptr, size_t len);
++extern ssize_t ext2_read_r (struct _reent *r, void *fd, char *ptr, size_t len);
++extern off_t ext2_seek_r (struct _reent *r, void *fd, off_t pos, int dir);
++extern int ext2_fstat_r (struct _reent *r, void *fd, struct stat *st);
++extern int ext2_ftruncate_r (struct _reent *r, void *fd, off_t len);
++extern int ext2_fsync_r (struct _reent *r, void *fd);
+ 
+ #endif /* _EXT2FILE_H */
+ 
+diff --git a/source/gekko_io.c b/source/gekko_io.c
+index ec6d93d..a3d5373 100644
+--- a/source/gekko_io.c
++++ b/source/gekko_io.c
+@@ -203,13 +203,12 @@ static errcode_t device_gekko_io_close(io_channel dev)
+         return -1;
+     }
+ 
+-    if(!(dev->flags & EXT2_FLAG_RW))
+-        return 0;
+-
+     // Flush and destroy the cache (if required)
+     if (fd->cache) {
+-        cache_flush(fd->cache);
++        if (dev->flags & EXT2_FLAG_RW)
++            cache_flush(fd->cache);
+         cache_destructor(fd->cache);
++        fd->cache = NULL;
+     }
+ 
+     return 0;
+diff --git a/source/tdb.c b/source/tdb.c
+index 73d54b6..795228b 100644
+--- a/source/tdb.c
++++ b/source/tdb.c
+@@ -104,7 +104,7 @@ static char *rep_strdup(const char *s)
+ #endif
+ #endif
+ 
+-typedef int bool;
++#include <stdbool.h>
+ 
+ #include "tdb.h"
+ 

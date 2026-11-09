@@ -36,6 +36,39 @@ libraries.
 | pugixml | 1.16 | `wiitdb.xml`, categories, homebrew `meta.xml`, Wiinnertag |
 | minizip | from zlib 1.3.2 | zip extraction (`ZipFile`, `utils/minizip/miniunz.c`) |
 | hbc agent | hbc-reborn v1.11.0 (ec7111c) | HBC's in-app agent |
+| libfat (`libcustomfat.a`) | extremscorner/libfat c756e1e (libFAT 1.2.0+) | FAT32 drives and SD |
+| libntfs | extremscorner/libntfs 417e8dd (NTFS-3G 2026.9.28) | NTFS drives |
+| libext2fs | this repository's `libs` branch, 910f6f5 (`libcustomext2fs`) | ext2/3/4 drives |
+
+The three filesystem libraries replace the prebuilt `.a` files that used to sit in
+`source/libs/`. Sources, pinned by sha256 (see `deps/build.sh` for the full URLs):
+
+| Library | Tarball sha256 | Patches in `deps/libfs/` |
+|---|---|---|
+| libfat | `46a7bc78938c7d57a61f1712da8125bc0f7d22912029f3c67d52a98bfbd0356f` | `fat/gx-classic-disc-interface.patch`, `fat/fatfile_frag.[ch]`, `fat/libfatversion.h` |
+| libntfs | `5fbaa98b9a834f82c7ca224e96b8622c8adf88d7f5025f15fe2bfdda794c3d29` | `ntfs/gx-classic-disc-interface.patch`, `ntfs/*_frag.*` |
+| libext2fs | `19a582f8d90b118e8104369ab31746b741111547d9e3f45349aa0f00693a146c` | `ext2/gx-libogc3.patch` |
+
+Why each patch exists:
+
+- Classic `DISC_INTERFACE` (fat, ntfs): libogc 3's `DISC_INTERFACE` is the original one, and
+  the upstream forks use Extrems' libogc2 variant (`disc` argument, flush call, variable sector
+  size). The patch moves them back. It also keeps the 1.1.5 boot-sector range check on the
+  sector size and uses a plain alignment test instead of `SYS_IsDMAAddress`.
+- Fragment functions (`*_frag.*`): `_FAT_get_fragments()`, `_NTFS_get_fragments()` and
+  `_EXT2_get_fragments()` give GX the sector runs of a game file, which the cIOS reads
+  directly. Upstream has none of them; the code is from the `libs` branch.
+- Recursive locks (fat, ext2): the old ext2 library locked its volume mutex twice on a failed
+  mount (`ext2DeinitVolume` then `ext2Sync`) and deadlocked, which froze GX at start-up with an
+  ext partition. The volume locks are recursive now.
+- AddDevice slot fix (ext2): a failed `AddDevice` leaked the device and left the slot taken.
+- ext2 double-free fix: the mount error path and `ext2Unmount` closed the filesystem twice
+  and freed the cache twice; cleanup now runs once.
+
+`libfat` installs as `libcustomfat.a` and its `fat.h` goes ahead of libogc 3's: the image's own
+`libfat.a` is a FatFs build behind another `fat.h`. Measured in Dolphin with the harness on a
+FAT32 image: mount and unmount each write one sector (the FSInfo sector), the same as the old
+prebuilt 1.1.5.
 
 The wolfSSL configuration is `deps/wolfssl/user_settings.h`. Three of its settings are
 not optional:
@@ -70,15 +103,10 @@ devkitPPC and libogc as the Dockerfile.
 ## 3. Prebuilt, in the repository
 
 These have no source in the repository, or none that can be rebuilt with devkitPPC
-alone. They link and run with libogc 3: the libogc functions and structures they use
-(`LWP_Mutex*`, `DISC_INTERFACE`, `sys_resetinfo`, `DCInvalidateRange` aside) did not
-change. Rebuilding any of them is a project of its own, and it needs tests on a Wii.
+alone. Rebuilding any of them is a project of its own, and it needs tests on a Wii.
 
 | File | What it is | Origin | To rebuild |
 |---|---|---|---|
-| `source/libs/libfat/libcustomfat.a` | libfat 1.1.5 with `_FAT_get_fragments()` (`fatfile_frag.h`) | Last replaced by upstream GX in 2025 (a24d7d92). Its source up to libfat 1.1.1 (2017) is on this repository's `libs` branch, `libcustomfat/`; the 2025 build's source is not published. | The `libs` branch's `libcustomfat` (it has the fragment code) moved up to devkitPro's libfat 1.1.5. |
-| `source/libs/libntfs/libcustomntfs.a` | libntfs-wii (NTFS-3G) with `_NTFS_get_fragments()`, MEM2 allocation and sectors over 512 bytes | Same commit as libcustomfat. Its 2017 source is on the `libs` branch, `libcustomntfs/`. | The `libs` branch's `libcustomntfs`, compared with what the 2025 binary does. |
-| `source/libs/libext2fs/libcustomext2fs.a` | libext2fs-wii with `_EXT2_get_fragments()` | GX, 2012-02 (R1153). Source on the `libs` branch, `libcustomext2fs/`. | The `libs` branch's `libcustomext2fs`. |
 | `source/mload/modules/ehcmodule_5.c` | Hermes/rodries EHCI module for cIOS 222/223, as a C array | GX 2010-10, from WiiFlow | Source (ehcmodule, tinyehci, mload) on this repository's `ehcmodule_rodries` branch (2011); devkitARM. |
 | `source/mload/modules/odip_frag.c`, `dip_plugin_249.c` | DIP plugins for cIOS 249 and Hermes cIOS, as C arrays | GX 2010-10, from WiiFlow | Their cIOS sources, devkitARM. |
 | `source/patches/codehandler*.c`, `codehandleronly.h`, `kenobiwii.h` | Gecko/Ocarina cheat code handlers, as C arrays | GX 2009-2011 | Gecko OS code handler assembly. |
@@ -89,5 +117,6 @@ change. Rebuilding any of them is a project of its own, and it needs tests on a 
 The `libs` and `ehcmodule_rodries` branches are kept for these sources; they are separate trees, not
 branches of the loader, and never merge into `master`.
 
-The filesystem libraries matter most: they write to users' drives, so a rebuild needs
-testing on FAT32, NTFS and ext2/3/4 drives on a Wii before it replaces these files.
+The filesystem libraries write to users' drives, so their change from prebuilt to source
+needs testing on FAT32, NTFS and ext2/3/4 drives on a Wii (Dolphin has no USB; it was tested
+there with the SD interface standing in for USB).

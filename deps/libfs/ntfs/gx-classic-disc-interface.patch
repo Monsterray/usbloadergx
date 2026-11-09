@@ -1,0 +1,362 @@
+diff --git a/include/ntfs.h b/include/ntfs.h
+index ab2750e..770cf97 100644
+--- a/include/ntfs.h
++++ b/include/ntfs.h
+@@ -59,7 +59,7 @@ extern "C" {
+  */
+ typedef struct _ntfs_md {
+     char name[32];                      /* Mount name (can be accessed as "name:/") */
+-    DISC_INTERFACE *interface;          /* Block device containing the mounted partition */
++    const DISC_INTERFACE *interface;          /* Block device containing the mounted partition */
+     sec_t startSector;                  /* Local block address to first sector of partition */
+ } ntfs_md;
+ 
+@@ -72,7 +72,7 @@ typedef struct _ntfs_md {
+  * @return The number of entries in PARTITIONS or -1 if an error occurred (see errno)
+  * @note The caller is responsible for freeing PARTITIONS when finished with it
+  */
+-extern int ntfsFindPartitions (DISC_INTERFACE *interface, sec_t **partitions);
++extern int ntfsFindPartitions (const DISC_INTERFACE *interface, sec_t **partitions);
+ 
+ /**
+  * Mount all NTFS partitions on all inserted block devices.
+@@ -97,7 +97,7 @@ extern int ntfsMountAll (ntfs_md **mounts, u32 flags);
+  * @note The caller is responsible for freeing MOUNTS when finished with it
+  * @note The device cache is setup using default values (see above)
+  */
+-extern int ntfsMountDevice (DISC_INTERFACE* interface, ntfs_md **mounts, u32 flags);
++extern int ntfsMountDevice (const DISC_INTERFACE* interface, ntfs_md **mounts, u32 flags);
+ 
+ /**
+  * Mount a NTFS partition from a specific sector on a block device.
+@@ -112,7 +112,7 @@ extern int ntfsMountDevice (DISC_INTERFACE* interface, ntfs_md **mounts, u32 fla
+  * @return True if mount was successful, false if no partition was found or an error occurred (see errno)
+  * @note ntfsFindPartitions should be used first to locate the partitions start sector
+  */
+-extern bool ntfsMount (const char *name, DISC_INTERFACE *interface, sec_t startSector, u32 cachePageCount, u32 cachePageSize, u32 flags);
++extern bool ntfsMount (const char *name, const DISC_INTERFACE *interface, sec_t startSector, u32 cachePageCount, u32 cachePageSize, u32 flags);
+ 
+ /**
+  * Unmount a NTFS partition.
+diff --git a/source/cache2.c b/source/cache2.c
+index 27916ba..21c76b1 100644
+--- a/source/cache2.c
++++ b/source/cache2.c
+@@ -46,7 +46,7 @@
+ 
+ #define CACHE_FREE ((sec_t)-1)
+ 
+-NTFS_CACHE* _NTFS_cache_constructor (unsigned int numberOfPages, unsigned int sectorsPerPage, DISC_INTERFACE* discInterface, sec_t endOfPartition, unsigned int bytesPerSector) {
++NTFS_CACHE* _NTFS_cache_constructor (unsigned int numberOfPages, unsigned int sectorsPerPage, const DISC_INTERFACE* discInterface, sec_t endOfPartition, unsigned int bytesPerSector) {
+ 	NTFS_CACHE* cache;
+ 	unsigned int i;
+ 	NTFS_CACHE_ENTRY* cacheEntries;
+@@ -144,7 +144,7 @@ static NTFS_CACHE_ENTRY* _NTFS_cache_getPage(NTFS_CACHE *cache,sec_t sector,sec_
+ 		sec_t sec = ffsll(cacheEntries[oldUsed].dirty)-1;
+ 		sec_t secs_to_write = flsll(cacheEntries[oldUsed].dirty)-sec;
+ 
+-		if(!cache->disc->writeSectors(cache->disc,cacheEntries[oldUsed].sector+sec,secs_to_write,cacheEntries[oldUsed].cache+(sec*cache->bytesPerSector))) return NULL;
++		if(!cache->disc->writeSectors(cacheEntries[oldUsed].sector+sec,secs_to_write,cacheEntries[oldUsed].cache+(sec*cache->bytesPerSector))) return NULL;
+ 
+ 		cacheEntries[oldUsed].dirty = 0;
+ 	}
+@@ -171,7 +171,7 @@ static NTFS_CACHE_ENTRY* _NTFS_cache_getPage(NTFS_CACHE *cache,sec_t sector,sec_
+ 		}
+ 	}
+ 
+-	if(!cache->disc->readSectors(cache->disc,cacheEntries[oldUsed].sector+sec,secs_to_read,cacheEntries[oldUsed].cache+(sec*cache->bytesPerSector))) {
++	if(!cache->disc->readSectors(cacheEntries[oldUsed].sector+sec,secs_to_read,cacheEntries[oldUsed].cache+(sec*cache->bytesPerSector))) {
+ 		cacheEntries[oldUsed].sector = CACHE_FREE;
+ 		cacheEntries[oldUsed].count = 0;
+ 		cacheEntries[oldUsed].last_access = 0;
+@@ -218,7 +218,7 @@ bool _NTFS_cache_readSectors(NTFS_CACHE *cache,sec_t sector,sec_t numSectors,voi
+ 	uint8_t *dest = (uint8_t *)buffer;
+ 
+ 	while(numSectors>0) {
+-		if(SYS_IsDMAAddress(dest,32) && (sector%cache->sectorsPerPage)==0) {
++		if((((u32)(dest) & 31) == 0) && (sector%cache->sectorsPerPage)==0) {
+ 			entry = _NTFS_cache_findPage(cache,sector,numSectors);
+ 			if(entry==NULL) {
+ 				secs_to_read = (numSectors/cache->sectorsPerPage)*cache->sectorsPerPage;
+@@ -229,7 +229,7 @@ bool _NTFS_cache_readSectors(NTFS_CACHE *cache,sec_t sector,sec_t numSectors,voi
+ 			}
+ 
+ 			if(secs_to_read>0) {
+-				if(!cache->disc->readSectors(cache->disc,sector,secs_to_read,dest)) return false;
++				if(!cache->disc->readSectors(sector,secs_to_read,dest)) return false;
+ 
+ 				dest += (secs_to_read*cache->bytesPerSector);
+ 				sector += secs_to_read;
+@@ -350,7 +350,7 @@ bool _NTFS_cache_writeSectors (NTFS_CACHE* cache, sec_t sector, sec_t numSectors
+ 	const uint8_t *src = (const uint8_t *)buffer;
+ 
+ 	while(numSectors>0) {
+-		if(SYS_IsDMAAddress(src,32) && (sector%cache->sectorsPerPage)==0) {
++		if((((u32)(src) & 31) == 0) && (sector%cache->sectorsPerPage)==0) {
+ 			entry = _NTFS_cache_findPage(cache,sector,numSectors);
+ 			if(entry==NULL) {
+ 				secs_to_write = (numSectors/cache->sectorsPerPage)*cache->sectorsPerPage;
+@@ -361,7 +361,7 @@ bool _NTFS_cache_writeSectors (NTFS_CACHE* cache, sec_t sector, sec_t numSectors
+ 			}
+ 
+ 			if(secs_to_write>0) {
+-				if(!cache->disc->writeSectors(cache->disc,sector,secs_to_write,src)) return false;
++				if(!cache->disc->writeSectors(sector,secs_to_write,src)) return false;
+ 
+ 				src += (secs_to_write*cache->bytesPerSector);
+ 				sector += secs_to_write;
+@@ -405,13 +405,13 @@ bool _NTFS_cache_flush (NTFS_CACHE* cache) {
+ 			sec = ffsll(entry->dirty) - 1;
+ 			secs_to_write = flsll(entry->dirty) - sec;
+ 
+-			if (!cache->disc->writeSectors(cache->disc, entry->sector + sec, secs_to_write, entry->cache + (sec * cache->bytesPerSector))) return false;
++			if (!cache->disc->writeSectors(entry->sector + sec, secs_to_write, entry->cache + (sec * cache->bytesPerSector))) return false;
+ 
+ 			entry->dirty = 0;
+ 		}
+ 	}
+ 
+-	return cache->disc->flush(cache->disc);
++	return true;
+ }
+ 
+ void _NTFS_cache_invalidate (NTFS_CACHE* cache) {
+diff --git a/source/cache2.h b/source/cache2.h
+index 0af3221..e4a42bd 100644
+--- a/source/cache2.h
++++ b/source/cache2.h
+@@ -53,7 +53,7 @@ typedef struct {
+ } NTFS_CACHE_ENTRY;
+ 
+ typedef struct {
+-	DISC_INTERFACE*   disc;
++	const DISC_INTERFACE*   disc;
+ 	sec_t             endOfPartition;
+ 	unsigned int      numberOfPages;
+ 	unsigned int      sectorsPerPage;
+@@ -125,7 +125,7 @@ Clear out the contents of the cache without writing any dirty sectors first
+ */
+ void _NTFS_cache_invalidate (NTFS_CACHE* cache);
+ 
+-NTFS_CACHE* _NTFS_cache_constructor (unsigned int numberOfPages, unsigned int sectorsPerPage, DISC_INTERFACE* discInterface, sec_t endOfPartition, unsigned int bytesPerSector);
++NTFS_CACHE* _NTFS_cache_constructor (unsigned int numberOfPages, unsigned int sectorsPerPage, const DISC_INTERFACE* discInterface, sec_t endOfPartition, unsigned int bytesPerSector);
+ 
+ void _NTFS_cache_destructor (NTFS_CACHE* cache);
+ 
+diff --git a/source/gekko_io.c b/source/gekko_io.c
+index fad765e..a3ebf90 100644
+--- a/source/gekko_io.c
++++ b/source/gekko_io.c
+@@ -85,19 +85,19 @@ static int ntfs_device_gekko_io_open(struct ntfs_device *dev, int flags)
+     }
+ 
+     // Get the device interface
+-    DISC_INTERFACE *interface = fd->interface;
++    const DISC_INTERFACE *interface = fd->interface;
+     if (!interface) {
+         errno = ENODEV;
+         return -1;
+     }
+ 
+     // Start the device interface and ensure that it is inserted
+-    if (!interface->startup(interface)) {
++    if (!interface->startup()) {
+         ntfs_log_perror("device failed to start\n");
+         errno = EIO;
+         return -1;
+     }
+-    if (!interface->isInserted(interface)) {
++    if (!interface->isInserted()) {
+         ntfs_log_perror("device media is not inserted\n");
+         errno = EIO;
+         return -1;
+@@ -117,7 +117,7 @@ static int ntfs_device_gekko_io_open(struct ntfs_device *dev, int flags)
+         return -1;
+     }
+ 
+-    if (!interface->readSectors(interface, fd->startSector, 1, boot)) {
++    if (!interface->readSectors(fd->startSector, 1, boot)) {
+         ntfs_log_perror("read failure @ sector %lld\n", fd->startSector);
+         errno = EIO;
+         ntfs_free(boot);
+@@ -201,7 +201,7 @@ static int ntfs_device_gekko_io_close(struct ntfs_device *dev)
+     // Shutdown the device interface
+     /*DISC_INTERFACE *interface = fd->interface;
+     if (interface) {
+-        interface->shutdown(interface);
++        interface->shutdown();
+     }*/
+ 
+     // Free the device driver private data
+@@ -282,7 +282,7 @@ static s64 ntfs_device_gekko_io_readbytes(struct ntfs_device *dev, s64 offset, s
+     }
+ 
+     // Get the device interface
+-    DISC_INTERFACE *interface = fd->interface;
++    const DISC_INTERFACE *interface = fd->interface;
+     if (!interface) {
+         errno = ENODEV;
+         return -1;
+@@ -368,7 +368,7 @@ static s64 ntfs_device_gekko_io_writebytes(struct ntfs_device *dev, s64 offset,
+     }
+ 
+     // Get the device interface
+-    DISC_INTERFACE *interface = fd->interface;
++    const DISC_INTERFACE *interface = fd->interface;
+     if (!interface) {
+         errno = ENODEV;
+         return -1;
+@@ -477,7 +477,7 @@ static bool ntfs_device_gekko_io_readsectors(struct ntfs_device *dev, sec_t sect
+     if (fd->cache)
+         return _NTFS_cache_readSectors(fd->cache, sector, numSectors, buffer);
+     else
+-        return fd->interface->readSectors(fd->interface, sector, numSectors, buffer);
++        return fd->interface->readSectors(sector, numSectors, buffer);
+ 
+     return false;
+ }
+@@ -495,7 +495,7 @@ static bool ntfs_device_gekko_io_writesectors(struct ntfs_device *dev, sec_t sec
+     if (fd->cache)
+         return _NTFS_cache_writeSectors(fd->cache, sector, numSectors, buffer);
+     else
+-        return fd->interface->writeSectors(fd->interface, sector, numSectors, buffer);
++        return fd->interface->writeSectors(sector, numSectors, buffer);
+ 
+     return false;
+ }
+@@ -524,12 +524,8 @@ static int ntfs_device_gekko_io_sync(struct ntfs_device *dev)
+             errno = EIO;
+             return -1;
+         }
+-    } else {
+-        if (!fd->interface->flush(fd->interface)) {
+-            errno = EIO;
+-            return -1;
+-        }
+     }
++    /* libogc 3's DISC_INTERFACE has no flush; every write has gone through. */
+ 
+     return 0;
+ }
+diff --git a/source/gekko_io.h b/source/gekko_io.h
+index b16eda5..6a8da3d 100644
+--- a/source/gekko_io.h
++++ b/source/gekko_io.h
+@@ -36,7 +36,7 @@
+  * gekko_fd - Gekko device driver descriptor
+  */
+ typedef struct _gekko_fd {
+-    DISC_INTERFACE *interface;              /* Device disc interface */
++    const DISC_INTERFACE *interface;              /* Device disc interface */
+     sec_t startSector;                      /* LBA of partition start */
+     sec_t hiddenSectors;                    /* LBA offset to true partition start (as described by boot sector) */
+     u16 sectorSize;                         /* Device sector size (in bytes) */
+diff --git a/source/ntfs.c b/source/ntfs.c
+index c4f0eb7..1e7f4ab 100644
+--- a/source/ntfs.c
++++ b/source/ntfs.c
+@@ -97,7 +97,7 @@ void ntfsInit (void)
+     return;
+ }
+ 
+-int ntfsFindPartitions (DISC_INTERFACE *interface, sec_t **partitions)
++int ntfsFindPartitions (const DISC_INTERFACE *interface, sec_t **partitions)
+ {
+     MASTER_BOOT_RECORD mbr;
+     PARTITION_RECORD *partition = NULL;
+@@ -125,16 +125,16 @@ int ntfsFindPartitions (DISC_INTERFACE *interface, sec_t **partitions)
+     ntfsInit();
+ 
+     // Start the device and check that it is inserted
+-    if (!interface->startup(interface)) {
++    if (!interface->startup()) {
+         errno = EIO;
+         return -1;
+     }
+-    if (!interface->isInserted(interface)) {
++    if (!interface->isInserted()) {
+         return 0;
+     }
+ 
+     // Read the first sector on the device
+-    if (!interface->readSectors(interface, 0, 1, &sector.buffer)) {
++    if (!interface->readSectors(0, 1, &sector.buffer)) {
+         errno = EIO;
+         return -1;
+     }
+@@ -172,7 +172,7 @@ int ntfsFindPartitions (DISC_INTERFACE *interface, sec_t **partitions)
+                     ntfs_log_debug("Partition %i: Claims to be NTFS\n", i + 1);
+ 
+                     // Read and validate the NTFS partition
+-                    if (interface->readSectors(interface, part_lba, 1, &sector)) {
++                    if (interface->readSectors(part_lba, 1, &sector)) {
+                         if (ntfs_boot_sector_is_ntfs(&sector.boot)) {
+                             ntfs_log_debug("Partition %i: Valid NTFS boot sector found\n", i + 1);
+                             if (partition_count < NTFS_MAX_PARTITIONS) {
+@@ -199,7 +199,7 @@ int ntfsFindPartitions (DISC_INTERFACE *interface, sec_t **partitions)
+                     do {
+ 
+                         // Read and validate the extended boot record
+-                        if (interface->readSectors(interface, ebr_lba + next_erb_lba, 1, &sector)) {
++                        if (interface->readSectors(ebr_lba + next_erb_lba, 1, &sector)) {
+                             if (sector.ebr.signature == EBR_SIGNATURE) {
+                                 ntfs_log_debug("Logical Partition @ %lld: %s type 0x%x\n", ebr_lba + next_erb_lba,
+                                                sector.ebr.partition.status == PARTITION_STATUS_BOOTABLE ? "bootable (active)" : "non-bootable",
+@@ -211,7 +211,7 @@ int ntfsFindPartitions (DISC_INTERFACE *interface, sec_t **partitions)
+                                 next_erb_lba = le32_to_cpu(sector.ebr.next_ebr.lba_start);
+ 
+                                 // Check if this partition has a valid NTFS boot record
+-                                if (interface->readSectors(interface, part_lba, 1, &sector)) {
++                                if (interface->readSectors(part_lba, 1, &sector)) {
+                                     if (ntfs_boot_sector_is_ntfs(&sector.boot)) {
+                                         ntfs_log_debug("Logical Partition @ %lld: Valid NTFS boot sector found\n", part_lba);
+                                         if(sector.ebr.partition.type != PARTITION_TYPE_NTFS) {
+@@ -240,7 +240,7 @@ int ntfsFindPartitions (DISC_INTERFACE *interface, sec_t **partitions)
+ 
+                     // Check if this partition has a valid NTFS boot record anyway,
+                     // it might be misrepresented due to a lazy partition editor
+-                    if (interface->readSectors(interface, part_lba, 1, &sector)) {
++                    if (interface->readSectors(part_lba, 1, &sector)) {
+                         if (ntfs_boot_sector_is_ntfs(&sector.boot)) {
+                             ntfs_log_debug("Partition %i: Valid NTFS boot sector found\n", i + 1);
+                             if(partition->type != PARTITION_TYPE_NTFS) {
+@@ -267,7 +267,7 @@ int ntfsFindPartitions (DISC_INTERFACE *interface, sec_t **partitions)
+ 
+         // As a last-ditched effort, search the first 64 sectors of the device for stray NTFS partitions
+         for (i = 1; i < 64; i++) {
+-            if (interface->readSectors(interface, i, 1, &sector)) {
++            if (interface->readSectors(i, 1, &sector)) {
+                 if (ntfs_boot_sector_is_ntfs(&sector.boot)) {
+                     ntfs_log_debug("Valid NTFS boot sector found at sector %d!\n", i);
+                     if (partition_count < NTFS_MAX_PARTITIONS) {
+@@ -350,7 +350,7 @@ int ntfsMountAll (ntfs_md **mounts, u32 flags)
+     return 0;
+ }
+ 
+-int ntfsMountDevice (DISC_INTERFACE *interface, ntfs_md **mounts, u32 flags)
++int ntfsMountDevice (const DISC_INTERFACE *interface, ntfs_md **mounts, u32 flags)
+ {
+     const INTERFACE_ID *discs = ntfsGetDiscInterfaces();
+     const INTERFACE_ID *disc = NULL;
+@@ -423,7 +423,7 @@ int ntfsMountDevice (DISC_INTERFACE *interface, ntfs_md **mounts, u32 flags)
+     return 0;
+ }
+ 
+-bool ntfsMount (const char *name, DISC_INTERFACE *interface, sec_t startSector, u32 cachePageCount, u32 cachePageSize, u32 flags)
++bool ntfsMount (const char *name, const DISC_INTERFACE *interface, sec_t startSector, u32 cachePageCount, u32 cachePageSize, u32 flags)
+ {
+     ntfs_vd *vd = NULL;
+     gekko_fd *fd = NULL;
+diff --git a/source/ntfsinternal.h b/source/ntfsinternal.h
+index 1303268..f897a48 100644
+--- a/source/ntfsinternal.h
++++ b/source/ntfsinternal.h
+@@ -105,7 +105,7 @@ typedef struct _EXTENDED_BOOT_RECORD {
+  */
+ typedef struct _INTERFACE_ID {
+     const char *name;                       /* Interface name */
+-    DISC_INTERFACE *interface;              /* Disc interface */
++    const DISC_INTERFACE *interface;              /* Disc interface */
+ } INTERFACE_ID;
+ 
+ /**

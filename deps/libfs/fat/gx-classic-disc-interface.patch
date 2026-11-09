@@ -1,0 +1,422 @@
+diff --git a/include/fat.h b/include/fat.h
+index 0f3d9fd..b60f41c 100644
+--- a/include/fat.h
++++ b/include/fat.h
+@@ -76,7 +76,7 @@ You can then access the filesystem using "name:/".
+ This will mount the active partition or the first valid partition on the disc,
+ and will use a cache size optimized for the host system.
+ */
+-extern bool fatMountSimple (const char* name, DISC_INTERFACE* interface);
++extern bool fatMountSimple (const char* name, const DISC_INTERFACE* interface);
+ 
+ /*
+ Mount the device pointed to by interface, and set up a devoptab entry for it as "name:".
+@@ -86,7 +86,7 @@ the disc. Otherwise it will try to mount the partition starting at startSector.
+ cacheSize specifies the number of pages to allocate for the cache.
+ This will not startup the disc, so you need to call interface->startup(); first.
+ */
+-extern bool fatMount (const char* name, DISC_INTERFACE* interface, sec_t startSector, uint32_t cacheSize, uint32_t SectorsPerPage);
++extern bool fatMount (const char* name, const DISC_INTERFACE* interface, sec_t startSector, uint32_t cacheSize, uint32_t SectorsPerPage);
+ 
+ /*
+ Unmount the partition specified by name.
+diff --git a/source/cache.c b/source/cache.c
+index ae3679f..8859f4b 100644
+--- a/source/cache.c
++++ b/source/cache.c
+@@ -46,7 +46,7 @@
+ 
+ #define CACHE_FREE ((sec_t)-1)
+ 
+-CACHE* _FAT_cache_constructor (unsigned int numberOfPages, unsigned int sectorsPerPage, DISC_INTERFACE* discInterface, sec_t endOfPartition, unsigned int bytesPerSector) {
++CACHE* _FAT_cache_constructor (unsigned int numberOfPages, unsigned int sectorsPerPage, const DISC_INTERFACE* discInterface, sec_t endOfPartition, unsigned int bytesPerSector) {
+ 	CACHE* cache;
+ 	unsigned int i;
+ 	CACHE_ENTRY* cacheEntries;
+@@ -219,7 +219,7 @@ bool _FAT_cache_readSectors(CACHE *cache,sec_t sector,sec_t numSectors,void *buf
+ 
+ 	while(numSectors>0) {
+ #if defined(__gamecube__) || defined (__wii__)
+-		if(SYS_IsDMAAddress(dest,32) && (sector%cache->sectorsPerPage)==0) {
++		if((((uintptr_t)dest & 31) == 0) && (sector%cache->sectorsPerPage)==0) {
+ #else
+ 		if((sector%cache->sectorsPerPage)==0) {
+ #endif
+@@ -355,7 +355,7 @@ bool _FAT_cache_writeSectors (CACHE* cache, sec_t sector, sec_t numSectors, cons
+ 
+ 	while(numSectors>0) {
+ #if defined(__gamecube__) || defined (__wii__)
+-		if(SYS_IsDMAAddress(src,32) && (sector%cache->sectorsPerPage)==0) {
++		if((((uintptr_t)src & 31) == 0) && (sector%cache->sectorsPerPage)==0) {
+ #else
+ 		if((sector%cache->sectorsPerPage)==0) {
+ #endif
+diff --git a/source/cache.h b/source/cache.h
+index 8249b99..aadd007 100644
+--- a/source/cache.h
++++ b/source/cache.h
+@@ -48,7 +48,7 @@ typedef struct {
+ } CACHE_ENTRY;
+ 
+ typedef struct {
+-	DISC_INTERFACE* disc;
++	const DISC_INTERFACE* disc;
+ 	sec_t           endOfPartition;
+ 	unsigned int    numberOfPages;
+ 	unsigned int    sectorsPerPage;
+@@ -120,7 +120,7 @@ Clear out the contents of the cache without writing any dirty sectors first
+ */
+ void _FAT_cache_invalidate (CACHE* cache);
+ 
+-CACHE* _FAT_cache_constructor (unsigned int numberOfPages, unsigned int sectorsPerPage, DISC_INTERFACE* discInterface, sec_t endOfPartition, unsigned int bytesPerSector);
++CACHE* _FAT_cache_constructor (unsigned int numberOfPages, unsigned int sectorsPerPage, const DISC_INTERFACE* discInterface, sec_t endOfPartition, unsigned int bytesPerSector);
+ 
+ void _FAT_cache_destructor (CACHE* cache);
+ 
+diff --git a/source/disc.c b/source/disc.c
+index 54cd41b..336eee1 100644
+--- a/source/disc.c
++++ b/source/disc.c
+@@ -44,19 +44,17 @@ The list is terminated by a NULL/NULL entry.
+ #include <ogc/usbstorage.h>
+ #include <sdcard/gcsd.h>
+ 
+-static DISC_INTERFACE* get_io_wiisd (void) {
++static const DISC_INTERFACE* get_io_wiisd (void) {
+ 	return &__io_wiisd;
+ }
+ 
+-static DISC_INTERFACE* get_io_usbstorage (void) {
++static const DISC_INTERFACE* get_io_usbstorage (void) {
+ 	return &__io_usbstorage;
+ }
+ 
+ const INTERFACE_ID _FAT_disc_interfaces[] = {
+ 	{"sd", get_io_wiisd},
+ 	{"usb", get_io_usbstorage},
+-	{"carda", get_io_gcsda},
+-	{"cardb", get_io_gcsdb},
+ 	{NULL, NULL}
+ };	
+ 
+diff --git a/source/disc.h b/source/disc.h
+index 0489061..50835a3 100644
+--- a/source/disc.h
++++ b/source/disc.h
+@@ -37,11 +37,7 @@ terminated by a {NULL,NULL} entry.
+ */
+ typedef struct {
+ 	const char* name;
+-#if defined(__gamecube__) || defined (__wii__)
+-	DISC_INTERFACE* (*getInterface)(void);
+-#else
+ 	const DISC_INTERFACE* (*getInterface)(void);
+-#endif
+ } INTERFACE_ID;
+ extern const INTERFACE_ID _FAT_disc_interfaces[];
+ 
+@@ -49,12 +45,8 @@ extern const INTERFACE_ID _FAT_disc_interfaces[];
+ Check if a disc is inserted
+ Return true if a disc is inserted and ready, false otherwise
+ */
+-static inline bool _FAT_disc_isInserted (DISC_INTERFACE* disc) {
+-#if defined(__gamecube__) || defined (__wii__)
+-	return disc->isInserted(disc);
+-#else
++static inline bool _FAT_disc_isInserted (const DISC_INTERFACE* disc) {
+ 	return disc->isInserted();
+-#endif
+ }
+ 
+ /*
+@@ -64,12 +56,8 @@ else it is at least 1
+ sector is 0 or greater
+ buffer is a pointer to the memory to fill
+ */
+-static inline bool _FAT_disc_readSectors (DISC_INTERFACE* disc, sec_t sector, sec_t numSectors, void* buffer) {
+-#if defined(__gamecube__) || defined (__wii__)
+-	return disc->readSectors (disc, sector, numSectors, buffer);
+-#else
++static inline bool _FAT_disc_readSectors (const DISC_INTERFACE* disc, sec_t sector, sec_t numSectors, void* buffer) {
+ 	return disc->readSectors (sector, numSectors, buffer);
+-#endif
+ }
+ 
+ /*
+@@ -79,71 +67,52 @@ else it is at least 1
+ sector is 0 or greater
+ buffer is a pointer to the memory to read from
+ */
+-static inline bool _FAT_disc_writeSectors (DISC_INTERFACE* disc, sec_t sector, sec_t numSectors, const void* buffer) {
+-#if defined(__gamecube__) || defined (__wii__)
+-	return disc->writeSectors (disc, sector, numSectors, buffer);
+-#else
++static inline bool _FAT_disc_writeSectors (const DISC_INTERFACE* disc, sec_t sector, sec_t numSectors, const void* buffer) {
+ 	return disc->writeSectors (sector, numSectors, buffer);
+-#endif
+ }
+ 
+ /*
+ Write any dirty sectors back to disc and clear out the contents of the cache
+ */
+-static inline bool _FAT_disc_flush (DISC_INTERFACE* disc) {
+-#if defined(__gamecube__) || defined (__wii__)
+-	return disc->flush(disc);
+-#else
++static inline bool _FAT_disc_flush (const DISC_INTERFACE* disc) {
+ 	return true;
+-#endif
+ }
+ 
+ /*
+ Initialise the disc to a state ready for data reading or writing
+ */
+-static inline bool _FAT_disc_startup (DISC_INTERFACE* disc) {
+-#if defined(__gamecube__) || defined (__wii__)
+-	return disc->startup(disc);
+-#else
++static inline bool _FAT_disc_startup (const DISC_INTERFACE* disc) {
+ 	return disc->startup();
+-#endif
+ }
+ 
+ /*
+ Put the disc in a state ready for power down.
+ Complete any pending writes and disable the disc if necessary
+ */
+-static inline bool _FAT_disc_shutdown (DISC_INTERFACE* disc) {
+-#if defined(__gamecube__) || defined (__wii__)
+-	return disc->shutdown(disc);
+-#else
++static inline bool _FAT_disc_shutdown (const DISC_INTERFACE* disc) {
+ 	return disc->shutdown();
+-#endif
+ }
+ 
+ /*
+ Return a 32 bit value unique to each type of interface
+ */
+-static inline uint32_t _FAT_disc_hostType (DISC_INTERFACE* disc) {
++static inline uint32_t _FAT_disc_hostType (const DISC_INTERFACE* disc) {
+ 	return disc->ioType;
+ }
+ 
+ /*
+ Return a 32 bit value that specifies the capabilities of the disc
+ */
+-static inline uint32_t _FAT_disc_features (DISC_INTERFACE* disc) {
++static inline uint32_t _FAT_disc_features (const DISC_INTERFACE* disc) {
+ 	return disc->features;
+ }
+ 
+ /*
+ Return a 32 bit value that specifies the sector size of the disc
+ */
+-static inline uint32_t _FAT_disc_bytesPerSector (DISC_INTERFACE* disc) {
+-#if defined(__gamecube__) || defined (__wii__)
+-	return disc->bytesPerSector;
+-#else
++static inline uint32_t _FAT_disc_bytesPerSector (const DISC_INTERFACE* disc) {
++	(void)disc;
+ 	return 512;
+-#endif
+ }
+ 
+ #endif // _DISC_H
+diff --git a/source/libfat.c b/source/libfat.c
+index 0adb45b..92197dc 100644
+--- a/source/libfat.c
++++ b/source/libfat.c
+@@ -75,7 +75,7 @@ static const devoptab_t dotab_fat = {
+ 	NULL,	// readlink_r
+ };
+ 
+-bool fatMount (const char* name, DISC_INTERFACE* interface, sec_t startSector, uint32_t cacheSize, uint32_t SectorsPerPage) {
++bool fatMount (const char* name, const DISC_INTERFACE* interface, sec_t startSector, uint32_t cacheSize, uint32_t SectorsPerPage) {
+ 	PARTITION* partition;
+ 	devoptab_t* devops;
+ 	char* nameCopy;
+@@ -89,11 +89,6 @@ bool fatMount (const char* name, DISC_INTERFACE* interface, sec_t startSector, u
+ 	if(!_FAT_disc_isInserted(interface))
+ 		return false;
+ 
+-	if (_FAT_disc_bytesPerSector (interface) < MIN_SECTOR_SIZE ||
+-		_FAT_disc_bytesPerSector (interface) > MAX_SECTOR_SIZE) {
+-		return false;
+-	}
+-
+ 	char devname[10];
+ 	strcpy(devname, name);
+ 	strcat(devname, ":");
+@@ -120,12 +115,16 @@ bool fatMount (const char* name, DISC_INTERFACE* interface, sec_t startSector, u
+ 	devops->name = nameCopy;
+ 	devops->deviceData = partition;
+ 
+-	AddDevice (devops);
++	if (AddDevice (devops) == -1) {
++		_FAT_partition_destructor (partition);
++		_FAT_mem_free (devops);
++		return false;
++	}
+ 
+ 	return true;
+ }
+ 
+-bool fatMountSimple (const char* name, DISC_INTERFACE* interface) {
++bool fatMountSimple (const char* name, const DISC_INTERFACE* interface) {
+ 	return fatMount (name, interface, 0, 0, 0);
+ }
+ 
+@@ -175,13 +174,13 @@ static sys_resetinfo _FAT_resetinfo = {
+ bool fatInit (uint32_t cacheSize, bool setAsDefaultDevice) {
+ 	int i;
+ 	int defaultDevice = -1;
+-	DISC_INTERFACE *disc;
++	const DISC_INTERFACE *disc;
+ 
+ 	for (i = 0;
+ 		_FAT_disc_interfaces[i].name != NULL && _FAT_disc_interfaces[i].getInterface != NULL;
+ 		i++)
+ 	{
+-		disc = (DISC_INTERFACE*) _FAT_disc_interfaces[i].getInterface();
++		disc = _FAT_disc_interfaces[i].getInterface();
+ 		if (!disc) {
+ 			continue;
+ 		}
+@@ -235,7 +234,7 @@ bool fatInitDefault (void) {
+ 
+ void fatDeinit (void) {
+ 	int i;
+-	DISC_INTERFACE *disc;
++	const DISC_INTERFACE *disc;
+ 
+ 	for (i = 0;
+ 		_FAT_disc_interfaces[i].name != NULL && _FAT_disc_interfaces[i].getInterface != NULL;
+@@ -245,7 +244,7 @@ void fatDeinit (void) {
+ 		strcpy (devname, _FAT_disc_interfaces[i].name);
+ 		strcat (devname, ":");
+ 		if (fatUnmount (devname)) {
+-			disc = (DISC_INTERFACE*) _FAT_disc_interfaces[i].getInterface();
++			disc = _FAT_disc_interfaces[i].getInterface();
+ 			if (!disc) {
+ 				continue;
+ 			}
+diff --git a/source/lock.h b/source/lock.h
+index de5723a..40ef6a3 100644
+--- a/source/lock.h
++++ b/source/lock.h
+@@ -35,7 +35,7 @@
+ 
+ static inline void _FAT_lock_init(mutex_t *mutex)
+ {
+-	LWP_MutexInit(mutex, false);
++	LWP_MutexInit(mutex, true);
+ }
+ 
+ static inline void _FAT_lock_deinit(mutex_t *mutex)
+diff --git a/source/partition.c b/source/partition.c
+index 299af9a..cf09087 100644
+--- a/source/partition.c
++++ b/source/partition.c
+@@ -111,7 +111,7 @@ static bool isValidMBR(uint8_t *sectorBuffer) {
+ 
+ }
+ 
+-sec_t FindFirstValidPartition_buf(DISC_INTERFACE* disc, uint8_t *sectorBuffer)
++sec_t FindFirstValidPartition_buf(const DISC_INTERFACE* disc, uint8_t *sectorBuffer)
+ {
+ 	uint8_t part_table[16*4];
+ 	uint8_t *ptr;
+@@ -168,9 +168,9 @@ sec_t FindFirstValidPartition_buf(DISC_INTERFACE* disc, uint8_t *sectorBuffer)
+ 	return 0;
+ }
+ 
+-sec_t FindFirstValidPartition(DISC_INTERFACE* disc)
++sec_t FindFirstValidPartition(const DISC_INTERFACE* disc)
+ {
+-	uint8_t *sectorBuffer = (uint8_t*) _FAT_mem_align(_FAT_disc_bytesPerSector(disc));
++	uint8_t *sectorBuffer = (uint8_t*) _FAT_mem_align(MAX_SECTOR_SIZE);
+ 	if (!sectorBuffer) return 0;
+ 	sec_t ret = FindFirstValidPartition_buf(disc, sectorBuffer);
+ 	_FAT_mem_free(sectorBuffer);
+@@ -178,7 +178,7 @@ sec_t FindFirstValidPartition(DISC_INTERFACE* disc)
+ }
+ 
+ 
+-PARTITION* _FAT_partition_constructor_buf (DISC_INTERFACE* disc, uint32_t cacheSize, uint32_t sectorsPerPage, sec_t startSector, uint8_t *sectorBuffer)
++PARTITION* _FAT_partition_constructor_buf (const DISC_INTERFACE* disc, uint32_t cacheSize, uint32_t sectorsPerPage, sec_t startSector, uint8_t *sectorBuffer)
+ {
+ 	PARTITION* partition;
+ 
+@@ -217,9 +217,6 @@ PARTITION* _FAT_partition_constructor_buf (DISC_INTERFACE* disc, uint32_t cacheS
+ 		return NULL;
+ 	}
+ 
+-	// Init the partition lock
+-	_FAT_lock_init(&partition->lock);
+-
+ 	if (!memcmp(sectorBuffer + BPB_FAT16_fileSysType, FAT_SIG, sizeof(FAT_SIG)))
+ 		strncpy(partition->label, (char*)(sectorBuffer + BPB_FAT16_volumeLabel), 11);
+ 	else
+@@ -241,13 +238,16 @@ PARTITION* _FAT_partition_constructor_buf (DISC_INTERFACE* disc, uint32_t cacheS
+ 	}
+ 
+ 	partition->bytesPerSector = u8array_to_u16(sectorBuffer, BPB_bytesPerSector);
+-	if (partition->bytesPerSector != _FAT_disc_bytesPerSector (partition->disc)) {
++	if (partition->bytesPerSector < MIN_SECTOR_SIZE || partition->bytesPerSector > MAX_SECTOR_SIZE) {
+ 		// Unsupported sector size
+ 		_FAT_mem_free(partition);
+ 		return NULL;
+ 	}
+ 
+-	partition->sectorsPerCluster = sectorBuffer[BPB_sectorsPerCluster];
++	// Init the partition lock (after the early return above, which would leak it)
++	_FAT_lock_init(&partition->lock);
++
++	partition->sectorsPerCluster =sectorBuffer[BPB_sectorsPerCluster];
+ 	partition->bytesPerCluster = partition->bytesPerSector * partition->sectorsPerCluster;
+ 	partition->fat.fatStart = startSector + u8array_to_u16(sectorBuffer, BPB_reservedSectors);
+ 
+@@ -311,9 +311,9 @@ PARTITION* _FAT_partition_constructor_buf (DISC_INTERFACE* disc, uint32_t cacheS
+ 	return partition;
+ }
+ 
+-PARTITION* _FAT_partition_constructor (DISC_INTERFACE* disc, uint32_t cacheSize, uint32_t sectorsPerPage, sec_t startSector)
++PARTITION* _FAT_partition_constructor (const DISC_INTERFACE* disc, uint32_t cacheSize, uint32_t sectorsPerPage, sec_t startSector)
+ {
+-	uint8_t *sectorBuffer = (uint8_t*) _FAT_mem_align(_FAT_disc_bytesPerSector(disc));
++	uint8_t *sectorBuffer = (uint8_t*) _FAT_mem_align(MAX_SECTOR_SIZE);
+ 	if (!sectorBuffer) return NULL;
+ 	PARTITION *ret = _FAT_partition_constructor_buf(disc, cacheSize,
+ 			sectorsPerPage, startSector, sectorBuffer);
+@@ -424,7 +424,7 @@ void _FAT_partition_readFSinfo(PARTITION * partition)
+ 
+ void _FAT_partition_writeFSinfo(PARTITION * partition)
+ {
+-	if(partition->filesysType != FS_FAT32)
++	if(partition->readOnly || partition->filesysType != FS_FAT32)
+ 		return;
+ 
+ 	uint8_t *sectorBuffer = (uint8_t*) _FAT_mem_align(partition->bytesPerSector);
+diff --git a/source/partition.h b/source/partition.h
+index 73f4c06..06f143e 100644
+--- a/source/partition.h
++++ b/source/partition.h
+@@ -50,7 +50,7 @@ typedef struct {
+ } FAT;
+ 
+ typedef struct {
+-	DISC_INTERFACE*      disc;
++	const DISC_INTERFACE* disc;
+ 	CACHE*               cache;
+ 	// Info about the partition
+ 	FS_TYPE              filesysType;
+@@ -76,7 +76,7 @@ typedef struct {
+ /*
+ Mount the supplied device and return a pointer to the struct necessary to use it
+ */
+-PARTITION* _FAT_partition_constructor (DISC_INTERFACE* disc, uint32_t cacheSize, uint32_t SectorsPerPage, sec_t startSector);
++PARTITION* _FAT_partition_constructor (const DISC_INTERFACE* disc, uint32_t cacheSize, uint32_t SectorsPerPage, sec_t startSector);
+ 
+ /*
+ Dismount the device and free all structures used.

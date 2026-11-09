@@ -29,9 +29,9 @@
 #include <string.h>
 #include <malloc.h>
 
-#include "libs/libfat/fat.h"
-#include "libs/libntfs/ntfs.h"
-#include "libs/libext2fs/ext2.h"
+#include <fat.h>
+#include <ntfs.h>
+#include <ext2.h>
 #include "libs/libwbfs/libwbfs.h"
 #include "utils/uncompress.h"
 #include "BootSector.h"
@@ -186,12 +186,11 @@ bool PartitionHandle::Mount(int pos, const char *name, bool forceFAT)
 
 	if (strncmp(GetFSName(pos), "LINUX", 5) == 0 || strcmp(GetFSName(pos), "GUID-Entry") == 0)
 	{
-		// Read-only: a read-write mount that fails inside the prebuilt libext2fs deadlocks:
-		// ext2DeinitVolume() holds the volume's non-recursive mutex and calls ext2Sync(),
-		// which locks it again. Traced in Dolphin on ext2 and ext4 alike (2026-11-09); a Wii
-		// froze the same way at start-up. Stay read-only until the library is fixed or replaced.
+		// Read-write. The old prebuilt libext2fs deadlocked when a mount failed (non-recursive
+		// volume lock taken twice); deps/libfs/ext2 uses a recursive lock. RW mounts and
+		// unmounts cleanly in Dolphin and on a Wii (ext2 and ext4, 2026-11-09). For read-only pass EXT2_FLAG_DEFAULT & ~EXT2_FLAG_RW below.
 		if (ext2Mount(MountNameList[pos].c_str(), interface, GetLBAStart(pos), CACHE, SECTORS,
-					  EXT2_FLAG_DEFAULT & ~EXT2_FLAG_RW))
+					  EXT2_FLAG_DEFAULT))
 		{
 			PartitionList[pos].FSName = "LINUX";
 			return true;

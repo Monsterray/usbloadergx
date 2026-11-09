@@ -34,6 +34,29 @@ HBCAGENT_VERSION=ec7111c7ebe6b366ecf8bc305b35aa07b8d8ddf9
 HBCAGENT_URL=https://github.com/Monsterray/hbc-reborn/archive/ec7111c7ebe6b366ecf8bc305b35aa07b8d8ddf9.tar.gz
 HBCAGENT_SHA256=7162a4aa06e0c47fe97594d0038b2c35b575ea7b444b475b9534aac83756baea
 
+# libntfs-wii: Extrems' maintained NTFS-3G port (NTFS-3G 2026.9.28). GX patches it to libogc 3's
+# classic DISC_INTERFACE (deps/libfs/ntfs/*.patch) and adds _NTFS_get_fragments() for the
+# WBFS/ISO loader (deps/libfs/ntfs/*_frag.*, from GX's libs branch).
+NTFS_VERSION=417e8ddb7141d8519be77afccf2e88eca370ad43
+NTFS_URL=https://github.com/extremscorner/libntfs/archive/417e8ddb7141d8519be77afccf2e88eca370ad43.tar.gz
+NTFS_SHA256=5fbaa98b9a834f82c7ca224e96b8622c8adf88d7f5025f15fe2bfdda794c3d29
+
+# libfat: Extrems' maintained fork (libFAT 1.2.0 plus later work), the successor of devkitPro's
+# libfat 1.1.5 that GX's prebuilt libcustomfat.a was built from. GX patches it to libogc 3's
+# classic DISC_INTERFACE (deps/libfs/fat/*.patch) and adds _FAT_get_fragments() for the WBFS/ISO
+# loader (deps/libfs/fat/fatfile_frag.*, from GX's libs branch). libfatversion.h is generated
+# by upstream's Makefile and is not in the tarball.
+FAT_VERSION=c756e1e3024e2ef2e037e99d3fd057b37ac02c5b
+FAT_URL=https://github.com/extremscorner/libfat/archive/c756e1e3024e2ef2e037e99d3fd057b37ac02c5b.tar.gz
+FAT_SHA256=46a7bc78938c7d57a61f1712da8125bc0f7d22912029f3c67d52a98bfbd0356f
+
+# libext2fs-wii (e2fsprogs 1.42 port) with _EXT2_get_fragments(): no maintained upstream
+# exists, so this is GX's own copy of it, built from the `libs` branch of the fork (commit
+# 910f6f5f, tarball of the whole branch). deps/libfs/ext2/*.patch moves it to libogc 3.
+EXT2_VERSION=910f6f5f2241d6f7a01efb2b1514208a60feda62
+EXT2_URL=https://github.com/Monsterray/usbloadergx/archive/910f6f5f2241d6f7a01efb2b1514208a60feda62.tar.gz
+EXT2_SHA256=19a582f8d90b118e8104369ab31746b741111547d9e3f45349aa0f00693a146c
+
 DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}"
 DEVKITPPC="${DEVKITPPC:-$DEVKITPRO/devkitPPC}"
 PREFIX="${1:-$DEVKITPRO/portlibs/usbloadergx}"
@@ -97,6 +120,35 @@ cp "$src"/unzip.h "$src"/ioapi.h "$src"/ints.h "$src"/crypt.h "$PREFIX/include/m
 # newlib has no fopen64 and friends; USE_FILE32API maps them to the plain calls.
 compile "$PREFIX/lib/libminizip.a" "$CC" "$CFLAGS -DUSE_FILE32API" "$src/unzip.c" "$src/ioapi.c"
 
+echo "== libntfs $NTFS_VERSION"
+src="$WORK/$(fetch "$NTFS_URL" "$NTFS_SHA256")"
+patch -d "$src" -p1 -s < "$HERE/libfs/ntfs/gx-classic-disc-interface.patch"
+cp "$HERE"/libfs/ntfs/attrib_frag.c "$HERE"/libfs/ntfs/ntfsfile_frag.c "$HERE"/libfs/ntfs/ntfsfile_frag.h "$src/source/"
+mapfile -t files < <(ls "$src"/source/*.c)
+compile "$PREFIX/lib/libntfs.a" "$CC" \
+	"$CFLAGS -DHAVE_CONFIG_H -include $HERE/libfs/shim.h -I$src/source -I$src/include -w" "${files[@]}"
+cp "$src/include/ntfs.h" "$src/source/ntfsfile_frag.h" "$PREFIX/include/"
+
+echo "== libext2fs $EXT2_VERSION"
+src="$WORK/$(fetch "$EXT2_URL" "$EXT2_SHA256")/libcustomext2fs"
+patch -d "$src" -p1 -s < "$HERE/libfs/ext2/gx-libogc3.patch"
+mapfile -t files < <(ls "$src"/source/*.c)
+compile "$PREFIX/lib/libext2fs.a" "$CC" \
+	"$CFLAGS -DWORDS_BIGENDIAN -fgnu89-inline -include $HERE/libfs/shim.h -I$src/source -I$src/include -w" "${files[@]}"
+cp "$src/include/ext2.h" "$src/source/ext2_frag.h" "$PREFIX/include/"
+
+echo "== libfat $FAT_VERSION"
+src="$WORK/$(fetch "$FAT_URL" "$FAT_SHA256")"
+patch -d "$src" -p1 -s < "$HERE/libfs/fat/gx-classic-disc-interface.patch"
+cp "$HERE"/libfs/fat/fatfile_frag.c "$HERE"/libfs/fat/fatfile_frag.h "$src/source/"
+cp "$HERE"/libfs/fat/libfatversion.h "$src/include/"
+mapfile -t files < <(ls "$src"/source/*.c)
+# Named libcustomfat.a: the image's own libfat.a is a FatFs build behind libogc 3's fat.h, and
+# this fat.h (installed ahead of libogc's) must be the one the app sees.
+compile "$PREFIX/lib/libcustomfat.a" "$CC" \
+	"-I$src/include -I$src/source $CFLAGS -Wno-stringop-truncation" "${files[@]}"
+cp "$src/include/fat.h" "$src/include/libfatversion.h" "$src/source/fatfile_frag.h" "$PREFIX/include/"
+
 echo "== hbc agent $HBCAGENT_VERSION"
 src="$WORK/$(fetch "$HBCAGENT_URL" "$HBCAGENT_SHA256")"
 make -C "$src/sdk/hbc_agent" -j"$JOBS" DEVKITPRO="$DEVKITPRO" DEVKITPPC="$DEVKITPPC" >/dev/null
@@ -107,6 +159,9 @@ cat > "$PREFIX/VERSIONS" <<EOF
 wolfSSL  $WOLFSSL_VERSION  $WOLFSSL_URL
 pugixml  $PUGIXML_VERSION  $PUGIXML_URL
 minizip  $MINIZIP_VERSION  $MINIZIP_URL
+libntfs  $NTFS_VERSION  $NTFS_URL
+libext2fs $EXT2_VERSION  $EXT2_URL
+libfat   $FAT_VERSION  $FAT_URL
 hbcagent $HBCAGENT_VERSION  $HBCAGENT_URL
 EOF
 echo "Installed in $PREFIX:"

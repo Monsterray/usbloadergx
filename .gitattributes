@@ -7,3 +7,5 @@ makefile text eol=lf
 *.ogg binary
 *.bin binary
 *.bnr binary
+# patches and sources applied to pinned upstream trees: keep LF in every checkout
+deps/libfs/** text eol=lf

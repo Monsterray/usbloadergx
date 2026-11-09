@@ -84,7 +84,7 @@ endif
 # image libraries they were built with (bzip2, brotli, webp). Their gdlib.pc
 # cannot be used for this: it has an unsubstituted @LIBICONV@.
 LIBS := -lhbcagent -lwolfssl -lpugixml -lminizip \
-		-lcustomfat -lcustomntfs -lcustomext2fs -lvorbisidec -logg -lmad \
+		-lcustomfat -lntfs -lext2fs -lvorbisidec -logg -lmad \
 		-lgd -lfreetype -lpng16 -ljpeg -lwebp -lsharpyuv -lbz2 -lbrotlidec -lbrotlicommon \
 		-lm -lz -lwiiuse -lbte -lasnd -logc
 #---------------------------------------------------------------------------------
@@ -140,8 +140,6 @@ export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 # Build a list of library paths
 #---------------------------------------------------------------------------------
 export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib) \
-					-L$(CURDIR)/source/libs/libext2fs -L$(CURDIR)/source/libs/libfat \
-					-L$(CURDIR)/source/libs/libntfs \
 					-L$(LIBOGC_LIB)
 
 export OUTPUT	:=	$(CURDIR)/$(TARGET)

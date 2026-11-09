@@ -385,7 +385,7 @@ void WindowCredits()
 	txt.push_back(currentTxt);
 	y += 34;
 
-	currentTxt = new GuiText("USB Loader GX (Unofficial)", 24, ( GXColor ) {255, 255, 255, 255});
+	currentTxt = new GuiText("USB Loader GX - unofficial fork by Monsterray", 24, ( GXColor ) {255, 255, 255, 255});
 	currentTxt->SetAlignment(ALIGN_CENTER, ALIGN_TOP);
 	currentTxt->SetPosition(0, y);
 	currentTxt->SetFont(creditsFont, creditsFontSize);

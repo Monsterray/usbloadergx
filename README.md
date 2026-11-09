@@ -5,7 +5,7 @@
 </p>
 
 > [!IMPORTANT]
-> **This is an unofficial fork of [USB Loader GX](https://github.com/wiidev/usbloadergx).** The upstream developers do not make, release or support it. Please report problems with it [here](https://github.com/Monsterray/usbloadergx/issues), never to the upstream project, its developers or its GBAtemp thread. Every build says "Unofficial" on its start-up screen and in the Homebrew Channel.
+> **This is an unofficial fork of [USB Loader GX](https://github.com/wiidev/usbloadergx), by Monsterray.** It is not the official USB Loader GX. The upstream developers do not make, release or support it. Please report problems with it [here](https://github.com/Monsterray/usbloadergx/issues), never to the upstream project, its developers or its GBAtemp thread. Every build says "Unofficial, fork by Monsterray" on its start-up screen and in the Homebrew Channel.
 
 ## Description
 USB Loader GX allows you to play Wii and GameCube games from a USB storage device or an SD card, launch other homebrew apps, create backups, use cheats in games, and a whole lot more.

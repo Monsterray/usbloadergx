@@ -62,7 +62,7 @@ cat <<EOF > ./HBC/meta.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <app version="1">
 	<name> USB Loader GX (Unofficial)</name>
-	<coder>Monsterray (fork of blackb0x and others)</coder>
+	<coder>Fork by Monsterray (original: blackb0x and others)</coder>
 	<version>$ver_new</version>
 	<release_date>$rev_date</release_date>
 	<!-- to enable arguments change disabled_arguments to arguments -->
@@ -73,10 +73,10 @@ cat <<EOF > ./HBC/meta.xml
 		<arg>--sdmode=0</arg>
 	</disabled_arguments>
 	<ahb_access/>
-	<short_description>Unofficial fork: load games from USB or SD</short_description>
+	<short_description>Unofficial fork by Monsterray</short_description>
 	<long_description>USB Loader GX allows you to install your games to a USB storage device or SD card. You can then boot your games faster, download and use cheats, or apply various patches.
 
-This is an unofficial fork, not the upstream release. Please report problems to the fork, not to the upstream developers.
+Unofficial fork by Monsterray. This is not the official USB Loader GX: its developers (blackb0x and others) do not make or support it. Please report problems to the fork, not to them.
 
 Home and issues:
 https://github.com/Monsterray/usbloadergx</long_description>

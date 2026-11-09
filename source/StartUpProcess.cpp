@@ -61,11 +61,11 @@ StartUpProcess::StartUpProcess()
 // USB Loader GX, and every build says so, so its issues don't go to upstream.
 // Builds made outside CI are also marked as dev builds.
 #if defined(FULLCHANNEL)
-	versionTxt->SetTextf("v%s (channel) / Unofficial", LOADER_VERSION);
+	versionTxt->SetTextf("v%s (channel) / Unofficial, fork by Monsterray", LOADER_VERSION);
 #elif defined(GITRELEASE)
-	versionTxt->SetTextf("v%s / Unofficial", LOADER_VERSION);
+	versionTxt->SetTextf("v%s / Unofficial, fork by Monsterray", LOADER_VERSION);
 #else
-	versionTxt->SetTextf("v%s / Unofficial dev build", LOADER_VERSION);
+	versionTxt->SetTextf("v%s / Unofficial dev build, fork by Monsterray", LOADER_VERSION);
 #endif
 
 	if (strncmp(Settings.ConfigPath, "sd", 2) == 0)

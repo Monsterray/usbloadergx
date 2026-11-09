@@ -31,9 +31,10 @@ What has been tested, as of November 2026. The Wii tests used d2x v11.1.0-rc3 (c
 | Drive layout | Status |
 |---|---|
 | One FAT32 partition (MBR) | **Supported, tested on a Wii.** Wii games (WBFS files in `wbfs/`) install from the disc and boot. GameCube games (`games/<Title> [ID6]/game.iso`) boot through Nintendont 6.508 and 6.509, and memory card saves are written to `saves/` on the same drive. |
-| An ext2 or ext4 partition anywhere on the drive (ext3 not tested; it goes through the same library) | **Not supported.** The loader freezes at "Initializing USB devices", and only a power-off gets the Wii back. It mounts every partition at start-up, and the ext2 library hangs when it mounts one for writing. Seen on a Wii with a drive that had an ext2 and an ext4 partition; traced to ext2/ext4 in Dolphin. Take such a drive out before you start the loader. A fix that mounts ext partitions read-only (so the loader can read from them but never install to them) works in Dolphin and is not yet released. |
-| NTFS | Mounts (tested in Dolphin only). Games on NTFS have not been tested on a Wii. |
-| exFAT | Not supported. exFAT and NTFS share partition type 0x07, so the loader hands exFAT to its NTFS driver, which does not mount it (seen in Dolphin). |
+| Several partitions, FAT32 first, plus exFAT, NTFS, ext2 and ext4 | **The FAT32 partition works; the others are not used** (tested on a Wii). The loader starts, and lists and launches games from the FAT32 partition only. |
+| ext2 or ext4 (ext3 not tested; it goes through the same library) | **Not supported.** The partition does not mount, on a Wii or in Dolphin. Releases before November 2026 froze at "Initializing USB devices" with such a partition anywhere on the drive (only a power-off got the Wii back): the ext2 library deadlocked when its mount for writing failed. The loader now tries ext partitions read-only, which fails without the freeze. |
+| NTFS | **Not supported at the moment.** The partition does not mount, on a Wii (a Windows-formatted partition) or in Dolphin (made with mkntfs). Not investigated yet. |
+| exFAT | Not supported. exFAT and NTFS share partition type 0x07, so the loader hands exFAT to its NTFS driver, which does not mount it. |
 | GameCube games | Need a FAT32 partition. The loader refuses to launch them from any other filesystem (`Main GameCube Path` must be on FAT32). |
 | Not tested | A drive formatted as one WBFS partition, GPT drives, hard disks, port 1 and two drives at once. |
 

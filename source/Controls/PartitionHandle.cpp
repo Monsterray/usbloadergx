@@ -37,6 +37,7 @@
 #include "BootSector.h"
 #include "PartitionHandle.h"
 #include "usbloader/usbstorage2.h"
+#include "gecko.h"
 
 //! libfat stuff
 extern "C"
@@ -160,6 +161,10 @@ bool PartitionHandle::Mount(int pos, const char *name, bool forceFAT)
 		}
 	}
 
+	// Logged before the mount: a filesystem library that never returns names itself
+	gprintf("Mount %s: %s, type %02x, LBA %u, %u sectors\n", name, GetFSName(pos), GetPartitionType(pos),
+			GetLBAStart(pos), GetSecCount(pos));
+
 	if (strncmp(GetFSName(pos), "FAT", 3) == 0 || strcmp(GetFSName(pos), "GUID-Entry") == 0)
 	{
 		if (fatMount(MountNameList[pos].c_str(), interface, GetLBAStart(pos), CACHE, SECTORS))
@@ -181,7 +186,12 @@ bool PartitionHandle::Mount(int pos, const char *name, bool forceFAT)
 
 	if (strncmp(GetFSName(pos), "LINUX", 5) == 0 || strcmp(GetFSName(pos), "GUID-Entry") == 0)
 	{
-		if (ext2Mount(MountNameList[pos].c_str(), interface, GetLBAStart(pos), CACHE, SECTORS, EXT2_FLAG_DEFAULT))
+		// Read-only: a read-write mount that fails inside the prebuilt libext2fs deadlocks:
+		// ext2DeinitVolume() holds the volume's non-recursive mutex and calls ext2Sync(),
+		// which locks it again. Traced in Dolphin on ext2 and ext4 alike (2026-11-09); a Wii
+		// froze the same way at start-up. Stay read-only until the library is fixed or replaced.
+		if (ext2Mount(MountNameList[pos].c_str(), interface, GetLBAStart(pos), CACHE, SECTORS,
+					  EXT2_FLAG_DEFAULT & ~EXT2_FLAG_RW))
 		{
 			PartitionList[pos].FSName = "LINUX";
 			return true;

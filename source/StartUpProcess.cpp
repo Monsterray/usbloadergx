@@ -379,11 +379,17 @@ int StartUpProcess::Execute(bool quickGameBoot, bool isBadBoot)
 
 	// Do not mount USB if not needed. USB is not available with Wii U WiiVC injected channel
 	bool USBSuccess = false;
+#ifdef DEBUG_TO_FILE
+	// The file log needs the SD card: mounted first, a hang in the USB mounts is still logged
+	DeviceHandler::Instance()->MountSD();
+#endif
 	if (!isWiiVC && !Settings.SDMode)
 	{
 		SetTextf("Initializing USB devices\n");
+		gprintf("USB: spin-up\n");
 		if (USBSpinUp())
 		{
+			gprintf("USB: spun up, mounting\n");
 			DeviceHandler::Instance()->MountAllUSB(false);
 			USBSuccess = true;
 			gprintf("Completed initialization of USB devices\n");

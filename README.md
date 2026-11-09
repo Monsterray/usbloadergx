@@ -29,14 +29,14 @@ Slot 251 base 58
 ````
 
 ## Drives and partitions
-What has been tested, as of November 2026. The Wii tests used d2x v11.1.0-rc3 (cIOS slots 247, 252 and 253) and USB flash drives on port 0. Anything not listed here has not been tested.
+What has been tested, as of November 2026. The Wii tests used d2x v11.1.0-rc3 (cIOS slots 247, 252 and 253) and v11.1.0 (slot 249), and USB flash drives on port 0. Anything not listed here has not been tested.
 
 | Drive layout | Status |
 |---|---|
 | One FAT32 partition (MBR) | **Supported, tested on a Wii.** Wii games (WBFS files in `wbfs/`) install from the disc and boot. GameCube games (`games/<Title> [ID6]/game.iso`) boot through Nintendont 6.508 and 6.509, and memory card saves are written to `saves/` on the same drive. |
-| Several partitions, FAT32 first, plus exFAT, NTFS, ext2 and ext4 | **The FAT32 partition works; the others are not used** (tested on a Wii). The loader starts, and lists and launches games from the FAT32 partition only. |
-| ext2 or ext4 (ext3 not tested; it goes through the same library) | **Not supported.** The partition does not mount, on a Wii or in Dolphin. Releases before November 2026 froze at "Initializing USB devices" with such a partition anywhere on the drive (only a power-off got the Wii back): the ext2 library deadlocked when its mount for writing failed. The loader now tries ext partitions read-only, which fails without the freeze. |
-| NTFS | **Does not mount at the moment**, whether it is the only partition (Windows 11 format, tested on a Wii), the first, or a later one (Wii and Dolphin). The library reads the volume and then rejects it. Not yet known whether this is a regression. |
+| Several partitions, FAT32 first, plus exFAT, NTFS, ext2 and ext4 | **FAT32, NTFS, ext2 and ext4 all mount** (tested on a Wii), and the loader lists games from each. The exFAT partition is not used. |
+| ext2 or ext4 (ext3 not tested; it goes through the same library) | **Mounts read-write and lists games** (tested on a Wii and in Dolphin). Booting and installing a game on ext are not tested yet. Releases before November 2026 froze at "Initializing USB devices" with such a partition anywhere on the drive (only a power-off got the Wii back): the old ext2 library deadlocked when a mount failed. That library is now built from source with the fix, and a mount that fails no longer hangs. |
+| NTFS | **Supported, tested on a Wii.** A Windows 11 formatted drive with one NTFS partition mounts, lists its games and boots a Wii game (WBFS file in `wbfs/`); NTFS as a later partition mounts too. Installing a game to NTFS is not tested yet. Builds from October 2026 until this fix did not mount NTFS at all. |
 | exFAT | Not supported. exFAT and NTFS share partition type 0x07, so the loader hands exFAT to its NTFS driver, which does not mount it. |
 | GameCube games | Need a FAT32 partition. The loader refuses to launch them from any other filesystem (`Main GameCube Path` must be on FAT32). |
 | Not tested | A drive formatted as one WBFS partition, GPT drives, hard disks, port 1 and two drives at once. |

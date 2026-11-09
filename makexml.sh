@@ -11,6 +11,12 @@ rev_old=$(sed -n 2p ./source/version.h 2>/dev/null | cut -d '"' -f 2)
 
 # Retrieve git info
 git_new=$(git rev-parse HEAD 2>/dev/null | head -c 7)
+# No git here, but the host already wrote version.h and meta.xml (scripts/build.sh and
+# diag.sh run this script first): keep them. A container copy of a git worktree has a
+# .git file that names a folder on the host, so git cannot read it there.
+if [ -z "$git_new" ] && [ -n "$(sed -n 4p ./source/version.h 2>/dev/null)" ] && [ -f ./HBC/meta.xml ]; then
+	exit 0
+fi
 [ -z "$git_new" ] && git_new="0000001"
 commit_message=$(git show -s --format="%<(52,trunc)%s" HEAD 2>/dev/null | xargs echo -n)
 [ -z "$commit_message" ] && commit_message="unable to get the commit message"

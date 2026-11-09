@@ -39,6 +39,9 @@ else
 	echo "docker not found, natively or through WSL." >&2
 	exit 1
 fi
+# version.h and meta.xml from the host's git: in a git worktree the container cannot read
+# the repository (.git names a host folder), and makexml.sh there keeps these.
+(cd "$ROOT" && bash makexml.sh 2>/dev/null) || true
 
 # The Makefile's CFLAGS/LDFLAGS are recursive variables, so passing them on the
 # make command line keeps $(MACHDEP)/$(INCLUDE) expansion.

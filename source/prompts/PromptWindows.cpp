@@ -385,20 +385,20 @@ void WindowCredits()
 	txt.push_back(currentTxt);
 	y += 34;
 
-	currentTxt = new GuiText("USB Loader GX", 24, ( GXColor ) {255, 255, 255, 255});
+	currentTxt = new GuiText("USB Loader GX (Unofficial)", 24, ( GXColor ) {255, 255, 255, 255});
 	currentTxt->SetAlignment(ALIGN_CENTER, ALIGN_TOP);
 	currentTxt->SetPosition(0, y);
 	currentTxt->SetFont(creditsFont, creditsFontSize);
 	txt.push_back(currentTxt);
 	y += 24;
 
-	currentTxt = new GuiText(tr( "Official Site:" ), 20, ( GXColor ) {255, 255, 255, 255});
+	currentTxt = new GuiText(tr( "Fork site:" ), 20, ( GXColor ) {255, 255, 255, 255});
 	currentTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
 	currentTxt->SetPosition(10, y);
 	currentTxt->SetFont(creditsFont, creditsFontSize);
 	txt.push_back(currentTxt);
 
-	currentTxt = new GuiText("https://github.com/wiidev/usbloadergx", 20, ( GXColor ) {255, 255, 255, 255});
+	currentTxt = new GuiText("https://github.com/Monsterray/usbloadergx", 20, ( GXColor ) {255, 255, 255, 255});
 	currentTxt->SetAlignment(ALIGN_LEFT, ALIGN_TOP);
 	currentTxt->SetPosition(160, y);
 	currentTxt->SetFont(creditsFont, creditsFontSize);

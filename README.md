@@ -1,8 +1,11 @@
-<p align="center"><a href="https://github.com/wiidev/usbloadergx/" title="USB Loader GX"><img src="data/web/logo.png"></a></p>
+<p align="center"><a href="https://github.com/Monsterray/usbloadergx/" title="USB Loader GX (unofficial fork)"><img src="data/web/logo.png"></a></p>
 <p align="center">
 <a href="https://github.com/Monsterray/usbloadergx/releases" title="Releases"><img src="https://img.shields.io/github/v/release/Monsterray/usbloadergx?logo=github"></a>
 <a href="https://github.com/Monsterray/usbloadergx/actions" title="Actions"><img src="https://img.shields.io/github/actions/workflow/status/Monsterray/usbloadergx/main.yml?branch=master&logo=github"></a>
 </p>
+
+> [!IMPORTANT]
+> **This is an unofficial fork of [USB Loader GX](https://github.com/wiidev/usbloadergx).** The upstream developers do not make, release or support it. Please report problems with it [here](https://github.com/Monsterray/usbloadergx/issues), never to the upstream project, its developers or its GBAtemp thread. Every build says "Unofficial" on its start-up screen and in the Homebrew Channel.
 
 ## Description
 USB Loader GX allows you to play Wii and GameCube games from a USB storage device or an SD card, launch other homebrew apps, create backups, use cheats in games, and a whole lot more.
@@ -39,7 +42,7 @@ What has been tested, as of November 2026. The Wii tests used d2x v11.1.0-rc3 (c
 | Not tested | A drive formatted as one WBFS partition, GPT drives, hard disks, port 1 and two drives at once. |
 
 ## Building
-The project is built with devkitPPC r50 and libogc 3. The `toolchain` stage of the `Dockerfile` defines the whole toolchain: the image `devkitpro/devkitppc:20260503`, `devkitppc-crtls` 2.1.0 (the image does not have it yet), and the libraries `deps/build.sh` builds from pinned upstream sources (wolfSSL, pugixml, minizip and the Homebrew Channel agent). CI, the dev container and `scripts/*.sh` all build in that stage. [deps/README.md](deps/README.md) lists every library and where it comes from. Use any of the following. They compile with the same flags; builds made outside CI are tagged as unofficial in the version string.
+The project is built with devkitPPC r50 and libogc 3. The `toolchain` stage of the `Dockerfile` defines the whole toolchain: the image `devkitpro/devkitppc:20260503`, `devkitppc-crtls` 2.1.0 (the image does not have it yet), and the libraries `deps/build.sh` builds from pinned upstream sources (wolfSSL, pugixml, minizip and the Homebrew Channel agent). CI, the dev container and `scripts/*.sh` all build in that stage. [deps/README.md](deps/README.md) lists every library and where it comes from. Use any of the following. They compile with the same flags; every build is labelled "Unofficial", and builds made outside CI also say "dev build".
 
 1. **Docker** (Linux, macOS, or Windows via WSL2 with Docker Engine installed):
    ````
@@ -64,7 +67,7 @@ The loader shows a `MAJOR.MINOR.PATCH` version on its start-up screen, in its in
 - `5.2.0+4.g1a2b3c4`: 4 commits after `v5.2.0`, at commit `1a2b3c4`; `.dirty` is added when the tree has uncommitted changes.
 - `0.0.0+g1a2b3c4`: no release tag is reachable (a shallow clone, for example).
 
-Builds made outside the project's CI add "/ Unofficial". To release, tag the commit and push the tag:
+Every build adds "/ Unofficial", because this is a fork and not upstream's release; builds made outside the project's CI say "/ Unofficial dev build". To release, tag the commit and push the tag:
 
 ````
 git tag -a v5.3.0 -m "USB Loader GX 5.3.0"

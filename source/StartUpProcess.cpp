@@ -57,14 +57,15 @@ StartUpProcess::StartUpProcess()
 	versionTxt->SetAlignment(ALIGN_LEFT, ALIGN_BOTTOM);
 	versionTxt->SetPosition(23, screenheight - 20);
 
-// The version from the release tag (makexml.sh). Please don't release
-// unofficial builds w/o tagging them as such
+// The version from the release tag (makexml.sh). This fork is not upstream's
+// USB Loader GX, and every build says so, so its issues don't go to upstream.
+// Builds made outside CI are also marked as dev builds.
 #if defined(FULLCHANNEL)
-	versionTxt->SetTextf("v%s (channel)", LOADER_VERSION);
+	versionTxt->SetTextf("v%s (channel) / Unofficial", LOADER_VERSION);
 #elif defined(GITRELEASE)
-	versionTxt->SetTextf("v%s", LOADER_VERSION);
-#else
 	versionTxt->SetTextf("v%s / Unofficial", LOADER_VERSION);
+#else
+	versionTxt->SetTextf("v%s / Unofficial dev build", LOADER_VERSION);
 #endif
 
 	if (strncmp(Settings.ConfigPath, "sd", 2) == 0)

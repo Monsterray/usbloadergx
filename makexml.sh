@@ -61,8 +61,8 @@ rev_date=`date -u +%Y%m%d%H%M%S`
 cat <<EOF > ./HBC/meta.xml
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <app version="1">
-	<name> USB Loader GX</name>
-	<coder>blackb0x</coder>
+	<name> USB Loader GX (Unofficial)</name>
+	<coder>Monsterray (fork of blackb0x and others)</coder>
 	<version>$ver_new</version>
 	<release_date>$rev_date</release_date>
 	<!-- to enable arguments change disabled_arguments to arguments -->
@@ -73,12 +73,12 @@ cat <<EOF > ./HBC/meta.xml
 		<arg>--sdmode=0</arg>
 	</disabled_arguments>
 	<ahb_access/>
-	<short_description>Load games from a USB or SD card</short_description>
+	<short_description>Unofficial fork: load games from USB or SD</short_description>
 	<long_description>USB Loader GX allows you to install your games to a USB storage device or SD card. You can then boot your games faster, download and use cheats, or apply various patches.
 
-Home:
-https://github.com/wiidev/usbloadergx
-Support:
-https://gbatemp.net/threads/149922</long_description>
+This is an unofficial fork, not the upstream release. Please report problems to the fork, not to the upstream developers.
+
+Home and issues:
+https://github.com/Monsterray/usbloadergx</long_description>
 </app>
 EOF

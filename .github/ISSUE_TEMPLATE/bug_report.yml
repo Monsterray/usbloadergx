@@ -1,0 +1,44 @@
+name: Problem report
+description: Something does not work in this unofficial fork of USB Loader GX
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is an **unofficial fork** of USB Loader GX. The upstream developers (wiidev/blackb0x) do not make or support it: report problems with this fork here, never upstream or in upstream's GBAtemp thread.
+  - type: checkboxes
+    id: fork
+    attributes:
+      label: Which loader
+      options:
+        - label: The start-up screen of my loader says "Unofficial" (this fork's build)
+          required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: As shown on the start-up screen, for example `v5.4.0 / Unofficial`
+    validations:
+      required: true
+  - type: input
+    id: setup
+    attributes:
+      label: Console and cIOS
+      description: Wii or Wii U (vWii), the cIOS and slot the game uses, for example `Wii, d2x v11 in 249 (base 56)`
+  - type: input
+    id: drive
+    attributes:
+      label: Drive
+      description: USB drive or SD card, size, partitions and filesystems (FAT32, NTFS, ...)
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead. Name the game and its ID if one is involved.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Anything from `apps/usbloader_gx/` on the SD card such as `exit.log` or `boot.log`, if there is one
+      render: text

@@ -25,6 +25,18 @@ Slot 250 base 57
 Slot 251 base 58
 ````
 
+## Drives and partitions
+What has been tested, as of November 2026. The Wii tests used d2x v11.1.0-rc3 (cIOS slots 247, 252 and 253) and USB flash drives on port 0. Anything not listed here has not been tested.
+
+| Drive layout | Status |
+|---|---|
+| One FAT32 partition (MBR) | **Supported, tested on a Wii.** Wii games (WBFS files in `wbfs/`) install from the disc and boot. GameCube games (`games/<Title> [ID6]/game.iso`) boot through Nintendont 6.508 and 6.509, and memory card saves are written to `saves/` on the same drive. |
+| An ext2 or ext4 partition anywhere on the drive (ext3 not tested; it goes through the same library) | **Not supported.** The loader freezes at "Initializing USB devices", and only a power-off gets the Wii back. It mounts every partition at start-up, and the ext2 library hangs when it mounts one for writing. Seen on a Wii with a drive that had an ext2 and an ext4 partition; traced to ext2/ext4 in Dolphin. Take such a drive out before you start the loader. A fix that mounts ext partitions read-only (so the loader can read from them but never install to them) works in Dolphin and is not yet released. |
+| NTFS | Mounts (tested in Dolphin only). Games on NTFS have not been tested on a Wii. |
+| exFAT | Not supported. exFAT and NTFS share partition type 0x07, so the loader hands exFAT to its NTFS driver, which does not mount it (seen in Dolphin). |
+| GameCube games | Need a FAT32 partition. The loader refuses to launch them from any other filesystem (`Main GameCube Path` must be on FAT32). |
+| Not tested | A drive formatted as one WBFS partition, GPT drives, hard disks, port 1 and two drives at once. |
+
 ## Building
 The project is built with devkitPPC r50 and libogc 3. The `toolchain` stage of the `Dockerfile` defines the whole toolchain: the image `devkitpro/devkitppc:20260503`, `devkitppc-crtls` 2.1.0 (the image does not have it yet), and the libraries `deps/build.sh` builds from pinned upstream sources (wolfSSL, pugixml, minizip and the Homebrew Channel agent). CI, the dev container and `scripts/*.sh` all build in that stage. [deps/README.md](deps/README.md) lists every library and where it comes from. Use any of the following. They compile with the same flags; builds made outside CI are tagged as unofficial in the version string.
 

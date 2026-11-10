@@ -40,6 +40,7 @@
 #include "usbloader/frag.h"
 #include "usbloader/wbfs.h"
 #include "wad/nandtitle.h"
+#include "utils/UsbBench.h"
 
 /*** Variables that are also used extern ***/
 GuiWindow * mainWindow = NULL;
@@ -206,6 +207,8 @@ int MainMenu(int menu)
 	MusicPlayer::Instance()->SetLoop(Settings.musicloopmode);
 
 	WDVD_StopMotor();
+
+	UsbBench_Run(); // only in the cIOS bench build: measures, then leaves for HBC
 
 	if (Settings.autonetwork)
 		ResumeNetworkThread();

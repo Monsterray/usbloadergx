@@ -5,10 +5,6 @@
 #include <string.h>
 #include <ogc/system.h>
 #include <ogc/cache.h>
-#define HBC_AGENT_LAYOUT_ONLY
-#define HBC_NETLOG_LAYOUT_ONLY
-#include <hbc_agent.h>
-#include <hbc_netlog.h>
 #include "gecko.h"
 
 #define MAX_MEM1_ARENA_LO	((void *) (0x81700000-size))
@@ -16,16 +12,13 @@
 
 //! MEM2 GX does not take for its heap:
 //! - below 0x90200000: an IOS reload uses it
-//! - the hbc agent's netlog copy, crash and last-log records, which `hbc.py log`
-//!   and the agent write while GX runs (HBC Reborn 1.10: 0x91800000-0x91801140)
 //! - LIBOGC_ARENA2_RESERVE under the top of the SYS arena: libogc takes it after
 //!   MEM2_init(), from SYS_GetArena2Hi() down. Measured in Dolphin, 233 KB by the
 //!   main menu: the Bluetooth buffers for each WPAD_Init() (85 KB, twice at start-up)
-//!   and the 64 KB network heap. The bench Wii's mem2_free of 1.7 MB above the old
-//!   48 MiB heap agrees.
+//!   and the 64 KB network heap. On the bench Wii (2026-11-06) it was 256 KB at most.
+//! The hbc agent's records at 0x91800000 are not left out: since HBC 1.10.7 the
+//! agent writes them only when the app stops, after GX's heap is gone.
 #define IOS_RELOAD_AREA			0x90200000
-#define HBC_RECORDS_START		HBC_NETLOG_KEEP_ADDR
-#define HBC_RECORDS_END			((HBC_LASTLOG_ADDR + sizeof(hbc_lastlog_block) + 31) & ~31)
 #define LIBOGC_ARENA2_RESERVE	(768 * 1024)
 
 // Forbid the use of MEM2 through malloc
@@ -56,10 +49,7 @@ static CMEM2Alloc g_texLo;
 static CMEM2Alloc g_texHi;
 static volatile int g_texState = TEX_UNOPENED;
 
-//! The heap is two pools, one on each side of the hbc records. An allocation never
-//! spans the records; the lower pool is tried first.
-static CMEM2Alloc g_mem2lo;
-static CMEM2Alloc g_mem2hi;
+static CMEM2Alloc g_mem2;
 static void *g_arena2Lo = 0;
 static void *g_poolEnd = 0;
 
@@ -75,54 +65,28 @@ static bool g_bigGoesToMem2 = true;
 
 static void *mem2_allocate(unsigned int s)
 {
-	void *p = g_mem2lo.allocate(s);
-	return p ? p : g_mem2hi.allocate(s);
-}
-
-//! The pool a pointer came from, or NULL for MEM2 GX's heap does not own
-static CMEM2Alloc *mem2_owner(void *p)
-{
-	if (g_mem2lo.Owns(p))
-		return &g_mem2lo;
-	if (g_mem2hi.Owns(p))
-		return &g_mem2hi;
-	return 0;
+	return g_mem2.allocate(s);
 }
 
 static void mem2_release(void *p)
 {
-	CMEM2Alloc *pool = mem2_owner(p);
-	if (pool)
-		pool->release(p);
+	if (g_mem2.Owns(p))
+		g_mem2.release(p);
 	else if (p)
-		gprintf("mem: free of %p, which no MEM2 pool owns\n", p);
+		gprintf("mem: free of %p, which the MEM2 pool does not own\n", p);
 }
 
 static unsigned int mem2_usable(void *p)
 {
-	CMEM2Alloc *pool = mem2_owner(p);
-	return pool ? pool->usableSize(p) : 0;
+	return g_mem2.Owns(p) ? g_mem2.usableSize(p) : 0;
 }
 
+//! A MEM2 pointer the pool does not own is left alone
 static void *mem2_reallocate(void *p, unsigned int s)
 {
-	CMEM2Alloc *pool = mem2_owner(p);
-	if (!pool)
+	if (!g_mem2.Owns(p))
 		return p ? 0 : mem2_allocate(s);
-
-	void *n = pool->reallocate(p, s);
-	if (n)
-		return n;
-
-	//! No room in its own pool: move it to the other one
-	CMEM2Alloc *other = (pool == &g_mem2lo) ? &g_mem2hi : &g_mem2lo;
-	n = other->allocate(s);
-	if (!n)
-		return 0;
-	unsigned int old = pool->usableSize(p);
-	memcpy(n, p, old < s ? old : s);
-	pool->release(p);
-	return n;
+	return g_mem2.reallocate(p, s);
 }
 
 //! The texture pool a MEM1 pointer came from, or NULL. Its ranges stay known after
@@ -188,20 +152,13 @@ void MEM2_init(void)
 
 	g_arena2Lo = SYS_GetArena2Lo();
 	g_poolEnd = (void *) hi;
-	if (hi <= HBC_RECORDS_START || lo >= HBC_RECORDS_END)
-		g_mem2lo.init((void *) lo, (void *) hi);
-	else
-	{
-		g_mem2lo.init((void *) lo, (void *) HBC_RECORDS_START);
-		g_mem2hi.init((void *) HBC_RECORDS_END, (void *) hi);
-	}
+	g_mem2.init((void *) lo, (void *) hi);
 	SYS_SetArena2Lo((void *) hi);
 }
 
 void MEM2_cleanup(void)
 {
-	g_mem2lo.cleanup();
-	g_mem2hi.cleanup();
+	g_mem2.cleanup();
 	// Give the arena back if nothing took the MEM2 above it meanwhile
 	if (g_arena2Lo && SYS_GetArena2Lo() == g_poolEnd)
 		SYS_SetArena2Lo(g_arena2Lo);
@@ -234,14 +191,12 @@ unsigned int MEM2_usableSize(void *p)
 
 unsigned int MEM2_freesize()
 {
-	return g_mem2lo.FreeSize() + g_mem2hi.FreeSize();
+	return g_mem2.FreeSize();
 }
 
 unsigned int MEM2_largestfree()
 {
-	unsigned int lo = g_mem2lo.LargestFree();
-	unsigned int hi = g_mem2hi.LargestFree();
-	return lo > hi ? lo : hi;
+	return g_mem2.LargestFree();
 }
 
 //! One line with where every bank stands. The hbc agent's mem1_free and mem2_free
@@ -249,16 +204,15 @@ unsigned int MEM2_largestfree()
 void MEM_Report(const char *where)
 {
 	struct mallinfo mi = mallinfo();
-	void *loBase, *hiBase, *texLoBase, *texHiBase;
-	unsigned int loSize, hiSize, texLoSize, texHiSize;
-	g_mem2lo.info(loBase, loSize);
-	g_mem2hi.info(hiBase, hiSize);
+	void *poolBase, *texLoBase, *texHiBase;
+	unsigned int poolSize, texLoSize, texHiSize;
+	g_mem2.info(poolBase, poolSize);
 	g_texLo.info(texLoBase, texLoSize);
 	g_texHi.info(texHiBase, texHiSize);
-	gprintf("mem %s: arena1 %p-%p heap %u used %u free %u | pool %p+%u %p+%u free %u largest %u | arena2 %p-%p"
+	gprintf("mem %s: arena1 %p-%p heap %u used %u free %u | pool %p+%u free %u largest %u | arena2 %p-%p"
 			" | tex %p+%u %p+%u free %u largest %u\n",
 			where, SYS_GetArena1Lo(), SYS_GetArena1Hi(), mi.arena, mi.uordblks, mi.fordblks,
-			loBase, loSize, hiBase, hiSize, MEM2_freesize(), MEM2_largestfree(),
+			poolBase, poolSize, MEM2_freesize(), MEM2_largestfree(),
 			SYS_GetArena2Lo(), SYS_GetArena2Hi(),
 			texLoBase, texLoSize, texHiBase, texHiSize, tex_free(), tex_largest());
 }

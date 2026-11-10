@@ -35,7 +35,7 @@ libraries.
 | wolfSSL | 5.9.4 | HTTPS (`source/network/https.c`) |
 | pugixml | 1.16 | `wiitdb.xml`, categories, homebrew `meta.xml`, Wiinnertag |
 | minizip | from zlib 1.3.2 | zip extraction (`ZipFile`, `utils/minizip/miniunz.c`) |
-| hbc agent | hbc-reborn v1.11.0 (ec7111c) | HBC's in-app agent |
+| hbc agent | hbc-reborn 1.15.11 (develop b01e0c8) | HBC's in-app agent |
 | libfat (`libcustomfat.a`) | extremscorner/libfat c756e1e (libFAT 1.2.0+) | FAT32 drives and SD |
 | libntfs | extremscorner/libntfs 417e8dd (NTFS-3G 2026.9.28) | NTFS drives |
 | libext2fs | this repository's `libs` branch, 910f6f5 (`libcustomext2fs`) | ext2/3/4 drives |
